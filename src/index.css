@@ -69,8 +69,18 @@ input[type=number] {
   -moz-appearance: textfield;
 }
 
-/* ── Time input Chrome fix (keep it readable) ── */
+/* ── Time input — prevent overflow on mobile ── */
+input[type=time] {
+  /* Ensure the input never exceeds its container */
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Prevent the native time picker from forcing a min-width */
+  min-width: 0;
+}
+
 input[type=time]::-webkit-calendar-picker-indicator {
   opacity: 0.4;
   cursor: pointer;
+  /* Shrink the picker icon on small screens */
+  flex-shrink: 0;
 }

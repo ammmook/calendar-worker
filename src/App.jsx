@@ -155,7 +155,7 @@ export default function App() {
 
   // ── Shared utility classes ──
   const labelCls = 'text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] block mb-1';
-  const inputCls = 'w-full bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white';
+  const inputCls = 'w-full min-w-0 block bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white box-border';
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -469,7 +469,7 @@ export default function App() {
             </div>
 
             {/* ── Right panel ── */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 min-w-0 overflow-hidden">
 
               {/* Day detail card */}
               <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
@@ -482,20 +482,20 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="p-4">
+                <div className="p-4 w-full overflow-hidden">
                   {!selectedKey ? (
                     <p className="text-sm text-[#9CA3AF] text-center py-4">
                       Click any day on the calendar to log hours.
                     </p>
                   ) : (
-                    <div className="flex flex-col gap-3">
-                      {/* Time inputs */}
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <div className="flex-1">
+                    <div className="flex flex-col gap-3 w-full min-w-0">
+                      {/* Time inputs — grid-cols-2 so each cell is exactly 50% and never overflows */}
+                      <div className="grid grid-cols-2 gap-2 w-full min-w-0">
+                        <div className="min-w-0">
                           <label className={labelCls}>Clock In</label>
                           <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
                         </div>
-                        <div className="flex-1">
+                        <div className="min-w-0">
                           <label className={labelCls}>Clock Out</label>
                           <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
                         </div>
