@@ -62,11 +62,13 @@
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
 input[type=number] {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* ── Time input — prevent overflow on mobile ── */
@@ -76,6 +78,9 @@ input[type=time] {
   box-sizing: border-box;
   /* Prevent the native time picker from forcing a min-width */
   min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  /* เพิ่มบรรทัดนี้ */
 }
 
 input[type=time]::-webkit-calendar-picker-indicator {

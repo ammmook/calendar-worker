@@ -155,8 +155,7 @@ export default function App() {
 
   // ── Shared utility classes ──
   const labelCls = 'text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] block mb-1';
-  const inputCls = 'w-full min-w-0 block bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white box-border';
-
+  const inputCls = 'w-full min-w-0 block bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-1 sm:px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white box-border';
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white text-[#374151] font-sans antialiased selection:bg-[#EEF0FD]">
@@ -490,7 +489,7 @@ export default function App() {
                   ) : (
                     <div className="flex flex-col gap-3 w-full min-w-0">
                       {/* Time inputs — grid-cols-2 so each cell is exactly 50% and never overflows */}
-                      <div className="grid grid-cols-2 gap-2 w-full min-w-0">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
                         <div className="min-w-0">
                           <label className={labelCls}>Clock In</label>
                           <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
