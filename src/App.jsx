@@ -490,12 +490,12 @@ export default function App() {
                   ) : (
                     <div className="flex flex-col gap-3">
                       {/* Time inputs */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="flex-1">
                           <label className={labelCls}>Clock In</label>
                           <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <label className={labelCls}>Clock Out</label>
                           <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
                         </div>
@@ -556,12 +556,11 @@ export default function App() {
                         <div
                           key={k}
                           onClick={() => setSelectedKey(k)}
-                          className={`grid items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
+                          className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
                             ${hasOT
                               ? 'border-l-[3px] border-l-[#F59E0B] border-r-transparent border-t-transparent border-b-transparent'
                               : 'border-transparent'}
                             hover:bg-[#F8F9FB] hover:border-[#E8EAEF]`}
-                          style={{ gridTemplateColumns: '36px 1fr auto' }}
                         >
                           <div className={`w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0
                             ${hasOT ? 'bg-[#FFFBEB] text-[#F59E0B]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
