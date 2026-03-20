@@ -25,7 +25,12 @@ const calc = (inT, outT, stdVal) => {
   const std = parseFloat(stdVal || 8);
   return { total, reg: Math.min(total, std), ot: Math.max(0, total - std) };
 };
-const earn = (reg, ot, w, mult) => reg * w + ot * w * mult;
+
+// Use monthly base (salary), hourly OT (otR) and standard hours (stD) for earnings
+const earn = (reg, ot, sal, otR, stD) => {
+  return (sal / 30) * (reg / stD) + (ot * otR);
+};
+
 const fmt1 = (n) => n.toFixed(1);
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
 
@@ -40,8 +45,6 @@ const SHORT_MONTHS = [
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-const OT_MULT = 2; // fixed multiplier (chips removed)
-
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const today = useMemo(() => new Date(), []);
@@ -51,8 +54,11 @@ export default function App() {
   const [selectedKey, setSelectedKey] = useState(null);
   const [viewY, setViewY] = useState(today.getFullYear());
   const [viewM, setViewM] = useState(today.getMonth());
-  const [wage, setWage] = useState(85);
-  const [std, setStd] = useState(8);
+  
+  const [salary, setSalary] = useState(15000); // Monthly Base
+  const [otRate, setOtRate] = useState(100);   // Hourly OT Rate
+  const [std, setStd] = useState(8);           // Standard Hours
+
   const [dIn, setDIn] = useState('');
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
@@ -99,8 +105,8 @@ export default function App() {
     return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW };
   }, [entries, viewY, viewM, std]);
 
-  const regEarn = totalReg * wage;
-  const otEarn = totalOT * wage * OT_MULT;
+  const regEarn = (salary / 30) * (totalReg / std);
+  const otEarn = totalOT * otRate;
   const totalEarn = regEarn + otEarn;
 
   // ── Calendar cells ──
@@ -137,7 +143,7 @@ export default function App() {
 
   // ── Detail panel calc ──
   const detH = calc(dIn, dOut, std);
-  const detE = earn(detH.reg, detH.ot, wage, OT_MULT);
+  const detE = earn(detH.reg, detH.ot, salary, otRate, std);
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
   const selLabel = selDateObj
@@ -156,6 +162,7 @@ export default function App() {
   // ── Shared utility classes ──
   const labelCls = 'text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] block mb-1';
   const inputCls = 'w-full min-w-0 block bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-1 sm:px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white box-border';
+  
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white text-[#374151] font-sans antialiased selection:bg-[#EEF0FD]">
@@ -231,7 +238,7 @@ export default function App() {
             Dashboard
           </div>
 
-          {/* Rate settings at bottom (wage + std hours only — no multiplier chips) */}
+          {/* Rate settings at bottom */}
           <div className="mt-auto pt-4 border-t border-[#E8EAEF]">
             <div className="bg-[#F8F9FB] rounded-[10px] p-3.5">
 
@@ -240,16 +247,32 @@ export default function App() {
                 <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em]">Rate Settings</span>
               </div>
 
-              {/* Hourly wage */}
+              {/* Monthly Salary */}
               <div className="mb-2">
-                <label className={labelCls}>Hourly Wage</label>
+                <label className={labelCls}>Monthly Salary</label>
                 <div className="flex items-center bg-white border-[1.5px] border-[#D1D5E0] rounded-[6px] overflow-hidden focus-within:border-[#3B4FE4] transition-colors">
                   <div className="px-2 h-[34px] flex items-center justify-center bg-[#EEF0FD] border-r border-[#E8EAEF] shrink-0">
                     <Wallet size={12} className="text-[#3B4FE4]" />
                   </div>
                   <input
-                    type="number" min="1" value={wage}
-                    onChange={(e) => setWage(Number(e.target.value))}
+                    type="number" min="1" value={salary}
+                    onChange={(e) => setSalary(Number(e.target.value))}
+                    className="flex-1 bg-transparent border-none outline-none text-[#111827] text-sm font-medium px-2 h-[34px] w-0"
+                  />
+                  <span className="pr-2 text-[11px] text-[#9CA3AF] font-semibold shrink-0">฿/mo</span>
+                </div>
+              </div>
+
+              {/* Hourly OT */}
+              <div className="mb-2">
+                <label className={labelCls}>OT Rate / Hr</label>
+                <div className="flex items-center bg-white border-[1.5px] border-[#D1D5E0] rounded-[6px] overflow-hidden focus-within:border-[#3B4FE4] transition-colors">
+                  <div className="px-2 h-[34px] flex items-center justify-center bg-[#EEF0FD] border-r border-[#E8EAEF] shrink-0">
+                    <CircleDollarSign size={12} className="text-[#3B4FE4]" />
+                  </div>
+                  <input
+                    type="number" min="0" value={otRate}
+                    onChange={(e) => setOtRate(Number(e.target.value))}
                     className="flex-1 bg-transparent border-none outline-none text-[#111827] text-sm font-medium px-2 h-[34px] w-0"
                   />
                   <span className="pr-2 text-[11px] text-[#9CA3AF] font-semibold shrink-0">฿/hr</span>
@@ -313,12 +336,12 @@ export default function App() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-[fadeUp_0.4s_0.08s_ease_both]">
 
             <SummaryCard variant="amber" Icon={Timer} label="Total OT Hours" value={`${fmt1(totalOT)}h`} sub={`${otDays} day${otDays !== 1 ? 's' : ''} with overtime`} />
-            <SummaryCard variant="indigo" Icon={TrendingUp} label="OT Earnings" value={fmtB(otEarn)} sub={`at ${OT_MULT}× multiplier`} />
-            <SummaryCard variant="green" Icon={Banknote} label="Regular Earnings" value={fmtB(regEarn)} sub={`${fmt1(totalReg)}h regular`} />
+            <SummaryCard variant="indigo" Icon={TrendingUp} label="OT Earnings" value={fmtB(otEarn)} sub={`at ${otRate}฿/hr`} />
+            <SummaryCard variant="green" Icon={Banknote} label="Regular Earnings" value={fmtB(regEarn)} sub={`Est. daily base`} />
 
             {/* Hero card */}
             <div className="relative overflow-hidden rounded-2xl border-transparent cursor-default
-              bg-gradient-to-br from-[#3B4FE4] to-[#6366F1]
+              bg-gradient-to-br from-[#3B4FE4] to-[#2A3BC0]
               shadow-[0_8px_32px_rgba(59,79,228,0.28)] p-6
               transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
               hover:-translate-y-1 hover:shadow-[0_14px_40px_rgba(59,79,228,0.36)]">
@@ -382,49 +405,59 @@ export default function App() {
                     const dow = new Date(viewY, viewM, d).getDay();
                     const isWE = dow === 0 || dow === 6;
                     const h = entry ? calc(entry.in, entry.out, std) : { total: 0, reg: 0, ot: 0 };
-                    const eEarn = earn(h.reg, h.ot, wage, OT_MULT);
+                    const eEarn = earn(h.reg, h.ot, salary, otRate, std);
                     const hasOT = h.ot > 0;
                     const hasEntry = !!entry;
 
                     /*
                      * Corner icon logic:
                      *  - Default (workday): show Sun icon (amber) — visible on hover
-                     *  - Holiday: always show Palmtree icon (indigo) — always visible
+                     *  - Holiday: always show Palmtree icon (indigo / cyan) — always visible
                      *  - Clicking toggles between states
                      */
                     const CornerIcon = isHol ? Palmtree : Sun;
                     const cornerVisible = isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100';
                     const cornerColorCls = isHol
-                      ? 'text-[#6366F1] bg-[rgba(110,116,255,0.15)] hover:bg-[rgba(110,116,255,0.25)] border border-[rgba(110,116,255,0.3)]'
-                      : 'text-[#F59E0B] bg-[#FFFBEB] hover:bg-[#FDE68A] border border-[#FDE68A]';
+                      ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
+                      : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]';
 
                     // Cell background / border
-                    const cellBg = isHol
-                      ? 'bg-[rgba(110,116,255,0.06)] border-[rgba(110,116,255,0.2)]'
-                      : isSel
-                        ? 'border-[#3B4FE4] bg-[#EEF0FD] shadow-[0_0_0_2px_#EEF0FD]'
+                    const baseBg = isHol
+                      ? 'bg-[rgba(153,142,217,0.15)]'
+                      : hasOT
+                        ? 'bg-[#fffdef]'
                         : isToday
-                          ? 'bg-[#EEF0FD] border-[#C7CCFA] hover:border-[#3B4FE4]'
+                          ? 'bg-[#f0f5fa]'
+                          : 'bg-transparent hover:bg-[#F8F9FB]';
+
+                    const baseBorder = isSel
+                      ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
+                      : isHol
+                        ? 'border-transparent'
+                        : isToday
+                          ? 'border-[#6fa3cb] hover:border-[#5c96bb]'
                           : hasOT
-                            ? 'bg-[#FFFBEB] border-transparent hover:border-[#F59E0B]'
-                            : 'border-transparent bg-transparent hover:bg-[#F8F9FB] hover:border-[#E8EAEF]';
+                            ? 'border-transparent hover:border-[#fbde3a]'
+                            : 'border-transparent hover:border-[#E8EAEF]';
+
+                    const cellBg = `${baseBg} ${baseBorder}`;
 
                     return (
                       <div
                         key={d}
-                        onClick={() => setSelectedKey(k)}
+                        onClick={() => setSelectedKey(prev => prev === k ? null : k)}
                         className={`relative min-h-[72px] sm:min-h-[80px] p-[7px_6px_5px] rounded-lg flex flex-col gap-[2px] border cursor-pointer transition-all duration-[220ms] group ${cellBg}`}
                       >
                         {/* Day number */}
                         <span className={`text-[11px] font-bold leading-none
-                          ${isToday ? 'text-[#3B4FE4]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>
+                          ${isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]'}`}>
                           {d}
                         </span>
 
                         {/*
                          * Corner toggle button
                          * ☀ Sun   → workday (shown on hover when not holiday)
-                         * 🌴 Palmtree → holiday (always shown when holiday)
+                         * 🌴 Palmtree → holiday
                          * Click toggles holiday status
                          */}
                         <button
@@ -450,7 +483,7 @@ export default function App() {
                             </span>
                             <div className="flex justify-between items-end">
                               {hasOT ? (
-                                <span className="text-[10px] font-bold text-[#F59E0B] leading-none">OT {fmt1(h.ot)}h</span>
+                                <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(h.ot)}h</span>
                               ) : (
                                 <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
                               )}
@@ -475,7 +508,7 @@ export default function App() {
                 <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF]">
                   <span className="text-sm font-bold text-[#111827]">{selLabel}</span>
                   {isTodaySelected && (
-                    <span className="text-[10px] font-bold bg-[#3B4FE4] text-white px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
+                    <span className="text-[10px] font-bold bg-[#6fa3cb] text-white px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
                       Today
                     </span>
                   )}
@@ -513,7 +546,7 @@ export default function App() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">Overtime</span>
-                          <span className="text-[13px] font-bold text-[#F59E0B]">{dIn && dOut ? fmt1(detH.ot) + 'h' : '—'}</span>
+                          <span className="text-[13px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(detH.ot) + 'h' : '—'}</span>
                         </div>
                         <hr className="border-[#E8EAEF]" />
                         <div className="flex justify-between items-center">
@@ -554,15 +587,15 @@ export default function App() {
                       return (
                         <div
                           key={k}
-                          onClick={() => setSelectedKey(k)}
+                          onClick={() => setSelectedKey(prev => prev === k ? null : k)}
                           className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
                             ${hasOT
-                              ? 'border-l-[3px] border-l-[#F59E0B] border-r-transparent border-t-transparent border-b-transparent'
+                              ? 'border-l-[3px] border-l-[#fbde3a] border-r-transparent border-t-transparent border-b-transparent'
                               : 'border-transparent'}
                             hover:bg-[#F8F9FB] hover:border-[#E8EAEF]`}
                         >
                           <div className={`w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0
-                            ${hasOT ? 'bg-[#FFFBEB] text-[#F59E0B]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
+                            ${hasOT ? 'bg-[#fffdef] text-[#c29302]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
                             {d}
                           </div>
                           <div>
@@ -572,7 +605,7 @@ export default function App() {
                           <div className="text-right">
                             <div className="text-[12px] font-bold text-[#3B4FE4]">{fmt1(h.total)}h</div>
                             {hasOT && (
-                              <span className="text-[10px] font-bold bg-[#FFFBEB] text-[#F59E0B] px-1.5 py-px rounded">
+                              <span className="text-[10px] font-bold bg-[#fffdef] text-[#c29302] px-1.5 py-px rounded">
                                 OT {fmt1(h.ot)}h
                               </span>
                             )}
@@ -590,10 +623,10 @@ export default function App() {
           <div className="flex gap-5 flex-wrap px-1 animate-[fadeUp_0.4s_0.24s_ease_both]">
             {[
               { color: 'bg-[#EEF0FD] border border-[#C7CCFA]', label: 'Regular day' },
-              { color: 'bg-[#FFFBEB] border border-[#FDE68A]', label: 'OT day' },
-              { color: 'bg-[rgba(110,116,255,0.06)] border border-[rgba(110,116,255,0.2)]', label: 'Holiday' },
-              { color: 'bg-[#EEF0FD] border-2 border-[#3B4FE4]', label: 'Today' },
-              { color: 'bg-white border-2 border-[#3B4FE4]', label: 'Selected' },
+              { color: 'bg-[#fffdef] border border-[#ffe270]', label: 'OT day' },
+              { color: 'bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]', label: 'Holiday' },
+              { color: 'bg-[#f0f5fa] border-2 border-[#6fa3cb]', label: 'Today' },
+              { color: 'bg-[#f2f8fa] border-2 border-[#6ab9dc]', label: 'Selected' },
             ].map(({ color, label }) => (
               <div key={label} className="flex items-center gap-1.5 text-[12px] text-[#6B7280] font-medium">
                 <div className={`w-2.5 h-2.5 rounded-[3px] shrink-0 ${color}`} />
@@ -620,9 +653,9 @@ export default function App() {
 const variantStyles = {
   amber: {
     wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#F59E0B]',
-    icon: 'bg-[#FFFBEB] text-[#F59E0B]',
-    val: 'text-[#F59E0B]',
+    stripe: 'bg-[#fbde3a]',
+    icon: 'bg-[#fffdef] text-[#c29302]',
+    val: 'text-[#c29302]',
   },
   indigo: {
     wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
