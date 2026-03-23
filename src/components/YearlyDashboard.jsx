@@ -200,20 +200,20 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                 />
 
                 {/* Total annual */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] col-span-2 lg:col-span-1 cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
                     <div className="flex items-center gap-2 mb-3">
                         <div className="w-8 h-8 rounded-[8px] bg-white/25 grid place-items-center">
                             <CircleDollarSign size={15} className="text-white" />
                         </div>
                         <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.1em]">{t.total_year} {year}</span>
                     </div>
-                    <div className="text-[1.85rem] font-bold text-white leading-none tracking-tight">
+                    <div className="text-[1.4rem] sm:text-[1.85rem] font-bold text-white leading-none tracking-tight">
                         {fmtB(yearTotals.totalEarn)}
                     </div>
                     <div className="text-[11px] text-white/70 mt-1.5">{yearTotals.totalDays} {t.worked_days}</div>
                     {yearTotals.bestMonth && (
                         <div className="absolute top-4 right-4 bg-white/20 text-white/90 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em] flex items-center gap-1">
-                            <Award size={8} /> {t.best_month} {yearTotals.bestMonth.month}
+                            <Award size={8} /> <span className="hidden sm:inline">{t.best_month}</span> {yearTotals.bestMonth.month}
                         </div>
                     )}
                 </div>
@@ -288,6 +288,8 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                         fill="transparent"
                                         className="cursor-pointer"
                                         onMouseEnter={() => handleBarHover(idx)}
+                                        onClick={() => handleBarHover(idx)}
+                                        onTouchStart={() => handleBarHover(idx)}
                                     />
 
                                     {/* Hover highlight */}
@@ -414,7 +416,6 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                                     <span className={`text-[11px] font-bold w-[6px] h-[6px] rounded-full shrink-0 ${m.totalEarn > 0 ? 'bg-[#3B4FE4]' : 'bg-[#E8EAEF]'}`} />
                                                     <span className={`text-[13px] font-semibold ${isCurr ? 'text-[#3B4FE4]' : 'text-[#374151]'}`}>
                                                         {m.fullMonth}
-                                                        {isCurr && <span className="ml-1.5 text-[9px] font-bold bg-[#3B4FE4] text-white px-1.5 py-0.5 rounded-full uppercase">{t.this_month}</span>}
                                                     </span>
                                                 </div>
                                             </td>
@@ -520,14 +521,15 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function AnnualCard({ Icon, label, value, sub, iconCls, valCls, stripe }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-[#E8EAEF] bg-white p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]">
+        <div className="relative overflow-hidden rounded-2xl border border-[#E8EAEF] bg-white p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]">
             <span className={`absolute top-0 left-5 right-5 h-[3px] rounded-b-[4px] opacity-60 ${stripe}`} />
-            <div className={`w-9 h-9 rounded-[10px] grid place-items-center mb-3 ${iconCls}`}>
-                <Icon size={16} strokeWidth={2} />
+            <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] grid place-items-center mb-3 ${iconCls}`}>
+                <Icon size={14} strokeWidth={2} className="sm:hidden" />
+                <Icon size={16} strokeWidth={2} className="hidden sm:block" />
             </div>
-            <div className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.1em] mb-1">{label}</div>
-            <div className={`text-[1.65rem] font-bold leading-none tracking-tight ${valCls}`}>{value}</div>
-            {sub && <div className="text-[11px] mt-1.5 text-[#9CA3AF]">{sub}</div>}
+            <div className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 truncate">{label}</div>
+            <div className={`text-[1.4rem] sm:text-[1.65rem] font-bold leading-none tracking-tight truncate ${valCls}`}>{value}</div>
+            {sub && <div className="text-[10px] sm:text-[11px] mt-1.5 text-[#9CA3AF] truncate">{sub}</div>}
         </div>
     );
 }

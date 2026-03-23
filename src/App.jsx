@@ -287,7 +287,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setLang(l => l === 'en' ? 'th' : 'en')}
-            className="hidden sm:flex items-center justify-center w-8 h-8 rounded-full bg-white border-2 border-[#E8EAEF] text-[11px] font-bold text-[#6B7280] cursor-pointer transition-all hover:border-[#C7CCFA] hover:text-[#3B4FE4]"
+            className="flex items-center justify-center w-8 h-8 rounded-full bg-white border-2 border-[#E8EAEF] text-[11px] font-bold text-[#6B7280] cursor-pointer transition-all hover:border-[#C7CCFA] hover:text-[#3B4FE4]"
           >
             {lang.toUpperCase()}
           </button>
@@ -331,66 +331,6 @@ export default function App() {
           >
             <BarChart2 size={15} />
             {t.annual_overview}
-          </div>
-
-          {/* Rate settings at bottom */}
-          <div className="mt-auto pt-4 border-t border-[#E8EAEF]">
-            <div className="bg-[#F8F9FB] rounded-[10px] p-3.5">
-
-              <div className="flex items-center gap-1.5 mb-3">
-                <Settings2 size={12} className="text-[#9CA3AF]" />
-                <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.rate_settings}</span>
-              </div>
-
-              {/* Monthly Salary */}
-              <div className="mb-2">
-                <label className={labelCls}>{t.monthly_salary}</label>
-                <div className="flex items-center bg-white border-[1.5px] border-[#D1D5E0] rounded-[6px] overflow-hidden focus-within:border-[#3B4FE4] transition-colors">
-                  <div className="px-2 h-[34px] flex items-center justify-center bg-[#EEF0FD] border-r border-[#E8EAEF] shrink-0">
-                    <Wallet size={12} className="text-[#3B4FE4]" />
-                  </div>
-                  <input
-                    type="number" min="1" value={salary}
-                    onChange={(e) => setSalary(Number(e.target.value))}
-                    className="flex-1 bg-transparent border-none outline-none text-[#111827] text-sm font-medium px-2 h-[34px] w-0"
-                  />
-                  <span className="pr-2 text-[11px] text-[#9CA3AF] font-semibold shrink-0">{t.mo_unit}</span>
-                </div>
-              </div>
-
-              {/* Hourly OT */}
-              <div className="mb-2">
-                <label className={labelCls}>{t.ot_rate}</label>
-                <div className="flex items-center bg-white border-[1.5px] border-[#D1D5E0] rounded-[6px] overflow-hidden focus-within:border-[#3B4FE4] transition-colors">
-                  <div className="px-2 h-[34px] flex items-center justify-center bg-[#EEF0FD] border-r border-[#E8EAEF] shrink-0">
-                    <CircleDollarSign size={12} className="text-[#3B4FE4]" />
-                  </div>
-                  <input
-                    type="number" min="0" value={otRate}
-                    onChange={(e) => setOtRate(Number(e.target.value))}
-                    className="flex-1 bg-transparent border-none outline-none text-[#111827] text-sm font-medium px-2 h-[34px] w-0"
-                  />
-                  <span className="pr-2 text-[11px] text-[#9CA3AF] font-semibold shrink-0">{t.hr_unit}</span>
-                </div>
-              </div>
-
-              {/* Standard hours */}
-              <div>
-                <label className={labelCls}>{t.standard_hours}</label>
-                <div className="flex items-center bg-white border-[1.5px] border-[#D1D5E0] rounded-[6px] overflow-hidden focus-within:border-[#3B4FE4] transition-colors">
-                  <div className="px-2 h-[34px] flex items-center justify-center bg-[#EEF0FD] border-r border-[#E8EAEF] shrink-0">
-                    <Clock size={12} className="text-[#3B4FE4]" />
-                  </div>
-                  <input
-                    type="number" min="1" max="24" value={std}
-                    onChange={(e) => setStd(Number(e.target.value))}
-                    className="flex-1 bg-transparent border-none outline-none text-[#111827] text-sm font-medium px-2 h-[34px] w-0"
-                  />
-                  <span className="pr-2 text-[11px] text-[#9CA3AF] font-semibold shrink-0">h/day</span>
-                </div>
-              </div>
-
-            </div>
           </div>
         </aside>
 
@@ -786,16 +726,17 @@ const variantStyles = {
 function SummaryCard({ variant, Icon, label, value, sub }) {
   const s = variantStyles[variant];
   return (
-    <div className={`relative overflow-hidden rounded-2xl border p-6 cursor-default
+    <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-6 cursor-default
       transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
       shadow-[0_1px_3px_rgba(17,24,39,0.06)] hover:-translate-y-[3px] ${s.wrap}`}>
-      <span className={`absolute top-0 left-6 right-6 h-[3px] rounded-b-[4px] opacity-60 ${s.stripe}`} />
-      <div className={`w-[38px] h-[38px] rounded-[10px] grid place-items-center mb-4 ${s.icon}`}>
-        <Icon size={17} strokeWidth={2} />
+      <span className={`absolute top-0 left-4 sm:left-6 right-4 sm:right-6 h-[3px] rounded-b-[4px] opacity-60 ${s.stripe}`} />
+      <div className={`w-8 h-8 sm:w-[38px] sm:h-[38px] rounded-[10px] grid place-items-center mb-3 sm:mb-4 ${s.icon}`}>
+        <Icon size={14} strokeWidth={2} className="sm:hidden" />
+        <Icon size={17} strokeWidth={2} className="hidden sm:block" />
       </div>
-      <div className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.1em] mb-1.5">{label}</div>
-      <div className={`text-[2rem] font-bold leading-none tracking-tight ${s.val}`}>{value}</div>
-      {sub && <div className="text-[12px] mt-1.5 text-[#9CA3AF]">{sub}</div>}
+      <div className="text-[10px] sm:text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 sm:mb-1.5 truncate">{label}</div>
+      <div className={`text-[1.4rem] sm:text-[2rem] font-bold leading-none tracking-tight truncate ${s.val}`}>{value}</div>
+      {sub && <div className="text-[10px] sm:text-[12px] mt-1 sm:mt-1.5 text-[#9CA3AF] truncate">{sub}</div>}
     </div>
   );
 }
