@@ -297,7 +297,7 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                         <rect
                                             x={x - 4} y={CHART_PAD.top}
                                             width={bW + 8} height={CHART_H - CHART_PAD.top - CHART_PAD.bottom}
-                                            fill="#EEF0FD" rx="4"
+                                            fill="#EEF0FD"
                                         />
                                     )}
 
@@ -307,7 +307,6 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                             x={x} y={baseY - regH}
                                             width={bW} height={regH}
                                             fill={isActive ? '#3B4FE4' : '#C7CCFA'}
-                                            rx="3" ry="3"
                                             style={{ transition: 'fill 0.15s' }}
                                         />
                                     )}
@@ -318,7 +317,6 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                             x={x} y={baseY - regH - otH}
                                             width={bW} height={otH}
                                             fill={isActive ? '#fbde3a' : '#FDE68A'}
-                                            rx="3" ry="3"
                                             style={{ transition: 'fill 0.15s' }}
                                         />
                                     )}
@@ -328,7 +326,7 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                         <rect
                                             x={x} y={baseY - 3}
                                             width={bW} height={3}
-                                            fill="#E8EAEF" rx="2"
+                                            fill="#E8EAEF"
                                         />
                                     )}
 
@@ -391,12 +389,12 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                         <div className="text-[15px] font-bold text-[#111827]">{t.monthly_breakdown}</div>
                         <div className="text-[11px] text-[#9CA3AF]">{t.per_month}</div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
+                    <div className="w-full overflow-hidden">
+                        <table className="w-full text-[13px] sm:text-sm">
                             <thead>
                                 <tr className="border-b border-[#E8EAEF]">
                                     {[t.table_month, t.table_days, t.table_reg, t.table_ot, t.table_total].map((h, i) => (
-                                        <th key={h} className={`px-4 py-2.5 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] ${i === 0 ? 'text-left' : 'text-right'}`}>
+                                        <th key={h} className={`px-2 sm:px-4 py-2.5 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] ${i === 0 ? 'text-left' : 'text-right'}`}>
                                             {h}
                                         </th>
                                     ))}
@@ -411,7 +409,7 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                             className={`border-b border-[#F3F4F8] transition-colors hover:bg-[#F8F9FB] cursor-default
                         ${isCurr ? 'bg-[#EEF0FD]/40' : ''}`}
                                         >
-                                            <td className="px-4 py-2.5">
+                                            <td className="px-2 sm:px-4 py-2.5">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`text-[11px] font-bold w-[6px] h-[6px] rounded-full shrink-0 ${m.totalEarn > 0 ? 'bg-[#3B4FE4]' : 'bg-[#E8EAEF]'}`} />
                                                     <span className={`text-[13px] font-semibold ${isCurr ? 'text-[#3B4FE4]' : 'text-[#374151]'}`}>
@@ -419,14 +417,14 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-2.5 text-right text-[12px] text-[#6B7280]">{m.daysWorked}</td>
-                                            <td className="px-4 py-2.5 text-right text-[12px] font-semibold text-[#10B981]">
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] text-[#6B7280]">{m.daysWorked}</td>
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#10B981]">
                                                 {m.regEarn > 0 ? fmtB(m.regEarn) : <span className="text-[#D1D5E0]">—</span>}
                                             </td>
-                                            <td className="px-4 py-2.5 text-right text-[12px] font-semibold text-[#c29302]">
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#c29302]">
                                                 {m.otEarn > 0 ? fmtB(m.otEarn) : <span className="text-[#D1D5E0]">—</span>}
                                             </td>
-                                            <td className="px-4 py-2.5 text-right">
+                                            <td className="px-2 sm:px-4 py-2.5 text-right">
                                                 <span className={`text-[13px] font-bold ${m.totalEarn > 0 ? 'text-[#111827]' : 'text-[#D1D5E0]'}`}>
                                                     {m.totalEarn > 0 ? fmtB(m.totalEarn) : '—'}
                                                 </span>
@@ -438,11 +436,11 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                             {/* Totals row */}
                             <tfoot>
                                 <tr className="bg-[#F8F9FB] border-t-2 border-[#E8EAEF]">
-                                    <td className="px-4 py-3 text-[12px] font-bold text-[#111827]">{t.total_year} {year}</td>
-                                    <td className="px-4 py-3 text-right text-[12px] font-bold text-[#374151]">{yearTotals.totalDays}</td>
-                                    <td className="px-4 py-3 text-right text-[12px] font-bold text-[#10B981]">{fmtB(yearTotals.totalRegEarn)}</td>
-                                    <td className="px-4 py-3 text-right text-[12px] font-bold text-[#c29302]">{fmtB(yearTotals.totalOTEarn)}</td>
-                                    <td className="px-4 py-3 text-right text-[14px] font-bold text-[#3B4FE4]">{fmtB(yearTotals.totalEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-[12px] font-bold text-[#111827]">{t.total_year} {year}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#374151]">{yearTotals.totalDays}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#10B981]">{fmtB(yearTotals.totalRegEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#c29302]">{fmtB(yearTotals.totalOTEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[14px] font-bold text-[#3B4FE4]">{fmtB(yearTotals.totalEarn)}</td>
                                 </tr>
                             </tfoot>
                         </table>

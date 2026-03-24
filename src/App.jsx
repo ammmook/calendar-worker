@@ -6,7 +6,7 @@ import {
   Sun, Palmtree,
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
-  LogOut, UserCircle2, ChevronDown,
+  LogOut, UserCircle2, ChevronDown, X
 } from 'lucide-react';
 import YearlyDashboard from './components/YearlyDashboard';
 import { getLang } from './locales';
@@ -350,10 +350,11 @@ export default function App() {
           )}
 
           {/* ══ MONTHLY VIEW ══ */}
-          {activeTab === 'monthly' && (<>
+          {activeTab === 'monthly' && (
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_284px] gap-6 w-full">
 
             {/* Dashboard header */}
-            <div className="flex items-end justify-between flex-wrap gap-4 animate-[fadeUp_0.4s_ease_both]">
+            <div className="flex items-end justify-between flex-wrap gap-4 animate-[fadeUp_0.4s_ease_both] order-1 xl:col-span-2">
               <div>
                 <h1 className="text-[26px] font-bold text-[#111827] tracking-tight leading-tight">{t.dashboard}</h1>
                 <p className="text-sm text-[#9CA3AF] mt-0.5">
@@ -383,7 +384,7 @@ export default function App() {
             </div>
 
             {/* ── SUMMARY CARDS ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-[fadeUp_0.4s_0.08s_ease_both]">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-[fadeUp_0.4s_0.08s_ease_both] order-3 xl:order-2 xl:col-span-2">
 
               <SummaryCard variant="amber" Icon={Timer} label={t.total_ot_hours} value={`${fmt1(totalOT)}h`} sub={`${otDays} ${t.with_overtime}`} />
               <SummaryCard variant="indigo" Icon={TrendingUp} label={t.ot_earnings} value={fmtB(otEarn)} sub={`${t.at_rate} ${otRate}${t.hr_unit}`} />
@@ -407,11 +408,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── CALENDAR + RIGHT PANEL ── */}
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_284px] gap-5 animate-[fadeUp_0.4s_0.16s_ease_both]">
-
-              {/* ── Calendar ── */}
-              <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+            {/* ── CALENDAR ── */}
+            <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.4s_0.16s_ease_both] order-2 xl:order-3">
 
                 {/* Calendar header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
@@ -548,13 +546,13 @@ export default function App() {
                     })}
                   </div>
                 </div>
-              </div>
+            </div>
 
-              {/* ── Right panel ── */}
-              <div className="flex flex-col gap-4 min-w-0 overflow-hidden">
+            {/* ── Right panel ── */}
+            <div className="flex flex-col gap-4 min-w-0 overflow-hidden animate-[fadeUp_0.4s_0.20s_ease_both] order-4 xl:order-4">
 
                 {/* Day detail card */}
-                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+                <div className="hidden xl:block bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
                   <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF]">
                     <span className="text-sm font-bold text-[#111827]">{selLabel}</span>
                     {isTodaySelected && (
@@ -667,10 +665,9 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </div>
 
             {/* Legend */}
-            <div className="flex gap-5 flex-wrap px-1 animate-[fadeUp_0.4s_0.24s_ease_both]">
+            <div className="flex gap-5 flex-wrap px-1 animate-[fadeUp_0.4s_0.24s_ease_both] order-5 xl:col-span-2">
               {[
                 { color: 'bg-[#EEF0FD] border border-[#C7CCFA]', label: t.regular_day_legend },
                 { color: 'bg-[#fffdef] border border-[#ffe270]', label: t.ot_day_legend },
@@ -685,7 +682,85 @@ export default function App() {
               ))}
             </div>
 
-          </>)} {/* end monthly view */}
+            {/* Mobile Modal for Date Details */}
+            {selectedKey && (
+              <div 
+                className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
+                onClick={() => setSelectedKey(null)}
+              >
+                <div 
+                  className="bg-white rounded-[20px] w-full max-w-[340px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden max-h-[90vh] scale-100 animate-[zoomIn_0.2s_ease_both]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[15px] font-bold text-[#111827]">{selLabel}</span>
+                      {isTodaySelected && (
+                        <span className="text-[10px] font-bold bg-[#6fa3cb] text-white px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
+                          {t.today}
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => setSelectedKey(null)} className="w-[30px] h-[30px] grid place-items-center rounded-lg text-[#6B7280] hover:bg-[#F3F4F8] hover:text-[#111827] cursor-pointer transition-colors bg-transparent border-none">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-5 overflow-y-auto">
+                    <div className="flex flex-col gap-4 w-full min-w-0">
+                      {/* Time inputs */}
+                      <div className="grid grid-cols-2 gap-3 w-full min-w-0">
+                        <div className="min-w-0">
+                          <label className={labelCls}>{t.clock_in}</label>
+                          <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
+                        </div>
+                        <div className="min-w-0">
+                          <label className={labelCls}>{t.clock_out}</label>
+                          <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
+                        </div>
+                      </div>
+
+                      {/* Calc summary */}
+                      <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
+                          <span className="text-[14px] font-bold text-[#111827]">{dIn && dOut ? fmt1(detH.total) + 'h' : '—'}</span>
+                        </div>
+                        <div className="h-px bg-[#E8EAEF] w-full" />
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
+                          <span className="text-[14px] font-bold text-[#3B4FE4]">{dIn && dOut ? fmt1(detH.reg) + 'h' : '—'}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
+                          <span className="text-[14px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(detH.ot) + 'h' : '—'}</span>
+                        </div>
+                        <div className="h-px bg-[#E8EAEF] w-full" />
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
+                          <span className="text-[16px] font-bold text-[#10B981]">{dIn && dOut ? fmtB(detE) : '—'}</span>
+                        </div>
+                      </div>
+
+                      {/* Save / Update */}
+                      <button
+                        onClick={() => {
+                          if (dIn && dOut && selectedKey) {
+                             saveSelectedEntry(); 
+                             setSelectedKey(null); 
+                          }
+                        }}
+                        className="w-full py-3.5 rounded-[10px] bg-[#3B4FE4] text-white text-[14px] font-bold cursor-pointer border-none transition-all flex items-center justify-center gap-2.5 hover:bg-[#2A3BC0] mt-1 shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
+                      >
+                        <CheckCircle2 size={16} />
+                        {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>)} {/* end monthly view */}
 
         </main>
       </div>
