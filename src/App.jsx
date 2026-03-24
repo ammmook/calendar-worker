@@ -6,7 +6,7 @@ import {
   Sun, Palmtree,
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
-  LogOut, UserCircle2, ChevronDown, X
+  LogOut, UserCircle2, ChevronDown, X, Trash2
 } from 'lucide-react';
 import YearlyDashboard from './components/YearlyDashboard';
 import { getLang } from './locales';
@@ -140,6 +140,19 @@ export default function App() {
     if (!dIn || !dOut || !selectedKey) return;
     setEntries((p) => ({ ...p, [selectedKey]: { in: dIn, out: dOut } }));
     showToast('Entry saved');
+  };
+
+  const deleteSelectedEntry = () => {
+    if (!selectedKey || !entries[selectedKey]) return;
+    if (window.confirm(t.confirm_delete || 'Are you sure you want to delete this entry?')) {
+      setEntries((p) => {
+        const next = { ...p };
+        delete next[selectedKey];
+        return next;
+      });
+      setSelectedKey(null);
+      showToast(t.entry_deleted || 'Entry deleted');
+    }
   };
 
   const prevMonth = () => {
@@ -604,18 +617,33 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Save / Update */}
-                        <button
-                          onClick={saveSelectedEntry}
-                          disabled={isSelectedHoliday}
-                          className={`w-full py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2
-                            ${isSelectedHoliday 
-                              ? 'bg-[#D1D5E0] cursor-not-allowed' 
-                              : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
-                        >
-                          <CheckCircle2 size={14} />
-                          {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
-                        </button>
+                        {/* Save / Update / Delete */}
+                        <div className="flex gap-2 w-full mt-1">
+                          {entries[selectedKey]?.in && (
+                            <button
+                              onClick={deleteSelectedEntry}
+                              disabled={isSelectedHoliday}
+                              title={t.delete_entry}
+                              className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
+                                ${isSelectedHoliday 
+                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
+                                  : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={saveSelectedEntry}
+                            disabled={isSelectedHoliday}
+                            className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2
+                              ${isSelectedHoliday 
+                                ? 'bg-[#D1D5E0] cursor-not-allowed' 
+                                : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
+                          >
+                            <CheckCircle2 size={14} />
+                            {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -747,23 +775,38 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Save / Update */}
-                      <button
-                        onClick={() => {
-                          if (dIn && dOut && selectedKey) {
-                             saveSelectedEntry(); 
-                             setSelectedKey(null); 
-                          }
-                        }}
-                        disabled={isSelectedHoliday}
-                        className={`w-full py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 mt-1
-                          ${isSelectedHoliday 
-                            ? 'bg-[#D1D5E0] cursor-not-allowed' 
-                            : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
-                      >
-                        <CheckCircle2 size={16} />
-                        {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
-                      </button>
+                      {/* Save / Update / Delete */}
+                      <div className="flex gap-2.5 w-full mt-2">
+                        {entries[selectedKey]?.in && (
+                          <button
+                            onClick={deleteSelectedEntry}
+                            disabled={isSelectedHoliday}
+                            title={t.delete_entry}
+                            className={`px-5 py-3.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
+                              ${isSelectedHoliday 
+                                ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
+                                : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            if (dIn && dOut && selectedKey) {
+                               saveSelectedEntry(); 
+                               setSelectedKey(null); 
+                            }
+                          }}
+                          disabled={isSelectedHoliday}
+                          className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5
+                            ${isSelectedHoliday 
+                              ? 'bg-[#D1D5E0] cursor-not-allowed' 
+                              : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
+                        >
+                          <CheckCircle2 size={16} />
+                          {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
