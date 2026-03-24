@@ -71,7 +71,9 @@ export const TH = {
     vacation_leave: 'ลาพักร้อน',
     total_leave_taken: 'รวมวันลาที่ใช้ไป',
     days_unit: 'วัน',
-    leave_info: 'คลิกที่ตัวเลขเพื่อแก้ไขจำนวนวันลาที่ใช้ของปี',
+    leave_info: 'ระบบสรุปวันลาจากปฏิทินอัตโนมัติ',
+    entry_work: 'ทำงาน',
+    entry_leave: 'ลางาน',
 
     // Profile Page
     profile: 'โปรไฟล์',
@@ -176,7 +178,9 @@ export const EN = {
     vacation_leave: 'Annual Leave',
     total_leave_taken: 'Total Leave Taken',
     days_unit: 'days',
-    leave_info: 'Click the number next to each leave type to edit days used for',
+    leave_info: 'Leave counts are automatically calculated from your calendar entries.',
+    entry_work: 'Work',
+    entry_leave: 'Leave',
 
     // Profile Page
     profile: 'Profile',

@@ -47,11 +47,20 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
     const [year, setYear] = useState(today.getFullYear());
-    const [leaveData, setLeaveData] = useState({
-        sick: 3, personal: 2, vacation: 5,
-    });
     const [tooltip, setTooltip] = useState(null);   // { monthIdx, x, y }
     const chartRef = useRef(null);
+
+    // ── Calculate leave data from entries ──
+    const leaveData = useMemo(() => {
+        const counts = { sick: 0, personal: 0, vacation: 0 };
+        Object.keys(entries).forEach((dateStr) => {
+            const entry = entries[dateStr];
+            if (entry?.leave?.type) {
+                counts[entry.leave.type] = (counts[entry.leave.type] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [entries]);
 
     // ── Compute per-month stats ────────────────────────────────────────────────
     const monthlyStats = useMemo(() => {
@@ -471,16 +480,10 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                            {/* Editable number */}
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max={lt.max}
-                                                value={used}
-                                                onChange={(e) => setLeaveData(p => ({ ...p, [lt.key]: Math.min(lt.max, Math.max(0, Number(e.target.value))) }))}
-                                                className="w-[38px] text-center text-[12px] font-bold border border-[#E8EAEF] rounded-[6px] py-0.5 outline-none focus:border-[#3B4FE4] bg-transparent cursor-text"
-                                                style={{ color: lt.color }}
-                                            />
+                                            {/* Display text instead of input */}
+                                            <span className="text-[12px] font-bold" style={{ color: lt.color }}>
+                                                {used}
+                                            </span>
                                             <span className="text-[11px] text-[#9CA3AF]">/ {lt.max}</span>
                                         </div>
                                     </div>

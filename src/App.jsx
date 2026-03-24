@@ -3,13 +3,15 @@ import {
   ChevronLeft, ChevronRight,
   LayoutDashboard, Settings2,
   Clock, TrendingUp, Wallet,
-  Sun, Palmtree,
+  Sun, Palmtree, Plane,
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
-  LogOut, UserCircle2, ChevronDown, X, Trash2
+  LogOut, UserCircle2, ChevronDown, X, Trash2,
+  Stethoscope, UmbrellaOff,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
+import { LeaveSelector } from './components/LeaveSelector';
 import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
@@ -59,6 +61,9 @@ export default function App() {
   const [selectedKey, setSelectedKey] = useState(null);
   const [viewY, setViewY] = useState(today.getFullYear());
   const [viewM, setViewM] = useState(today.getMonth());
+  const [showLeaveSelector, setShowLeaveSelector] = useState(false);
+  const [leaveSelectorKey, setLeaveSelectorKey] = useState(null);
+  const [showMobileTimeInput, setShowMobileTimeInput] = useState(false);
 
   const [salary, setSalary] = useState(15000); // Monthly Base
   const [otRate, setOtRate] = useState(100);   // Hourly OT Rate
@@ -184,6 +189,53 @@ export default function App() {
       });
     } else {
       setShowDeleteConfirm(true);
+    }
+  };
+
+  // ── Leave Selector Handlers ──
+  const handleLeaveSelect = (dateStr, leaveData) => {
+    setEntries((p) => ({
+      ...p,
+      [dateStr]: { ...p[dateStr], ...leaveData }
+    }));
+    
+    // Close selector always
+    setShowLeaveSelector(false);
+    setLeaveSelectorKey(null);
+    
+    const isMobile = window.innerWidth < 1280;
+    if (!leaveData.leave) {
+      // Work day selected
+      if (isMobile) {
+        // On mobile: open time input bottom sheet next
+        setShowMobileTimeInput(true);
+      } else {
+        showToast(lang === 'th' ? 'กรุณากรอกเวลา' : 'Please enter time');
+      }
+    } else {
+      // Leave recorded — toast and close
+      showToast(lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded');
+      if (isMobile) setSelectedKey(null);
+    }
+  };
+
+  const handleLeaveCancel = () => {
+    setShowLeaveSelector(false);
+    setLeaveSelectorKey(null);
+    // On mobile, also clear selectedKey when cancelling leave selector
+    if (window.innerWidth < 1280) setSelectedKey(null);
+  };
+
+  const handleDayClick = (dateKey) => {
+    if (selectedKey === dateKey) {
+      setSelectedKey(null);
+    } else {
+      setSelectedKey(dateKey);
+      // ถ้าเป็นวันหยุด ไม่แสดง LeaveSelector
+      if (holidays.has(dateKey)) return;
+      // Show LeaveSelector for both mobile and desktop
+      setLeaveSelectorKey(dateKey);
+      setShowLeaveSelector(true);
     }
   };
 
@@ -507,6 +559,16 @@ export default function App() {
                       const eEarn = earn(h.reg, h.ot, salary, otRate, std);
                       const hasOT = h.ot > 0;
                       const hasEntry = !!entry;
+                      
+                      // Leave tag
+                      const isLeave = entry?.leave !== null && entry?.leave !== undefined;
+                      const leaveType = entry?.leave?.type;
+                      const LEAVE_ICONS = {
+                        sick:     { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)',  Icon: Stethoscope },
+                        personal: { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', Icon: UmbrellaOff },
+                        vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)',  Icon: Plane },
+                      };
+                      const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
 
                       /*
                        * Corner icon logic:
@@ -544,7 +606,7 @@ export default function App() {
                       return (
                         <div
                           key={d}
-                          onClick={() => setSelectedKey(prev => prev === k ? null : k)}
+                          onClick={() => handleDayClick(k)}
                           className={`relative min-h-[72px] sm:min-h-[80px] p-[7px_6px_5px] rounded-lg flex flex-col gap-[2px] border cursor-pointer transition-all duration-[220ms] group ${cellBg}`}
                         >
                           {/* Day number */}
@@ -554,28 +616,46 @@ export default function App() {
                           </span>
 
                           {/*
-                         * Corner toggle button
+                         * Corner toggle button / leave tag
                          * ☀ Sun   → workday (shown on hover when not holiday)
                          * 🌴 Palmtree → holiday
+                         * 🏥/☂️/✈️ → leave tag (shown if leave recorded and not holiday)
                          * Click toggles holiday status
                          */}
-                          <button
-                            title={isHol ? 'Mark as workday' : 'Mark as holiday'}
-                            onClick={(e) => toggleHoliday(e, k)}
-                            className={[
-                              'absolute top-[5px] right-[5px]',
-                              'w-[18px] h-[18px] rounded-[4px]',
-                              'grid place-items-center cursor-pointer',
-                              'transition-all duration-150',
-                              cornerVisible,
-                              cornerColorCls,
-                            ].join(' ')}
-                          >
-                            <CornerIcon size={10} strokeWidth={2.5} />
-                          </button>
+                          {!isHol && isLeave && leaveInfo ? (
+                            <div
+                              className="absolute top-[5px] right-[5px] w-[20px] h-[20px] rounded-[5px] grid place-items-center"
+                              style={{ backgroundColor: leaveInfo.bg, border: `1px solid ${leaveInfo.color}55` }}
+                              title={`${leaveType === 'sick' ? 'Sick Leave' : leaveType === 'personal' ? 'Personal Leave' : 'Annual Leave'}`}
+                            >
+                              <leaveInfo.Icon size={11} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
+                            </div>
+                          ) : (
+                            <button
+                              title={isHol ? 'Mark as workday' : 'Mark as holiday'}
+                              onClick={(e) => toggleHoliday(e, k)}
+                              className={[
+                                'absolute top-[5px] right-[5px]',
+                                'w-[18px] h-[18px] rounded-[4px]',
+                                'grid place-items-center cursor-pointer',
+                                'transition-all duration-150',
+                                (isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'),
+                                (isHol
+                                  ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
+                                  : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]'),
+                              ].join(' ')}
+                            >
+                              <CornerIcon size={10} strokeWidth={2.5} />
+                            </button>
+                          )}
 
                           {/* Entry data */}
-                          {hasEntry && (
+                          {hasEntry && isLeave ? (
+                            <div className="mt-auto flex items-center justify-center text-[10px] font-bold py-1 rounded px-1"
+                              style={{ backgroundColor: leaveInfo.color, opacity: 0.15, color: leaveInfo.color }}>
+                              {leaveType === 'sick' ? 'Sick Leave' : leaveType === 'personal' ? 'Personal' : 'Vacation'}
+                            </div>
+                          ) : hasEntry && (
                             <div className="mt-auto flex flex-col gap-[2px]">
                               <span className="text-[9px] font-medium text-[#9CA3AF] leading-tight hidden sm:block">
                                 {entry.in}–{entry.out}
@@ -618,6 +698,43 @@ export default function App() {
                       <p className="text-sm text-[#9CA3AF] text-center py-4">
                         {t.click_any_day}
                       </p>
+                    ) : selEntry.leave !== null && selEntry.leave !== undefined ? (
+                      /* Leave info display */
+                      <div className="flex flex-col gap-3 w-full">
+                        <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
+                          <div className="text-center">
+                            {(() => {
+                              const PANEL_LEAVE = {
+                                sick:     { Icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', label: lang === 'th' ? 'ลาป่วย'   : 'Sick Leave'     },
+                                personal: { Icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
+                                vacation: { Icon: Plane,       color: '#3B4FE4', bg: '#EEF0FD', label: lang === 'th' ? 'ลาพักร้อน' : 'Annual Leave'  },
+                              };
+                              const info = PANEL_LEAVE[selEntry.leave?.type] || PANEL_LEAVE.sick;
+                              return (
+                                <>
+                                  <div className="w-14 h-14 rounded-2xl grid place-items-center mx-auto mb-2" style={{ backgroundColor: info.bg }}>
+                                    <info.Icon size={28} style={{ color: info.color }} />
+                                  </div>
+                                  <div className="text-sm font-bold text-[#111827]">{info.label}</div>
+                                </>
+                              );
+                            })()}
+                            <div className="text-xs text-[#9CA3AF] mt-1">{lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day'}</div>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setEntries((p) => ({
+                              ...p,
+                              [selectedKey]: { ...p[selectedKey], leave: null }
+                            }));
+                            showToast(lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Changed to working day');
+                          }}
+                          className="w-full py-2.5 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
+                        >
+                          {lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Change to Working Day'}
+                        </button>
+                      </div>
                     ) : (
                       <div className="flex flex-col gap-3 w-full min-w-0">
                         {/* Time inputs — grid-cols-2 so each cell is exactly 50% and never overflows */}
@@ -705,7 +822,7 @@ export default function App() {
                         return (
                           <div
                             key={k}
-                            onClick={() => setSelectedKey(prev => prev === k ? null : k)}
+                            onClick={() => handleDayClick(k)}
                             className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
                             ${hasOT
                                 ? 'border-l-[3px] border-l-[#fbde3a] border-r-transparent border-t-transparent border-b-transparent'
@@ -752,8 +869,8 @@ export default function App() {
               ))}
             </div>
 
-            {/* Mobile Modal for Date Details */}
-            {selectedKey && (
+            {/* Mobile Modal for Date Details — only shown after leave/work flow completes */}
+            {selectedKey && !showLeaveSelector && !showMobileTimeInput && (
               <div 
                 className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
                 onClick={() => setSelectedKey(null)}
@@ -893,6 +1010,103 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Leave Selector Modal */}
+      <LeaveSelector
+        isOpen={showLeaveSelector}
+        dateStr={leaveSelectorKey}
+        currentData={leaveSelectorKey ? entries[leaveSelectorKey] : {}}
+        onSelect={handleLeaveSelect}
+        onCancel={handleLeaveCancel}
+        lang={lang}
+      />
+
+      {/* Mobile Time Input Bottom Sheet */}
+      {showMobileTimeInput && selectedKey && (
+        <div 
+          className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
+          onClick={() => setShowMobileTimeInput(false)}
+        >
+          <div 
+            className="bg-white w-full rounded-t-[20px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-6 border-b border-[#E8EAEF]">
+              <h3 className="text-[17px] font-bold text-[#111827]">{t.enter_time || 'Enter Work Time'}</h3>
+              <button 
+                onClick={() => setShowMobileTimeInput(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col gap-4">
+              {/* Time inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>{t.clock_in}</label>
+                  <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
+                </div>
+                <div>
+                  <label className={labelCls}>{t.clock_out}</label>
+                  <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
+                </div>
+              </div>
+
+              {/* Summary */}
+              {dIn && dOut && (
+                <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
+                    <span className="text-[14px] font-bold text-[#111827]">{fmt1(detH.total)}h</span>
+                  </div>
+                  <div className="h-px bg-[#E8EAEF]" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
+                    <span className="text-[14px] font-bold text-[#3B4FE4]">{fmt1(detH.reg)}h</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
+                    <span className="text-[14px] font-bold text-[#c29302]">{fmt1(detH.ot)}h</span>
+                  </div>
+                  <div className="h-px bg-[#E8EAEF]" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
+                    <span className="text-[16px] font-bold text-[#10B981]">{fmtB(detE)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => { setShowMobileTimeInput(false); setSelectedKey(null); }}
+                  className="flex-1 py-3 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
+                >
+                  {t.cancel || 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    saveSelectedEntry();
+                    setShowMobileTimeInput(false);
+                    setSelectedKey(null);
+                  }}
+                  disabled={!dIn || !dOut}
+                  className={`flex-1 py-3 rounded-[10px] text-white text-sm font-bold transition-all flex items-center justify-center gap-2
+                    ${!dIn || !dOut 
+                      ? 'bg-[#D1D5E0] cursor-not-allowed' 
+                      : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0]'}`}
+                >
+                  <CheckCircle2 size={16} />
+                  {t.save_entry || 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Toast */}
       <div className={`fixed bottom-6 right-6 bg-[#111827] text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
