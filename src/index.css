@@ -122,6 +122,11 @@
   }
 }
 
+@keyframes slideUpSheet {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 @keyframes shimmerCard {
   0% {
     box-shadow: 0 4px 20px rgba(59, 79, 228, 0.10);

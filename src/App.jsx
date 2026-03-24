@@ -8,6 +8,7 @@ import {
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2
 } from 'lucide-react';
+import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
 import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
@@ -73,6 +74,7 @@ export default function App() {
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
   const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'yearly'
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // ── Seed sample data ──
   useEffect(() => {
@@ -142,18 +144,53 @@ export default function App() {
     showToast('Entry saved');
   };
 
+  const performDelete = () => {
+    if (!selectedKey || !entries[selectedKey]) return;
+    setEntries((p) => {
+      const next = { ...p };
+      delete next[selectedKey];
+      return next;
+    });
+    setSelectedKey(null);
+    showToast(t.entry_deleted || 'Entry deleted');
+  };
+
   const deleteSelectedEntry = () => {
     if (!selectedKey || !entries[selectedKey]) return;
-    if (window.confirm(t.confirm_delete || 'Are you sure you want to delete this entry?')) {
-      setEntries((p) => {
-        const next = { ...p };
-        delete next[selectedKey];
-        return next;
+    const isDesktop = window.innerWidth >= 1280; // xl breakpoint
+    if (isDesktop) {
+      Swal.fire({
+        title: t.confirm_delete_title || 'Delete this entry?',
+        text: t.confirm_delete || 'Are you sure you want to delete this entry?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#EF4444',
+        cancelButtonColor: '#9CA3AF',
+        confirmButtonText: t.confirm_yes || 'Yes, delete it',
+        cancelButtonText: t.cancel || 'Cancel',
+        reverseButtons: true,
+        customClass: {
+          container: 'font-sans',
+          popup: 'rounded-2xl',
+          confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
+          cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
+          title: 'text-[18px] text-[#111827]',
+          htmlContainer: 'text-[14px] text-[#6B7280]'
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          performDelete();
+        }
       });
-      setSelectedKey(null);
-      showToast(t.entry_deleted || 'Entry deleted');
+    } else {
+      setShowDeleteConfirm(true);
     }
   };
+
+  // Ensure bottom sheet closes if date is deselected
+  useEffect(() => {
+    if (!selectedKey) setShowDeleteConfirm(false);
+  }, [selectedKey]);
 
   const prevMonth = () => {
     if (viewM === 0) { setViewM(11); setViewY((y) => y - 1); }
@@ -816,6 +853,46 @@ export default function App() {
 
         </main>
       </div>
+
+      {/* Mobile Delete Confirmation Bottom Sheet */}
+      {showDeleteConfirm && (
+        <div 
+          className="xl:hidden fixed inset-0 z-[250] bg-[#111827]/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-white w-full rounded-t-[20px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center justify-center p-6 pb-8 gap-4">
+              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full mb-2 cursor-grab"></div>
+              <div className="w-14 h-14 bg-[#FEF2F2] rounded-full flex items-center justify-center mb-1 text-[#EF4444]">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-[17px] font-bold text-[#111827] text-center leading-tight">{t.confirm_delete_title || 'Delete this entry?'}</h3>
+              <p className="text-[14px] text-[#6B7280] text-center mb-2 px-2 leading-relaxed">{t.confirm_delete || 'Are you sure you want to delete this entry?'}</p>
+              
+              <div className="flex w-full gap-3 mt-2">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3.5 rounded-[12px] bg-[#F8F9FB] text-[#6B7280] text-[15px] font-bold border border-[#E8EAEF] transition-all cursor-pointer hover:bg-[#E8EAEF]"
+                >
+                  {t.cancel || 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    performDelete();
+                    setShowDeleteConfirm(false);
+                  }}
+                  className="flex-1 py-3.5 rounded-[12px] bg-[#EF4444] text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-[#DC2828] shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
+                >
+                  {t.confirm_yes || 'Yes, delete it'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       <div className={`fixed bottom-6 right-6 bg-[#111827] text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
