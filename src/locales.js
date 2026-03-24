@@ -144,7 +144,7 @@ export const EN = {
     selected_legend: 'Selected',
 
     // Yearly Dashboard
-    yearly_desc: 'Full-year earnings, OT breakdown & leave summary',
+    yearly_desc: 'Full-year earnings, OT & leave summary',
     total_year: 'Total',
     best_month: 'best',
     across_months: 'across all months',

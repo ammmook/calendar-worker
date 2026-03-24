@@ -50,7 +50,7 @@ export default function App() {
   // ── Page routing ──
   const [page, setPage] = useState('dashboard'); // 'dashboard' | 'profile'
 
-  const [lang, setLang] = useState('th');
+  const [lang, setLang] = useState('en');
   const t = getLang(lang);
 
   const [entries, setEntries] = useState({});
@@ -161,6 +161,7 @@ export default function App() {
     ? `${t.days_long[selDateObj.getDay()]}, ${selDateObj.getDate()} ${t.short_months[viewM]}`
     : t.select_day;
   const isTodaySelected = selectedKey === todayKey();
+  const isSelectedHoliday = selectedKey ? holidays.has(selectedKey) : false;
 
   // ── Recent logs for current view month ──
   const recentLogs = useMemo(() =>
@@ -573,11 +574,11 @@ export default function App() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
                           <div className="min-w-0">
                             <label className={labelCls}>{t.clock_in}</label>
-                            <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
+                            <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dIn} onChange={(e) => setDIn(e.target.value)} disabled={isSelectedHoliday} />
                           </div>
                           <div className="min-w-0">
                             <label className={labelCls}>{t.clock_out}</label>
-                            <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
+                            <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dOut} onChange={(e) => setDOut(e.target.value)} disabled={isSelectedHoliday} />
                           </div>
                         </div>
 
@@ -606,7 +607,11 @@ export default function App() {
                         {/* Save / Update */}
                         <button
                           onClick={saveSelectedEntry}
-                          className="w-full py-2.5 rounded-[10px] bg-[#3B4FE4] text-white text-[13px] font-bold cursor-pointer border-none transition-all flex items-center justify-center gap-2 hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]"
+                          disabled={isSelectedHoliday}
+                          className={`w-full py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2
+                            ${isSelectedHoliday 
+                              ? 'bg-[#D1D5E0] cursor-not-allowed' 
+                              : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
                         >
                           <CheckCircle2 size={14} />
                           {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
@@ -712,11 +717,11 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-3 w-full min-w-0">
                         <div className="min-w-0">
                           <label className={labelCls}>{t.clock_in}</label>
-                          <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
+                          <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dIn} onChange={(e) => setDIn(e.target.value)} disabled={isSelectedHoliday} />
                         </div>
                         <div className="min-w-0">
                           <label className={labelCls}>{t.clock_out}</label>
-                          <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
+                          <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dOut} onChange={(e) => setDOut(e.target.value)} disabled={isSelectedHoliday} />
                         </div>
                       </div>
 
@@ -750,7 +755,11 @@ export default function App() {
                              setSelectedKey(null); 
                           }
                         }}
-                        className="w-full py-3.5 rounded-[10px] bg-[#3B4FE4] text-white text-[14px] font-bold cursor-pointer border-none transition-all flex items-center justify-center gap-2.5 hover:bg-[#2A3BC0] mt-1 shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
+                        disabled={isSelectedHoliday}
+                        className={`w-full py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 mt-1
+                          ${isSelectedHoliday 
+                            ? 'bg-[#D1D5E0] cursor-not-allowed' 
+                            : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
                       >
                         <CheckCircle2 size={16} />
                         {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
