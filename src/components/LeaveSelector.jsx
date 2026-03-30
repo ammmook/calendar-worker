@@ -69,7 +69,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Work Option */}
               <button
                 onClick={handleSelectWork}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
                   ${!isLeave
                     ? 'border-[#3B4FE4] bg-[#EEF0FD] shadow-sm'
                     : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
@@ -87,7 +87,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Leave Option */}
               <button
                 onClick={() => setMode('leaveType')}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
                   ${isLeave
                     ? 'border-[#8B5CF6] bg-[#F5F3FF] shadow-sm'
                     : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
@@ -113,7 +113,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 <button
                   key={leave.key}
                   onClick={() => handleSelectLeaveType(leave.key)}
-                  className="w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer"
                   style={{
                     borderColor: currentLeaveType === leave.key ? leave.color : '#E8EAEF',
                     backgroundColor: currentLeaveType === leave.key ? leave.bg : 'transparent'
@@ -147,7 +147,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Back Button */}
               <button
                 onClick={() => setMode('choice')}
-                className="w-full mt-4 p-3 rounded-lg border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
+                className="w-full mt-4 p-3 rounded-lg border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors cursor-pointer"
               >
                 {lang === 'th' ? 'กลับ' : 'Back'}
               </button>

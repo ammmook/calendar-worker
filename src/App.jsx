@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight,
   LayoutDashboard, Settings2,
@@ -7,7 +7,7 @@ import {
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
-  Stethoscope, UmbrellaOff,
+  Stethoscope, UmbrellaOff, Loader2,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
@@ -16,6 +16,7 @@ import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
+import { UserAPI, WorkEntryAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const dateKey = (y, m, d) =>
@@ -65,9 +66,9 @@ export default function App() {
   const [leaveSelectorKey, setLeaveSelectorKey] = useState(null);
   const [showMobileTimeInput, setShowMobileTimeInput] = useState(false);
 
-  const [salary, setSalary] = useState(15000); // Monthly Base
-  const [otRate, setOtRate] = useState(100);   // Hourly OT Rate
-  const [std, setStd] = useState(8);           // Standard Hours
+  const [salary, setSalary] = useState(0);
+  const [otRate, setOtRate] = useState(0);
+  const [std, setStd] = useState(8);
 
   // ── OT Calculation Mode (from ProfilePage) ──
   const [otMode, setOtMode] = useState(OT_MODE.HOURLY);
@@ -80,23 +81,89 @@ export default function App() {
   const [toast, setToast] = useState({ show: false, msg: '' });
   const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'yearly'
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // ── Seed sample data ──
+  // ── Load user profile from Google Sheets on login ──
   useEffect(() => {
-    const y = today.getFullYear(), m = today.getMonth();
-    const rows = [
-      [1, '08:30', '18:45'], [2, '09:00', '17:00'], [3, '08:00', '20:30'],
-      [4, '09:15', '18:00'], [5, '08:30', '19:00'], [8, '09:00', '21:00'],
-      [9, '08:45', '17:45'], [10, '09:00', '22:00'], [11, '08:30', '18:30'],
-      [12, '09:00', '17:00'], [15, '08:00', '19:30'], [16, '09:00', '20:00'],
-    ];
-    const init = {};
-    rows.forEach(([d, i, o]) => {
-      if (d > today.getDate()) return;
-      init[dateKey(y, m + 1, d)] = { in: i, out: o };
-    });
-    setEntries(init);
-  }, [today]);
+    if (!user?.email) return;
+    let cancelled = false;
+    console.log('[TimeFlow] Loading user profile for:', user.email);
+
+    (async () => {
+      try {
+        const res = await UserAPI.get(user.email);
+        if (cancelled) return;
+        console.log('[TimeFlow] User profile response:', res);
+
+        if (res.success && res.data) {
+          const u = res.data;
+          if (u.salary_monthly) setSalary(Number(u.salary_monthly));
+          if (u.ot_hourly) setOtRate(Number(u.ot_hourly));
+          if (u.working_hour) setStd(Number(u.working_hour));
+          if (u.sick_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, sick: Number(u.sick_leave_day) }));
+          if (u.personal_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, personal: Number(u.personal_leave_day) }));
+          if (u.annual_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, vacation: Number(u.annual_leave_day) }));
+
+          // Load OT settings if linked
+          if (u.ot_setting_id) {
+            const { OtSettingAPI } = await import('./services/api');
+            const otRes = await OtSettingAPI.get(u.ot_setting_id);
+            if (!cancelled && otRes.success && otRes.data) {
+              const ot = otRes.data;
+              if (ot.ot_mode) setOtMode(ot.ot_mode);
+              if (ot.ot_block_hours) setOtBlockHours(Number(ot.ot_block_hours));
+              if (ot.ot_deduct_mins) setOtDeductMins(Number(ot.ot_deduct_mins));
+            }
+          }
+          console.log('[TimeFlow] ✅ User profile loaded:', { salary: u.salary_monthly, otRate: u.ot_hourly, std: u.working_hour });
+        } else {
+          // User ไม่เจอ → สร้างใหม่ด้วย defaults
+          console.log('[TimeFlow] User not found, creating new user...');
+          await UserAPI.create({
+            email: user.email,
+            salary_monthly: 0,
+            ot_hourly: 0,
+            working_hour: 8,
+            sick_leave_day: 30,
+            personal_leave_day: 6,
+            annual_leave_day: 10,
+          });
+        }
+      } catch (err) {
+        console.error('[TimeFlow] Failed to load user profile:', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.email]);
+
+  // ── Load work entries from Google Sheets ──
+  const loadEntries = useCallback(async () => {
+    if (!user?.email) return;
+    setDataLoading(true);
+    console.log('[TimeFlow] Loading work entries for:', user.email);
+    try {
+      const res = await WorkEntryAPI.getByUser(user.email);
+      console.log('[TimeFlow] Work entries response:', res);
+      if (res.success && Array.isArray(res.data)) {
+        const converted = sheetEntriesToFrontend(res.data);
+        console.log('[TimeFlow] ✅ Entries loaded:', Object.keys(converted).length, 'dates');
+        setEntries(converted);
+      } else {
+        console.warn('[TimeFlow] No entries found or unexpected response:', res);
+        setEntries({});
+      }
+    } catch (err) {
+      console.error('[TimeFlow] Failed to load entries:', err);
+    } finally {
+      setDataLoading(false);
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    loadEntries();
+  }, [loadEntries]);
 
   const showToast = (msg) => {
     setToast({ show: true, msg });
@@ -143,21 +210,54 @@ export default function App() {
     });
   };
 
-  const saveSelectedEntry = () => {
-    if (!dIn || !dOut || !selectedKey) return;
-    setEntries((p) => ({ ...p, [selectedKey]: { in: dIn, out: dOut } }));
-    showToast('Entry saved');
+  const saveSelectedEntry = async () => {
+    if (!dIn || !dOut || !selectedKey || !user?.email) return;
+    setSaving(true);
+    try {
+      const entryData = frontendEntryToSheet(
+        selectedKey,
+        { in: dIn, out: dOut, leave: null },
+        user.email, std, salary, otRate
+      );
+      const res = await WorkEntryAPI.upsert(entryData);
+      if (res.success) {
+        // Reload entries จาก Sheet เพื่อ sync _id
+        await loadEntries();
+        showToast(lang === 'th' ? 'บันทึกแล้ว' : 'Entry saved');
+      } else {
+        showToast(res.error || 'Save failed');
+      }
+    } catch (err) {
+      console.error('[TimeFlow] Save error:', err);
+      showToast('Save failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const performDelete = () => {
+  const performDelete = async () => {
     if (!selectedKey || !entries[selectedKey]) return;
-    setEntries((p) => {
-      const next = { ...p };
-      delete next[selectedKey];
-      return next;
-    });
-    setSelectedKey(null);
-    showToast(t.entry_deleted || 'Entry deleted');
+    const entry = entries[selectedKey];
+    setSaving(true);
+    try {
+      if (entry._id) {
+        const res = await WorkEntryAPI.delete(entry._id);
+        if (!res.success) {
+          showToast(res.error || 'Delete failed');
+          setSaving(false);
+          return;
+        }
+      }
+      // Reload entries จาก Sheet
+      await loadEntries();
+      setSelectedKey(null);
+      showToast(t.entry_deleted || 'Entry deleted');
+    } catch (err) {
+      console.error('[TimeFlow] Delete error:', err);
+      showToast('Delete failed');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const deleteSelectedEntry = () => {
@@ -193,27 +293,42 @@ export default function App() {
   };
 
   // ── Leave Selector Handlers ──
-  const handleLeaveSelect = (dateStr, leaveData) => {
-    setEntries((p) => ({
-      ...p,
-      [dateStr]: { ...p[dateStr], ...leaveData }
-    }));
-    
+  const handleLeaveSelect = async (dateStr, leaveData) => {
     // Close selector always
     setShowLeaveSelector(false);
     setLeaveSelectorKey(null);
     
     const isMobile = window.innerWidth < 1280;
     if (!leaveData.leave) {
-      // Work day selected
+      // Work day selected — just update local state, user will fill time later
+      setEntries((p) => ({
+        ...p,
+        [dateStr]: { ...p[dateStr], ...leaveData }
+      }));
       if (isMobile) {
-        // On mobile: open time input bottom sheet next
         setShowMobileTimeInput(true);
       } else {
         showToast(lang === 'th' ? 'กรุณากรอกเวลา' : 'Please enter time');
       }
     } else {
-      // Leave recorded — toast and close
+      // Leave recorded — save to Google Sheets
+      if (user?.email) {
+        setSaving(true);
+        try {
+          const entryData = frontendEntryToSheet(
+            dateStr,
+            { in: '', out: '', leave: leaveData.leave },
+            user.email, std, salary, otRate
+          );
+          entryData.leave_type = leaveData.leave?.type || '';
+          await WorkEntryAPI.upsert(entryData);
+          await loadEntries();
+        } catch (err) {
+          console.error('[TimeFlow] Leave save error:', err);
+        } finally {
+          setSaving(false);
+        }
+      }
       showToast(lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded');
       if (isMobile) setSelectedKey(null);
     }
@@ -818,33 +933,49 @@ export default function App() {
                         const d = k.split('-')[2];
                         const dw = new Date(k + 'T00:00:00').getDay();
                         const h = calc(e.in, e.out, std);
+                        const eEarn = earn(h.reg, h.ot, salary, otRate, std);
                         const hasOT = h.ot > 0;
+                        const isLeaveEntry = e.leave !== null && e.leave !== undefined;
+                        const isSel = k === selectedKey;
                         return (
                           <div
                             key={k}
                             onClick={() => handleDayClick(k)}
                             className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
-                            ${hasOT
-                                ? 'border-l-[3px] border-l-[#fbde3a] border-r-transparent border-t-transparent border-b-transparent'
-                                : 'border-transparent'}
-                            hover:bg-[#F8F9FB] hover:border-[#E8EAEF]`}
+                            ${isSel ? 'bg-[#EEF0FD] border-[#C7CCFA]'  
+                              : hasOT
+                                ? 'border-l-[3px] border-l-[#fbde3a] border-r-transparent border-t-transparent border-b-transparent hover:bg-[#fffdef]'
+                                : 'border-transparent hover:bg-[#F8F9FB] hover:border-[#E8EAEF]'}`}
                           >
                             <div className={`w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0
                             ${hasOT ? 'bg-[#fffdef] text-[#c29302]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
                               {d}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <div className="text-[11px] font-semibold text-[#6B7280]">{t.days_short[dw]}</div>
-                              <div className="text-[11px] text-[#9CA3AF]">{e.in} → {e.out}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-[12px] font-bold text-[#3B4FE4]">{fmt1(h.total)}h</div>
-                              {hasOT && (
-                                <span className="text-[10px] font-bold bg-[#fffdef] text-[#c29302] px-1.5 py-px rounded">
-                                  OT {fmt1(h.ot)}h
-                                </span>
+                              {isLeaveEntry ? (
+                                <div className="text-[10px] font-medium text-[#8B5CF6]">
+                                  {e.leave?.type === 'sick' ? (lang === 'th' ? 'ลาป่วย' : 'Sick') 
+                                    : e.leave?.type === 'personal' ? (lang === 'th' ? 'ลากิจ' : 'Personal')
+                                    : (lang === 'th' ? 'ลาพักร้อน' : 'Vacation')}
+                                </div>
+                              ) : (
+                                <div className="text-[11px] text-[#9CA3AF]">{e.in} → {e.out}</div>
                               )}
                             </div>
+                            {!isLeaveEntry && (
+                              <div className="text-right flex flex-col items-end gap-0.5">
+                                <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(h.reg)}h</span>
+                                  {hasOT && (
+                                    <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">
+                                      +{fmt1(h.ot)}h OT
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })
