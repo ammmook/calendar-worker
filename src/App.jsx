@@ -14,6 +14,7 @@ import YearlyDashboard from './components/YearlyDashboard';
 import { LeaveSelector } from './components/LeaveSelector';
 import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
+import { useLoading } from './components/LoadingContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
 import { UserAPI, WorkEntryAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
@@ -50,6 +51,7 @@ export default function App() {
 
   // ── Auth ──
   const { user, loading: authLoading, signOut } = useAuth();
+  const { setLoading } = useLoading();
 
   // ── Page routing ──
   const [page, setPage] = useState('dashboard'); // 'dashboard' | 'profile'
@@ -81,8 +83,6 @@ export default function App() {
   const [toast, setToast] = useState({ show: false, msg: '' });
   const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'yearly'
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   // ── Load user profile from Google Sheets on login ──
   useEffect(() => {
@@ -139,9 +139,9 @@ export default function App() {
   }, [user?.email]);
 
   // ── Load work entries from Google Sheets ──
-  const loadEntries = useCallback(async () => {
+  const loadEntries = useCallback(async (silent = false) => {
     if (!user?.email) return;
-    setDataLoading(true);
+    if (!silent) setLoading(true, lang === 'th' ? 'กำลังเตรียมข้อมูล...' : 'Loading data...');
     console.log('[TimeFlow] Loading work entries for:', user.email);
     try {
       const res = await WorkEntryAPI.getByUser(user.email);
@@ -157,9 +157,9 @@ export default function App() {
     } catch (err) {
       console.error('[TimeFlow] Failed to load entries:', err);
     } finally {
-      setDataLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [user?.email]);
+  }, [user?.email, setLoading, lang]);
 
   useEffect(() => {
     loadEntries();
@@ -212,7 +212,7 @@ export default function App() {
 
   const saveSelectedEntry = async () => {
     if (!dIn || !dOut || !selectedKey || !user?.email) return;
-    setSaving(true);
+    setLoading(true, lang === 'th' ? 'กำลังบันทึกข้อมูล...' : 'Saving data...');
     try {
       const entryData = frontendEntryToSheet(
         selectedKey,
@@ -222,7 +222,7 @@ export default function App() {
       const res = await WorkEntryAPI.upsert(entryData);
       if (res.success) {
         // Reload entries จาก Sheet เพื่อ sync _id
-        await loadEntries();
+        await loadEntries(true);
         showToast(lang === 'th' ? 'บันทึกแล้ว' : 'Entry saved');
       } else {
         showToast(res.error || 'Save failed');
@@ -231,32 +231,32 @@ export default function App() {
       console.error('[TimeFlow] Save error:', err);
       showToast('Save failed');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   const performDelete = async () => {
     if (!selectedKey || !entries[selectedKey]) return;
     const entry = entries[selectedKey];
-    setSaving(true);
+    setLoading(true, lang === 'th' ? 'กำลังบันทึกข้อมูล...' : 'Saving data...');
     try {
       if (entry._id) {
         const res = await WorkEntryAPI.delete(entry._id);
         if (!res.success) {
           showToast(res.error || 'Delete failed');
-          setSaving(false);
+          setLoading(false);
           return;
         }
       }
       // Reload entries จาก Sheet
-      await loadEntries();
+      await loadEntries(true);
       setSelectedKey(null);
       showToast(t.entry_deleted || 'Entry deleted');
     } catch (err) {
       console.error('[TimeFlow] Delete error:', err);
       showToast('Delete failed');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
@@ -313,7 +313,7 @@ export default function App() {
     } else {
       // Leave recorded — save to Google Sheets
       if (user?.email) {
-        setSaving(true);
+        setLoading(true, lang === 'th' ? 'กำลังบันทึกข้อมูล...' : 'Saving data...');
         try {
           const entryData = frontendEntryToSheet(
             dateStr,
@@ -322,11 +322,11 @@ export default function App() {
           );
           entryData.leave_type = leaveData.leave?.type || '';
           await WorkEntryAPI.upsert(entryData);
-          await loadEntries();
+          await loadEntries(true);
         } catch (err) {
           console.error('[TimeFlow] Leave save error:', err);
         } finally {
-          setSaving(false);
+          setLoading(false);
         }
       }
       showToast(lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded');
@@ -424,10 +424,9 @@ export default function App() {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-white text-[#374151] font-sans antialiased selection:bg-[#EEF0FD]">
-
+      
       {/* ════════════════════════════════════════════
           TOPBAR
       ════════════════════════════════════════════ */}
@@ -563,6 +562,7 @@ export default function App() {
               salary={salary}
               otRate={otRate}
               std={std}
+              leaveQuotas={leaveQuotas}
               lang={lang}
             />
           )}

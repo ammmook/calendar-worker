@@ -6,6 +6,7 @@ import {
     Zap, Timer, AlertCircle, Loader2,
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { useLoading } from './LoadingContext';
 import { getLang } from '../locales';
 import { UserAPI, OtSettingAPI } from '../services/api';
 
@@ -51,13 +52,15 @@ export default function ProfilePage({
     onBack,
 }) {
     const { user } = useAuth();
+    const { setLoading } = useLoading();
     const t = getLang(lang);
     const [saved, setSaved] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+    const [isSavingLocal, setIsSavingLocal] = useState(false);
 
     const handleSave = async () => {
         if (!user?.email) return;
-        setIsSaving(true);
+        setLoading(true, lang === 'th' ? 'กำลังบันทึก...' : 'Saving...');
+        setIsSavingLocal(true);
         try {
             // 1. บันทึก OT Setting ก่อน
             const otData = { ot_mode: otMode };
@@ -96,7 +99,8 @@ export default function ProfilePage({
         } catch (err) {
             console.error('[TimeFlow] Failed to save profile:', err);
         } finally {
-            setIsSaving(false);
+            setIsSavingLocal(false);
+            setLoading(false);
         }
     };
 
@@ -289,12 +293,12 @@ export default function ProfilePage({
                     {/* ── Save button ── */}
                     <button
                         onClick={handleSave}
-                        disabled={isSaving}
+                        disabled={isSavingLocal}
                         className={`flex items-center justify-center gap-2 w-full py-3 rounded-[12px] text-white text-[14px] font-bold border-none transition-all
-                              ${isSaving ? 'bg-[#7B8CED] cursor-wait' : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(59,79,228,0.32)]'}`}
+                              ${isSavingLocal ? 'bg-[#7B8CED] cursor-wait' : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(59,79,228,0.32)]'}`}
                     >
-                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                        {isSaving ? (lang === 'th' ? 'กำลังบันทึก...' : 'Saving...') : saved ? t.saved_success : t.save_settings}
+                        {isSavingLocal ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                        {isSavingLocal ? (lang === 'th' ? 'กำลังบันทึก...' : 'Saving...') : saved ? t.saved_success : t.save_settings}
                     </button>
 
                 </div>

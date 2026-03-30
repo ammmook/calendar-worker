@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CalendarDays, Clock, TrendingUp } from 'lucide-react';
 import { useAuth } from './AuthContext';
+import { useLoading } from './LoadingContext';
 import { useGoogleLogin } from '@react-oauth/google';
 
 
@@ -168,8 +169,8 @@ function WorkerIllustration() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-    const { handleGoogleSuccess, signInAsDevMock, loading, error, setError, isDev } = useAuth();
-    const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
+    const { handleGoogleSuccess, signInAsDevMock, loading: authLoading, error, setError, isDev } = useAuth();
+    const { loading: globalLoading, setLoading } = useLoading();
 
     const loginWithGoogle = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
@@ -181,22 +182,29 @@ export default function LoginPage() {
                 handleGoogleSuccess(data);
             } catch {
                 setError('Error fetching profile from Google');
-                setIsLoadingGoogle(false);
+            } finally {
+                setLoading(false);
             }
         },
         onError: () => {
             setError('Sign-in cancelled or encountered an error');
-            setIsLoadingGoogle(false);
+            setLoading(false);
         },
-        onNonOAuthError: () => setIsLoadingGoogle(false),
+        onNonOAuthError: () => setLoading(false),
     });
 
     const handleGoogleClick = () => {
-        setIsLoadingGoogle(true);
+        setLoading(true, 'Signing in...');
         setError(null);
-        if (isDev) signInAsDevMock();
-        else loginWithGoogle();
+        if (isDev) {
+            signInAsDevMock();
+            setTimeout(() => setLoading(false), 500);
+        } else {
+            loginWithGoogle();
+        }
     };
+
+    const isInteractionDisabled = authLoading || globalLoading;
 
     return (
         <div className="min-h-screen bg-[#F8F9FB] flex flex-col lg:flex-row font-sans overflow-hidden">
@@ -310,7 +318,7 @@ export default function LoginPage() {
                         {/* Google button */}
                         <button
                             onClick={handleGoogleClick}
-                            disabled={loading || isLoadingGoogle}
+                            disabled={isInteractionDisabled}
                             className="w-full flex items-center justify-center gap-3 px-5 py-3.5
                 rounded-[14px] border-[1.5px] border-[#D1D5E0] bg-white
                 text-[#374151] font-semibold text-[14px] cursor-pointer
@@ -320,7 +328,7 @@ export default function LoginPage() {
                 disabled:opacity-50 disabled:cursor-not-allowed
                 shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
                         >
-                            {isLoadingGoogle ? (
+                            {globalLoading ? (
                                 /* Spinner */
                                 <svg className="animate-spin shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                     <circle cx="12" cy="12" r="10" stroke="#D1D5E0" strokeWidth="3" />
@@ -335,7 +343,7 @@ export default function LoginPage() {
                                     <path d="M24.48 9.667c3.548 0 6.733 1.22 9.237 3.617l6.93-6.93C36.456 2.413 30.994 0 24.48 0 15.118 0 6.916 5.142 2.94 13.38l8.002 6.253c1.905-5.714 7.24-9.966 13.538-9.966z" fill="#EA4335" />
                                 </svg>
                             )}
-                            {isLoadingGoogle ? 'Signing in...' : 'Continue with Google'}
+                            {globalLoading ? 'Signing in...' : 'Continue with Google'}
                         </button>
 
 

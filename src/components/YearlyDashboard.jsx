@@ -36,19 +36,20 @@ const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
 const fmt1 = (n) => n.toFixed(1);
 
-const LEAVE_TYPES = [
-    { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', max: 30 },
-    { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF', max: 6 },
-    { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', max: 10 },
-];
-
 // ─────────────────────────────────────────────────────────────────────────────
-export default function YearlyDashboard({ entries, holidays, salary, otRate, std, lang }) {
+export default function YearlyDashboard({ entries, holidays, salary, otRate, std, leaveQuotas, lang }) {
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
     const [year, setYear] = useState(today.getFullYear());
     const [tooltip, setTooltip] = useState(null);   // { monthIdx, x, y }
     const chartRef = useRef(null);
+
+    // ── Define leave types with dynamic max values from props ──
+    const LEAVE_TYPES = useMemo(() => [
+        { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', max: leaveQuotas?.sick || 30 },
+        { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF', max: leaveQuotas?.personal || 6 },
+        { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', max: leaveQuotas?.vacation || 10 },
+    ], [leaveQuotas]);
 
     // ── Calculate leave data from entries ──
     const leaveData = useMemo(() => {
@@ -115,7 +116,7 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
         bestMonth: monthlyStats.reduce((best, m) => m.totalEarn > best.totalEarn ? m : best, monthlyStats[0]),
     }), [monthlyStats]);
 
-    const totalLeave = LEAVE_TYPES.reduce((s, t) => s + (leaveData[t.key] || 0), 0);
+    const totalLeave = LEAVE_TYPES.reduce((s, lt) => s + (leaveData[lt.key] || 0), 0);
 
     // ── Chart geometry ─────────────────────────────────────────────────────────
     const CHART_H = 220;
