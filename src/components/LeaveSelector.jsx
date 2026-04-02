@@ -3,7 +3,7 @@ import { X, Stethoscope, UmbrellaOff, Plane, Clock } from 'lucide-react';
 
 const LEAVE_TYPES = [
   { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3' },
-  { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF' },
+  { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#F43F5E', bg: '#FFF1F3' },
   { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD' },
 ];
 

@@ -29,7 +29,7 @@ export const OT_MODE = {
 
 const LEAVE_QUOTAS = [
     { key: 'sick', label: 'ลาป่วย', Icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', defaultMax: 30 },
-    { key: 'personal', label: 'ลากิจ', Icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF', defaultMax: 6 },
+    { key: 'personal', label: 'ลากิจ', Icon: UmbrellaOff, color: '#F43F5E', bg: '#FFF1F3', defaultMax: 6 },
     { key: 'vacation', label: 'ลาพักร้อน', Icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', defaultMax: 10 },
 ];
 
@@ -47,6 +47,7 @@ export default function ProfilePage({
     otMode, setOtMode,
     otBlockHours, setOtBlockHours,    // max full-block OT hours before deduction
     otDeductMins, setOtDeductMins,    // minutes to deduct from the last partial block
+    otSettingId, setOtSettingId,
     leaveQuotas, setLeaveQuotas,
     lang,
     onBack,
@@ -62,7 +63,7 @@ export default function ProfilePage({
         setLoading(true, lang === 'th' ? 'กำลังบันทึก...' : 'Saving...');
         setIsSavingLocal(true);
         try {
-            // 1. บันทึก OT Setting ก่อน
+            // 1. บันทึก OT Setting
             const otData = { ot_mode: otMode };
             // ถ้าเป็น block mode → เก็บ hrs per block + deduct mins ด้วย
             if (otMode === OT_MODE.BLOCK) {
@@ -74,14 +75,24 @@ export default function ProfilePage({
                 otData.ot_deduct_mins = 0;
             }
 
-            // สร้าง/อัปเดต OT Setting
-            const otRes = await OtSettingAPI.create(otData);
-            let otSettingId = '';
-            if (otRes.success && otRes.data?.ot_setting_id) {
-                otSettingId = otRes.data.ot_setting_id;
+            let currentOtSettingId = otSettingId;
+
+            if (currentOtSettingId) {
+                // Edit existing record
+                await OtSettingAPI.update({
+                    ot_setting_id: currentOtSettingId,
+                    ...otData
+                });
+            } else {
+                // Create new record
+                const otRes = await OtSettingAPI.create(otData);
+                if (otRes.success && otRes.data?.ot_setting_id) {
+                    currentOtSettingId = otRes.data.ot_setting_id;
+                    setOtSettingId(currentOtSettingId);
+                }
             }
 
-            // 2. บันทึก User Profile + link ot_setting_id
+            // 2. บันทึก User Profile + link currentOtSettingId
             await UserAPI.update({
                 email: user.email,
                 salary_monthly: salary,
@@ -90,7 +101,7 @@ export default function ProfilePage({
                 sick_leave_day: leaveQuotas.sick,
                 personal_leave_day: leaveQuotas.personal,
                 annual_leave_day: leaveQuotas.vacation,
-                ...(otSettingId && { ot_setting_id: otSettingId }),
+                ...(currentOtSettingId && { ot_setting_id: currentOtSettingId }),
             });
 
             console.log('[TimeFlow] ✅ Profile & OT settings saved');
