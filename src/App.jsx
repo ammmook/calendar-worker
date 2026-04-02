@@ -17,7 +17,7 @@ import { useAuth } from './components/AuthContext';
 import { useLoading } from './components/LoadingContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
-import { UserAPI, WorkEntryAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
+import { UserAPI, WorkEntryAPI, HolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const dateKey = (y, m, d) =>
@@ -140,12 +140,13 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user?.email]);
 
-  // ── Load work entries from Google Sheets ──
+  // ── Load work entries and holidays from Google Sheets ──
   const loadEntries = useCallback(async (silent = false) => {
     if (!user?.email) return;
     if (!silent) setLoading(true, lang === 'th' ? 'กำลังเตรียมข้อมูล...' : 'Loading data...');
-    console.log('[TimeFlow] Loading work entries for:', user.email);
+    console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
     try {
+      // 1. Load work entries
       const res = await WorkEntryAPI.getByUser(user.email);
       console.log('[TimeFlow] Work entries response:', res);
       if (res.success && Array.isArray(res.data)) {
@@ -156,8 +157,17 @@ export default function App() {
         console.warn('[TimeFlow] No entries found or unexpected response:', res);
         setEntries({});
       }
+
+      // 2. Load holidays
+      const holRes = await HolidayAPI.get(user.email);
+      if (holRes.success && Array.isArray(holRes.data)) {
+        console.log('[TimeFlow] ✅ Holidays loaded:', holRes.data.length, 'days');
+        setHolidays(new Set(holRes.data));
+      } else {
+        setHolidays(new Set());
+      }
     } catch (err) {
-      console.error('[TimeFlow] Failed to load entries:', err);
+      console.error('[TimeFlow] Failed to load data:', err);
     } finally {
       if (!silent) setLoading(false);
     }
@@ -203,13 +213,31 @@ export default function App() {
   const dayCells = Array.from({ length: daysInM }, (_, i) => i + 1);
 
   // Toggle holiday for a date key
-  const toggleHoliday = (e, k) => {
+  const toggleHoliday = async (e, k) => {
     e.stopPropagation();
+    
+    // Calculate the new state before putting it in setHolidays
+    const isNowHoliday = !holidays.has(k);
+    
+    // Update local state immediately for fast feedback
     setHolidays((prev) => {
       const next = new Set(prev);
-      next.has(k) ? next.delete(k) : next.add(k);
+      if (isNowHoliday) {
+        next.add(k);
+      } else {
+        next.delete(k);
+      }
       return next;
     });
+
+    // Save to Google Apps Script backend
+    if (user?.email) {
+      try {
+        await HolidayAPI.toggle(user.email, k, isNowHoliday);
+      } catch (err) {
+        console.error('[TimeFlow] Failed to save holiday', err);
+      }
+    }
   };
 
   const saveSelectedEntry = async () => {
@@ -683,7 +711,7 @@ export default function App() {
                       const leaveType = entry?.leave?.type;
                       const LEAVE_ICONS = {
                         sick:     { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)',  Icon: Stethoscope },
-                        personal: { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)', Icon: UmbrellaOff },
+                        personal: { color: '#F472B6', bg: 'rgba(244,114,182,0.12)', Icon: UmbrellaOff },
                         vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)',  Icon: Plane },
                       };
                       const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
@@ -829,7 +857,7 @@ export default function App() {
                             {(() => {
                               const PANEL_LEAVE = {
                                 sick:     { Icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', label: lang === 'th' ? 'ลาป่วย'   : 'Sick Leave'     },
-                                personal: { Icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
+                                personal: { Icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
                                 vacation: { Icon: Plane,       color: '#3B4FE4', bg: '#EEF0FD', label: lang === 'th' ? 'ลาพักร้อน' : 'Annual Leave'  },
                               };
                               const info = PANEL_LEAVE[selEntry.leave?.type] || PANEL_LEAVE.sick;

@@ -29,7 +29,7 @@ export const OT_MODE = {
 
 const LEAVE_QUOTAS = [
     { key: 'sick', label: 'ลาป่วย', Icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', defaultMax: 30 },
-    { key: 'personal', label: 'ลากิจ', Icon: UmbrellaOff, color: '#F43F5E', bg: '#FFF1F3', defaultMax: 6 },
+    { key: 'personal', label: 'ลากิจ', Icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3', defaultMax: 6 },
     { key: 'vacation', label: 'ลาพักร้อน', Icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', defaultMax: 10 },
 ];
 

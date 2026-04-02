@@ -4,7 +4,7 @@ import { Clock, Stethoscope, UmbrellaOff, Plane } from 'lucide-react';
 
 const LEAVE_TYPES = [
   { key: 'sick', label: 'Sick', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3' },
-  { key: 'personal', label: 'Personal', icon: UmbrellaOff, color: '#8B5CF6', bg: '#F5F3FF' },
+  { key: 'personal', label: 'Personal', icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3' },
   { key: 'vacation', label: 'Vacation', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD' },
 ];
 

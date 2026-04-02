@@ -87,6 +87,15 @@ export const OtSettingAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  HOLIDAY API
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const HolidayAPI = {
+  get: (email) => apiCall('getHolidays', { email }),
+  toggle: (email, date, isHoliday) => apiCall('toggleHoliday', { email, date, isHoliday }),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  HELPERS — แปลง Sheet data ↔ Frontend format
 // ═══════════════════════════════════════════════════════════════════════════════
 
