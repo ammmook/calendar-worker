@@ -814,7 +814,10 @@ export default function App() {
                               </span>
                               <div className="flex justify-between items-end">
                                 {hasOT ? (
-                                  <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
+                                  <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
+                                    <span className="text-[8px] font-bold text-[#c29302] leading-none mt-0.5">+{fmtB(netOT * otRate)}</span>
+                                  </div>
                                 ) : (
                                   <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
                                 )}
@@ -914,7 +917,12 @@ export default function App() {
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                            <span className="text-[13px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(netDetOT) + 'h' : '—'}</span>
+                            <div className="text-right">
+                              <div className="text-[13px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(netDetOT) + 'h' : '—'}</div>
+                              {dIn && dOut && netDetOT > 0 && (
+                                <div className="text-[10px] font-bold text-[#c29302] leading-none">+{fmtB(netDetOT * otRate)}</div>
+                              )}
+                            </div>
                           </div>
                           <hr className="border-[#E8EAEF]" />
                           <div className="flex justify-between items-center">
@@ -1004,11 +1012,18 @@ export default function App() {
                             {!isLeaveEntry && (
                               <div className="text-right flex flex-col items-end gap-0.5">
                                 <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(h.reg)}h</span>
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(h.reg)}h</span>
+                                    {hasOT && (
+                                      <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">
+                                        +{fmt1(netOt)}h OT
+                                      </span>
+                                    )}
+                                  </div>
                                   {hasOT && (
-                                    <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">
-                                      +{fmt1(netOt)}h OT
+                                    <span className="text-[9px] font-bold text-[#c29302] leading-none">
+                                      +{fmtB(netOt * otRate)}
                                     </span>
                                   )}
                                 </div>
@@ -1089,7 +1104,12 @@ export default function App() {
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                          <span className="text-[14px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(detH.ot) + 'h' : '—'}</span>
+                          <div className="text-right">
+                            <div className="text-[14px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(netDetOT) + 'h' : '—'}</div>
+                            {dIn && dOut && netDetOT > 0 && (
+                              <div className="text-[11px] font-bold text-[#c29302] leading-none">+{fmtB(netDetOT * otRate)}</div>
+                            )}
+                          </div>
                         </div>
                         <div className="h-px bg-[#E8EAEF] w-full" />
                         <div className="flex justify-between items-center">
