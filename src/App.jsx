@@ -747,12 +747,6 @@ export default function App() {
                               ? 'border-transparent hover:border-[#fbde3a]'
                               : 'border-transparent hover:border-[#E8EAEF]';
 
-                      // Special styling for Leave types (Personal Leave and others)
-                      if (!isHol && isLeave && leaveInfo) {
-                        baseBg = ''; // clear default bg
-                        baseBorder = isSel ? baseBorder : 'border-transparent'; // remove border unless selected
-                      }
-
                       const cellBg = `${baseBg} ${baseBorder}`;
 
                       return (
@@ -760,32 +754,19 @@ export default function App() {
                           key={d}
                           onClick={() => handleDayClick(k)}
                           className={`relative min-h-[72px] sm:min-h-[80px] p-[7px_6px_5px] rounded-lg flex flex-col gap-[2px] border cursor-pointer transition-all duration-[220ms] group ${cellBg}`}
-                          style={!isHol && isLeave && leaveInfo ? { backgroundColor: leaveInfo.color } : {}}
                         >
                           {/* Day number */}
                           <span className={`text-[11px] font-bold leading-none
-                          ${(!isHol && isLeave) ? 'text-white/90' : (isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
+                          ${(isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
                             {d}
                           </span>
 
-                          {/*
-                         * Corner toggle button / leave tag
-                         * ☀ Sun   → workday (shown on hover when not holiday)
-                         * 🌴 Palmtree → holiday
-                         * 🏥/☂️/✈️ → leave tag (shown if leave recorded and not holiday)
-                         * Click toggles holiday status
-                         */}
+                          {/* Leave Tag Icon OR Holiday Toggle */}
                           {!isHol && isLeave && leaveInfo ? (
-                             <div className="flex-1 flex flex-col items-center justify-center gap-1.5 -mt-2">
-                                <leaveInfo.Icon size={18} strokeWidth={2.5} className="text-white" />
-                                <span className="text-[10px] font-bold text-white uppercase tracking-wider">
-                                  {leaveType === 'sick' ? (lang === 'th' ? 'ลาป่วย' : 'Sick') 
-                                   : leaveType === 'personal' ? (lang === 'th' ? 'ลากิจ' : 'Personal')
-                                   : (lang === 'th' ? 'ลาพักร้อน' : 'Vacation')}
-                                </span>
+                             <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center">
+                                <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
                              </div>
                           ) : (
-                            <>
                             <button
                               title={isHol ? 'Mark as workday' : 'Mark as holiday'}
                               onClick={(e) => toggleHoliday(e, k)}
@@ -802,26 +783,25 @@ export default function App() {
                             >
                               <CornerIcon size={10} strokeWidth={2.5} />
                             </button>
+                          )}
 
-                            {/* Entry data */}
-                            {hasEntry && (
-                              <div className="mt-auto flex flex-col gap-[2px]">
-                                <span className="text-[9px] font-medium text-[#9CA3AF] leading-tight hidden sm:block">
-                                  {entry.in}–{entry.out}
+                          {/* Entry data */}
+                          {hasEntry && (
+                            <div className="mt-auto flex flex-col gap-[2px]">
+                              <span className="text-[9px] font-medium text-[#9CA3AF] leading-tight hidden sm:block">
+                                {entry.in}–{entry.out}
+                              </span>
+                              <div className="flex justify-between items-end">
+                                {hasOT ? (
+                                  <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(h.ot)}h</span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
+                                )}
+                                <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
+                                  {fmtB(eEarn)}
                                 </span>
-                                <div className="flex justify-between items-end">
-                                  {hasOT ? (
-                                    <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(h.ot)}h</span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
-                                  )}
-                                  <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
-                                    {fmtB(eEarn)}
-                                  </span>
-                                </div>
                               </div>
-                            )}
-                            </>
+                            </div>
                           )}
                         </div>
                       );

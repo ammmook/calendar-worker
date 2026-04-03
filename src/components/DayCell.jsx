@@ -34,11 +34,9 @@ export function DayCell({ day, data, onClick, isMobile = false, isHoliday = fals
             </span>
           </div>
           {showLeaveTag && leaveInfo && (
-            <span className="px-3 py-1 text-xs font-bold rounded-full text-white flex items-center gap-1.5 shadow-sm border border-opacity-20"
-              style={{ backgroundColor: leaveInfo.color }}>
-              <leaveInfo.icon size={12} />
-              {leaveInfo.label}
-            </span>
+            <div className="flex items-center justify-center" title={leaveInfo.label} style={{ color: leaveInfo.color }}>
+              <leaveInfo.icon size={16} strokeWidth={2.5} />
+            </div>
           )}
           {!isLeave && hasData && data.otHours > 0 && (
             <span className="px-3 py-1 text-xs font-bold rounded-full bg-orange-100 text-orange-700 shadow-sm border border-orange-200">
@@ -47,12 +45,7 @@ export function DayCell({ day, data, onClick, isMobile = false, isHoliday = fals
           )}
         </div>
         
-        {isLeave ? (
-          <div className="flex items-center justify-center bg-opacity-10 p-4 rounded-xl border border-dashed"
-            style={{ backgroundColor: leaveInfo?.bg, borderColor: leaveInfo?.color + '40' }}>
-            <span className="font-semibold text-slate-600">{leaveInfo?.label} Leave</span>
-          </div>
-        ) : hasData ? (
+        {hasData ? (
           <div className="flex justify-between items-end bg-slate-50 p-3 rounded-xl border border-slate-100">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center text-sm font-medium text-slate-600 gap-1.5">
@@ -93,11 +86,9 @@ export function DayCell({ day, data, onClick, isMobile = false, isHoliday = fals
           {format(day, 'd')}
         </span>
         {showLeaveTag && leaveInfo && (
-          <span className="px-2.5 py-1 text-[11px] font-bold rounded-full text-white text-opacity-90 flex items-center gap-1 border border-opacity-20"
-            style={{ backgroundColor: leaveInfo.color }}>
-            <leaveInfo.icon size={11} />
-            {leaveInfo.label}
-          </span>
+          <div className="flex items-center justify-center p-1" title={leaveInfo.label} style={{ color: leaveInfo.color }}>
+            <leaveInfo.icon size={18} strokeWidth={2.5} />
+          </div>
         )}
         {!isLeave && hasData && data.otHours > 0 && (
           <span className="px-2.5 py-1 text-[11px] font-bold rounded-full bg-orange-100 text-orange-700 border border-orange-200 border-opacity-50">
@@ -106,12 +97,7 @@ export function DayCell({ day, data, onClick, isMobile = false, isHoliday = fals
         )}
       </div>
       
-      {isLeave && leaveInfo ? (
-        <div className="mt-auto flex items-center justify-center p-2 rounded-lg text-sm font-semibold text-opacity-80"
-          style={{ backgroundColor: leaveInfo.bg, color: leaveInfo.color }}>
-          {leaveInfo.label}
-        </div>
-      ) : hasData && (
+      {hasData && (
         <div className="mt-auto flex flex-col gap-2">
           <div className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-lg w-fit border border-slate-200 flex items-center gap-1.5">
             <Clock size={12} className="text-slate-400" />
