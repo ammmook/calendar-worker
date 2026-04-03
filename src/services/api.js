@@ -200,19 +200,32 @@ export function sheetEntriesToFrontend(sheetEntries) {
 /**
  * แปลง frontend entry → Sheet format สำหรับ upsert
  */
-export function frontendEntryToSheet(dateStr, entry, userEmail, std, salary, otRate) {
+export function frontendEntryToSheet(dateStr, entry, userEmail, std, salary, otRate, otMode, otBlockHours, otDeductMins) {
   const [ih, im] = (entry.in || '').split(':').map(Number);
   const [oh, om] = (entry.out || '').split(':').map(Number);
   let workingHour = 0, otHour = 0, otEarning = 0;
 
   if (entry.in && entry.out && !isNaN(ih) && !isNaN(oh)) {
-    const totalMins = oh * 60 + om - (ih * 60 + im);
+    let totalMins = oh * 60 + om - (ih * 60 + im);
+    if (totalMins < 0) totalMins += 1440; // handle overnight shift
     if (totalMins > 0) {
       const totalH = totalMins / 60;
       const stdH = parseFloat(std || 8);
       workingHour = Math.min(totalH, stdH);
-      otHour = Math.max(0, totalH - stdH);
-      otEarning = otHour * (otRate || 0);
+      const rawOT = Math.max(0, totalH - stdH);
+      
+      // Apply OT block rule
+      let netOT = rawOT;
+      if (otMode === 'block' && rawOT > 0) {
+        if (rawOT <= (otBlockHours || 0)) {
+          netOT = rawOT;
+        } else {
+          netOT = Math.max(0, rawOT - ((otDeductMins || 0) / 60));
+        }
+      }
+      
+      otHour = netOT;
+      otEarning = netOT * (otRate || 0);
     }
   }
 

@@ -30,16 +30,24 @@ const calc = (inT, outT, stdVal) => {
   if (!inT || !outT) return { total: 0, reg: 0, ot: 0 };
   const [ih, im] = inT.split(':').map(Number);
   const [oh, om] = outT.split(':').map(Number);
-  const mins = oh * 60 + om - (ih * 60 + im);
+  let mins = oh * 60 + om - (ih * 60 + im);
+  if (mins < 0) mins += 1440; // handle overnight shift
   if (mins <= 0) return { total: 0, reg: 0, ot: 0 };
   const total = mins / 60;
   const std = parseFloat(stdVal || 8);
   return { total, reg: Math.min(total, std), ot: Math.max(0, total - std) };
 };
 
+const applyOTRule = (ot, mode, blockHours, deductMins) => {
+  if (mode !== OT_MODE.BLOCK || ot <= 0) return ot;
+  if (ot <= blockHours) return ot;
+  return Math.max(0, ot - (deductMins / 60));
+};
+
 // Use monthly base (salary), hourly OT (otR) and standard hours (stD) for earnings
-const earn = (reg, ot, sal, otR, stD) => {
-  return (sal / 30) * (reg / stD) + (ot * otR);
+const earn = (reg, ot, sal, otR, stD, otMode, blockH, deductM) => {
+  const netOT = applyOTRule(ot, otMode, blockH, deductM);
+  return (sal / 30) * (reg / stD) + (netOT * otR);
 };
 
 const fmt1 = (n) => n.toFixed(1);
@@ -196,11 +204,17 @@ export default function App() {
       const [y, m] = k.split('-').map(Number);
       if (y === viewY && m === viewM + 1) {
         const h = calc(entries[k].in, entries[k].out, std);
-        if (h.total > 0) { dW++; tR += h.reg; tO += h.ot; if (h.ot > 0) oD++; }
+        if (h.total > 0) {
+          dW++;
+          tR += h.reg;
+          const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
+          tO += netOT;
+          if (netOT > 0) oD++;
+        }
       }
     });
     return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW };
-  }, [entries, viewY, viewM, std]);
+  }, [entries, viewY, viewM, std, otMode, otBlockHours, otDeductMins]);
 
   const regEarn = (salary / 30) * (totalReg / std);
   const otEarn = totalOT * otRate;
@@ -247,7 +261,8 @@ export default function App() {
       const entryData = frontendEntryToSheet(
         selectedKey,
         { in: dIn, out: dOut, leave: null },
-        user.email, std, salary, otRate
+        user.email, std, salary, otRate,
+        otMode, otBlockHours, otDeductMins
       );
       const res = await WorkEntryAPI.upsert(entryData);
       if (res.success) {
@@ -348,7 +363,8 @@ export default function App() {
           const entryData = frontendEntryToSheet(
             dateStr,
             { in: '', out: '', leave: leaveData.leave },
-            user.email, std, salary, otRate
+            user.email, std, salary, otRate,
+            otMode, otBlockHours, otDeductMins
           );
           entryData.leave_type = leaveData.leave?.type || '';
           await WorkEntryAPI.upsert(entryData);
@@ -401,7 +417,8 @@ export default function App() {
 
   // ── Detail panel calc ──
   const detH = calc(dIn, dOut, std);
-  const detE = earn(detH.reg, detH.ot, salary, otRate, std);
+  const detE = earn(detH.reg, detH.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins);
+  const netDetOT = applyOTRule(detH.ot, otMode, otBlockHours, otDeductMins);
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
   const selLabel = selDateObj
@@ -593,6 +610,9 @@ export default function App() {
               salary={salary}
               otRate={otRate}
               std={std}
+              otMode={otMode}
+              otBlockHours={otBlockHours}
+              otDeductMins={otDeductMins}
               leaveQuotas={leaveQuotas}
               lang={lang}
             />
@@ -702,8 +722,9 @@ export default function App() {
                       const dow = new Date(viewY, viewM, d).getDay();
                       const isWE = dow === 0 || dow === 6;
                       const h = entry ? calc(entry.in, entry.out, std) : { total: 0, reg: 0, ot: 0 };
-                      const eEarn = earn(h.reg, h.ot, salary, otRate, std);
-                      const hasOT = h.ot > 0;
+                      const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
+                      const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins);
+                      const hasOT = netOT > 0;
                       const hasEntry = !!entry;
                       
                       // Leave tag
@@ -793,7 +814,7 @@ export default function App() {
                               </span>
                               <div className="flex justify-between items-end">
                                 {hasOT ? (
-                                  <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(h.ot)}h</span>
+                                  <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
                                 ) : (
                                   <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
                                 )}
@@ -893,7 +914,7 @@ export default function App() {
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                            <span className="text-[13px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(detH.ot) + 'h' : '—'}</span>
+                            <span className="text-[13px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(netDetOT) + 'h' : '—'}</span>
                           </div>
                           <hr className="border-[#E8EAEF]" />
                           <div className="flex justify-between items-center">
@@ -949,8 +970,9 @@ export default function App() {
                         const d = k.split('-')[2];
                         const dw = new Date(k + 'T00:00:00').getDay();
                         const h = calc(e.in, e.out, std);
-                        const eEarn = earn(h.reg, h.ot, salary, otRate, std);
-                        const hasOT = h.ot > 0;
+                        const netOt = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
+                        const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins);
+                        const hasOT = netOt > 0;
                         const isLeaveEntry = e.leave !== null && e.leave !== undefined;
                         const isSel = k === selectedKey;
                         return (
@@ -986,7 +1008,7 @@ export default function App() {
                                   <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(h.reg)}h</span>
                                   {hasOT && (
                                     <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">
-                                      +{fmt1(h.ot)}h OT
+                                      +{fmt1(netOt)}h OT
                                     </span>
                                   )}
                                 </div>

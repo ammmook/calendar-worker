@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { getLang } from '../locales';
 
+import { OT_MODE } from './ProfilePage';
+
 // ── Design tokens (mirrors App.jsx / timeflow.css) ────────────────────────────
 const C = {
     indigo: '#3B4FE4',
@@ -37,7 +39,11 @@ const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
 const fmt1 = (n) => n.toFixed(1);
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function YearlyDashboard({ entries, holidays, salary, otRate, std, leaveQuotas, lang }) {
+export default function YearlyDashboard({
+    entries, holidays, salary, otRate, std,
+    otMode, otBlockHours, otDeductMins,
+    leaveQuotas, lang
+}) {
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
     const [year, setYear] = useState(today.getFullYear());
@@ -63,6 +69,12 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
         return counts;
     }, [entries]);
 
+    const applyOTRule = (ot, mode, blockH, deductM) => {
+        if (mode !== OT_MODE.BLOCK || ot <= 0) return ot;
+        if (ot <= blockH) return ot;
+        return Math.max(0, ot - (deductM / 60));
+    };
+
     // ── Compute per-month stats ────────────────────────────────────────────────
     const monthlyStats = useMemo(() => {
         return t.short_months.map((_, mIdx) => {
@@ -75,19 +87,22 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                 if (!e?.in || !e?.out) return;
                 const [ih, im] = e.in.split(':').map(Number);
                 const [oh, om] = e.out.split(':').map(Number);
-                const mins = (oh * 60 + om) - (ih * 60 + im);
+                let mins = (oh * 60 + om) - (ih * 60 + im);
+                if (mins < 0) mins += 1440; // handle overnight shift
                 if (mins <= 0) return;
                 const total = mins / 60;
                 const stdH = parseFloat(std || 8);
                 const reg = Math.min(total, stdH);
-                const ot = Math.max(0, total - stdH);
+                const rawOT = Math.max(0, total - stdH);
+                const netOT = applyOTRule(rawOT, otMode, otBlockHours, otDeductMins);
+                
                 daysW++;
                 tReg += reg;
-                tOT += ot;
-                if (ot > 0) otDays++;
+                tOT += netOT;
+                if (netOT > 0) otDays++;
             });
 
-            const regEarn = daysW > 0 ? (salary / 22) * daysW : 0;
+            const regEarn = daysW > 0 ? (salary / 30) * (tReg / (std || 8)) : 0;
             const otEarn = tOT * otRate;
             const totalEarn = regEarn + otEarn;
 
@@ -104,7 +119,7 @@ export default function YearlyDashboard({ entries, holidays, salary, otRate, std
                 totalEarn,
             };
         });
-    }, [entries, year, salary, otRate, std]);
+    }, [entries, year, salary, otRate, std, otMode, otBlockHours, otDeductMins]);
 
     // ── Yearly totals ──────────────────────────────────────────────────────────
     const yearTotals = useMemo(() => ({

@@ -18,13 +18,13 @@ import { UserAPI, OtSettingAPI } from '../services/api';
 
 // ── OT Calculation Mode ───────────────────────────────────────────────────────
 // MODE A: ต่อชั่วโมง — ทุก OT ชม. คิดเต็มตามอัตรา
-// MODE B: ชั่วโมงเต็ม — ต้องทำครบชั่วโมง ส่วนที่เหลือจะถูกตัดออก
-//         e.g. ทำ OT 4 ชม. → 2 ชม. แรกเต็ม → ครึ่งชม. ท้ายหัก → ได้ 3.5 ชม.
-//         (หาก OT > maxFullHours ให้หัก deductMins นาทีออกจาก OT สุดท้าย)
+// MODE B: ชั่วโมงเต็ม — หักนาทีออกหากเกินค่าที่กำหนด
+//         e.g. ทำ OT 4 ชม. โดยที่ block=2 และหัก=30นาที → จะได้ 3.5 ชม.
+//         (หาก OT <= otBlockHours ให้คิดเต็ม, หาก > ให้หัก deductMins นาทีออก)
 
 export const OT_MODE = {
     HOURLY: 'hourly',   // A: คิดต่อชั่วโมงทุกชม.
-    BLOCK: 'block',    // B: ชั่วโมงเต็มเท่านั้น (truncate partial hours)
+    BLOCK: 'block',    // B: หักนาทีออกเมื่อเกิน block
 };
 
 const LEAVE_QUOTAS = [
@@ -45,8 +45,8 @@ export default function ProfilePage({
     otRate, setOtRate,
     std, setStd,
     otMode, setOtMode,
-    otBlockHours, setOtBlockHours,    // max full-block OT hours before deduction
-    otDeductMins, setOtDeductMins,    // minutes to deduct from the last partial block
+    otBlockHours, setOtBlockHours,    // threshold for full OT payment
+    otDeductMins, setOtDeductMins,    // minutes to deduct if above threshold
     otSettingId, setOtSettingId,
     leaveQuotas, setLeaveQuotas,
     lang,
@@ -118,20 +118,13 @@ export default function ProfilePage({
     // ── OT example preview ───────────────────────────────────────────────────
     const previewOT = (rawOT) => {
         if (otMode === OT_MODE.HOURLY) return rawOT;
-        // BLOCK mode: every otBlockHours completed → bonus, then deductMins on last partial
         if (rawOT <= 0) return 0;
-        const full = Math.floor(rawOT / otBlockHours) * otBlockHours;
-        const partial = rawOT % otBlockHours;
-        const deductH = otDeductMins / 60;
-        if (partial === 0) return full;
-        // partial block exists — apply deduction
-        const partialEarned = Math.max(0, partial - deductH);
-        return full + partialEarned;
+        if (rawOT <= otBlockHours) return rawOT;
+        return Math.max(0, rawOT - (otDeductMins / 60));
     };
 
-    const eg1 = previewOT(2);      // exactly 2h OT
-    const eg2 = previewOT(4);      // 4h OT → should show 3.5 with defaults
-    const eg3 = previewOT(otBlockHours); // exactly one full block
+    const eg1 = previewOT(otBlockHours);      // threshold
+    const eg2 = previewOT(otBlockHours + 2);  // above threshold
 
     return (
         <div className="min-h-screen bg-[#F8F9FB] font-sans">
