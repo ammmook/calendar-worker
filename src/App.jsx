@@ -795,123 +795,30 @@ export default function App() {
                     {emptyCells.map((_, i) => <div key={`e-${i}`} />)}
 
                     {/* Actual day cells */}
-                    {dayCells.map((d) => {
-                      const k = dateKey(viewY, viewM + 1, d);
-                      const entry = entries[k];
-                      const isToday = k === todayKey();
-                      const isSel = k === selectedKey;
-                      const isHol = holidays.has(k);
-                      const dow = new Date(viewY, viewM, d).getDay();
-                      const isWE = dow === 0 || dow === 6;
-                      const h = entry ? calc(entry.in, entry.out, std) : { total: 0, reg: 0, ot: 0 };
-                      const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-                      const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
-                      const hasOT = netOT > 0;
-                      const hasEntry = !!entry;
-                      
-                      // Leave tag
-                      const isLeave = entry?.leave !== null && entry?.leave !== undefined;
-                      const leaveType = entry?.leave?.type;
-                      const LEAVE_ICONS = {
-                        sick:     { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)',  Icon: Stethoscope },
-                        personal: { color: '#F472B6', bg: 'rgba(244,114,182,0.12)', Icon: UmbrellaOff },
-                        vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)',  Icon: Plane },
-                      };
-                      const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
-
-                      /*
-                       * Corner icon logic:
-                       *  - Default (workday): show Sun icon (amber) — visible on hover
-                       *  - Holiday: always show Palmtree icon (indigo / cyan) — always visible
-                       *  - Clicking toggles between states
-                       */
-                      const CornerIcon = isHol ? Palmtree : Sun;
-                      const cornerVisible = isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100';
-                      const cornerColorCls = isHol
-                        ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
-                        : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]';
-
-                      // Cell background / border
-                      let baseBg = isHol
-                        ? 'bg-[rgba(153,142,217,0.15)]'
-                        : hasOT
-                          ? 'bg-[#fffdef]'
-                          : isToday
-                            ? 'bg-[#f0f5fa]'
-                            : 'bg-transparent hover:bg-[#F8F9FB]';
-
-                      let baseBorder = isSel
-                        ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
-                        : isHol
-                          ? 'border-transparent'
-                          : isToday
-                            ? 'border-[#6fa3cb] hover:border-[#5c96bb]'
-                            : hasOT
-                              ? 'border-transparent hover:border-[#fbde3a]'
-                              : 'border-transparent hover:border-[#E8EAEF]';
-
-                      const cellBg = `${baseBg} ${baseBorder}`;
-
-                      return (
-                        <div
-                          key={d}
-                          onClick={() => handleDayClick(k)}
-                          className={`relative min-h-[72px] sm:min-h-[80px] p-[7px_6px_5px] rounded-lg flex flex-col gap-[2px] border cursor-pointer transition-all duration-[220ms] group ${cellBg}`}
-                        >
-                          {/* Day number */}
-                          <span className={`text-[11px] font-bold leading-none
-                          ${(isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
-                            {d}
-                          </span>
-
-                          {/* Leave Tag Icon OR Holiday Toggle */}
-                          {!isHol && isLeave && leaveInfo ? (
-                             <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center">
-                                <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
-                             </div>
-                          ) : (
-                            <button
-                              title={isHol ? 'Mark as workday' : 'Mark as holiday'}
-                              onClick={(e) => toggleHoliday(e, k)}
-                              className={[
-                                'absolute top-[5px] right-[5px]',
-                                'w-[18px] h-[18px] rounded-[4px]',
-                                'grid place-items-center cursor-pointer',
-                                'transition-all duration-150',
-                                (isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'),
-                                (isHol
-                                  ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
-                                  : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]'),
-                              ].join(' ')}
-                            >
-                              <CornerIcon size={10} strokeWidth={2.5} />
-                            </button>
-                          )}
-
-                          {/* Entry data */}
-                          {hasEntry && (
-                            <div className="mt-auto flex flex-col gap-[2px]">
-                              <span className="text-[9px] font-medium text-[#9CA3AF] leading-tight hidden sm:block">
-                                {entry.in}–{entry.out}
-                              </span>
-                              <div className="flex justify-between items-end">
-                                {hasOT ? (
-                                  <div className="flex flex-col">
-                                    <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
-                                    <span className="text-[8px] font-bold text-[#c29302] leading-none mt-0.5">+{fmtB(netOT * otRate)}</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
-                                )}
-                                <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
-                                  {fmtB(eEarn)}
-                                </span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {dayCells.map((d) => (
+                      <DayCell
+                        key={d}
+                        d={d}
+                        k={dateKey(viewY, viewM + 1, d)}
+                        entries={entries}
+                        todayKey={todayKey()}
+                        selectedKey={selectedKey}
+                        holidays={holidays}
+                        viewY={viewY}
+                        viewM={viewM}
+                        std={std}
+                        otMode={otMode}
+                        otBlockHours={otBlockHours}
+                        otDeductMins={otDeductMins}
+                        salary={salary}
+                        otRate={otRate}
+                        paymentType={paymentType}
+                        dailyRate={dailyRate}
+                        handleDayClick={handleDayClick}
+                        toggleHoliday={toggleHoliday}
+                        t={t}
+                      />
+                    ))}
                   </div>
                 </div>
             </div>
@@ -1591,5 +1498,147 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
         {sub && <div className="text-[10px] text-[#9CA3AF]">{sub}</div>}
       </div>
     </button>
-  );
-}
+    );
+    }
+
+    // ── DayCell Sub-component ───────────────────────────────────────────────────
+    function DayCell({
+    d, k, entries, todayKey, selectedKey, holidays, viewY, viewM,
+    std, otMode, otBlockHours, otDeductMins, salary, otRate,
+    paymentType, dailyRate, handleDayClick, toggleHoliday, t
+    }) {
+    const entry = entries[k];
+    const isToday = k === todayKey;
+    const isSel = k === selectedKey;
+    const isHol = holidays.has(k);
+    const dow = new Date(viewY, viewM, d).getDay();
+    const isWE = dow === 0 || dow === 6;
+    const h = entry ? calc(entry.in, entry.out, std) : { total: 0, reg: 0, ot: 0 };
+    const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
+    const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
+    const hasOT = netOT > 0;
+    const hasEntry = !!entry;
+
+    // Leave tag
+    const isLeave = entry?.leave !== null && entry?.leave !== undefined;
+    const leaveType = entry?.leave?.type;
+    const LEAVE_ICONS = {
+    sick: { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)', Icon: Stethoscope },
+    personal: { color: '#F472B6', bg: 'rgba(244,114,182,0.12)', Icon: UmbrellaOff },
+    vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)', Icon: Plane },
+    };
+    const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
+
+    const CornerIcon = isHol ? Palmtree : Sun;
+
+    // Cell background / border
+    let baseBg = isHol
+    ? 'bg-[rgba(153,142,217,0.15)]'
+    : hasOT
+      ? 'bg-[#fffdef]'
+      : isToday
+        ? 'bg-[#f0f5fa]'
+        : 'bg-transparent hover:bg-[#F8F9FB]';
+
+    let baseBorder = isSel
+    ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
+    : isHol
+      ? 'border-transparent'
+      : isToday
+        ? 'border-[#6fa3cb] hover:border-[#5c96bb]'
+        : hasOT
+          ? 'border-transparent hover:border-[#fbde3a]'
+          : 'border-transparent hover:border-[#E8EAEF]';
+
+    const cellBg = `${baseBg} ${baseBorder}`;
+
+    // ── Mobile Long Press logic ──
+    const longPressTimer = useRef(null);
+    const isLongPress = useRef(false);
+
+    const handleTouchStart = (e) => {
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      toggleHoliday(e, k);
+      if (navigator.vibrate) navigator.vibrate(40); // Haptic feedback
+    }, 600); // 600ms for long press
+    };
+
+    const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+    };
+
+    const handleTouchMove = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+    };
+
+    return (
+    <div
+      onClick={() => {
+        if (!isLongPress.current) handleDayClick(k);
+      }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
+      onContextMenu={(e) => e.preventDefault()} // Disable native context menu
+      className={`relative min-h-[72px] sm:min-h-[80px] p-[7px_6px_5px] rounded-lg flex flex-col gap-[2px] border cursor-pointer transition-all duration-[220ms] group ${cellBg}`}
+    >
+      {/* Day number */}
+      <span className={`text-[11px] font-bold leading-none
+      ${(isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
+        {d}
+      </span>
+
+      {/* Leave Tag Icon OR Holiday Toggle */}
+      {!isHol && isLeave && leaveInfo ? (
+        <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center">
+          <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
+        </div>
+      ) : (
+        <button
+          title={isHol ? 'Mark as workday' : 'Mark as holiday'}
+          onClick={(e) => toggleHoliday(e, k)}
+          className={[
+            'absolute top-[5px] right-[5px]',
+            'w-[18px] h-[18px] rounded-[4px]',
+            'grid place-items-center cursor-pointer',
+            'transition-all duration-150',
+            (isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'),
+            (isHol
+              ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
+              : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]'),
+          ].join(' ')}
+        >
+          <CornerIcon size={10} strokeWidth={2.5} />
+        </button>
+      )}
+
+      {/* Entry data */}
+      {hasEntry && (
+        <div className="mt-auto flex flex-col gap-[2px]">
+          <span className="text-[9px] font-medium text-[#9CA3AF] leading-tight hidden sm:block">
+            {entry.in}–{entry.out}
+          </span>
+          <div className="flex justify-between items-end">
+            {hasOT ? (
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
+                <span className="text-[8px] font-bold text-[#c29302] leading-none mt-0.5">+{fmtB(netOT * otRate)}</span>
+              </div>
+            ) : (
+              <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
+            )}
+            <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
+              {fmtB(eEarn)}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+    );
+    }
