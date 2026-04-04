@@ -7,7 +7,7 @@ const LEAVE_TYPES = [
   { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD' },
 ];
 
-export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel, lang = 'en', isMobile = false, onWorkSelected = null }) {
+export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel, lang = 'en', onWorkSelected = null }) {
   const [mode, setMode] = useState('choice'); // 'choice' | 'leaveType'
 
   // Reset mode when opening
@@ -44,11 +44,19 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
   const currentLeaveType = currentData?.leave?.type;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={handleClose}>
+    <div 
+      className="fixed inset-0 z-[250] flex items-center xl:items-center items-end justify-center bg-black/40 p-0 xl:p-4 animate-[fadeIn_0.2s_ease_both]" 
+      onClick={handleClose}
+    >
       <div 
-        className="bg-white rounded-3xl shadow-xl max-w-md w-full animate-[fadeUp_0.3s_ease_both]" 
+        className="bg-white w-full xl:max-w-md xl:rounded-3xl rounded-t-[24px] shadow-xl overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)] xl:animate-[fadeUp_0.3s_ease_both]" 
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile handle */}
+        <div className="xl:hidden flex justify-center pt-3 pb-1">
+          <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-[#E8EAEF]">
           <h2 className="text-lg font-bold text-[#111827]">
@@ -56,14 +64,14 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
           </h2>
           <button 
             onClick={handleClose} 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 pb-10 xl:pb-6">
           {mode === 'choice' ? (
             <div className="space-y-3">
               {/* Work Option */}
@@ -118,18 +126,6 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                     borderColor: currentLeaveType === leave.key ? leave.color : '#E8EAEF',
                     backgroundColor: currentLeaveType === leave.key ? leave.bg : 'transparent'
                   }}
-                  onMouseEnter={(e) => {
-                    if (currentLeaveType !== leave.key) {
-                      e.currentTarget.style.borderColor = '#D1D5E0';
-                      e.currentTarget.style.backgroundColor = '#F8F9FB';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (currentLeaveType !== leave.key) {
-                      e.currentTarget.style.borderColor = '#E8EAEF';
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                    }
-                  }}
                 >
                   <div 
                     className="w-10 h-10 rounded-lg grid place-items-center shrink-0 text-white"
@@ -147,7 +143,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Back Button */}
               <button
                 onClick={() => setMode('choice')}
-                className="w-full mt-4 p-3 rounded-lg border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors cursor-pointer"
+                className="w-full mt-4 p-3 rounded-lg border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors cursor-pointer bg-white"
               >
                 {lang === 'th' ? 'กลับ' : 'Back'}
               </button>

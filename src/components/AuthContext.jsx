@@ -3,18 +3,9 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 /* ─────────────────────────────────────────────────────────────────────────────
    AuthContext
    ─ Wraps Google Identity Services (GIS) One Tap / OAuth 2.0
-   ─ Falls back to a mock user in dev when VITE_GOOGLE_CLIENT_ID is missing
    ───────────────────────────────────────────────────────────────────────────── */
 
 const AuthContext = createContext(null);
-
-// ── Mock user for dev / demo ──────────────────────────────────────────────────
-const MOCK_USER = {
-    id: 'mock-001',
-    name: 'สมชาย ใจดี',
-    email: 'somchai.jaidee@example.com',
-    picture: 'https://ui-avatars.com/api/?name=สมชาย+ใจดี&background=3B4FE4&color=fff&size=128&font-size=0.4',
-};
 
 // ── Decode a Google JWT id_token (base64url) ──────────────────────────────────
 function decodeJwt(token) {
@@ -30,9 +21,6 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);   // { id, name, email, picture }
     const [loading, setLoading] = useState(true);   // true while checking session
     const [error, setError] = useState(null);
-
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const isDev = !clientId || clientId === 'YOUR_GOOGLE_CLIENT_ID_HERE';
 
     // ── Restore session from localStorage ────────────────────────────────────
     useEffect(() => {
@@ -60,10 +48,6 @@ export function AuthProvider({ children }) {
         setError(null);
     }, []);
 
-    // ── Manual Dev Mock Login ─────────────────────────────────────────────────
-    const signInAsDevMock = useCallback(() => {
-        setUser(MOCK_USER);
-    }, []);
     // ── Sign in as Guest ───────────────────────────────────────────────────────
     const signInAsGuest = useCallback((name = 'ผู้ใช้งานทั่วไป') => {
         setUser({
@@ -80,7 +64,7 @@ export function AuthProvider({ children }) {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, error, setError, handleGoogleSuccess, signInAsDevMock, signInAsGuest, signOut, isDev }}>
+        <AuthContext.Provider value={{ user, loading, error, setError, handleGoogleSuccess, signInAsGuest, signOut }}>
             {children}
         </AuthContext.Provider>
     );

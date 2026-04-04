@@ -7,7 +7,7 @@ import {
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
-  Stethoscope, UmbrellaOff, Loader2,
+  Stethoscope, UmbrellaOff, Loader2, AlertCircle,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
@@ -105,13 +105,14 @@ export default function App() {
   const [otBlockHours, setOtBlockHours] = useState(2);
   const [otDeductMins, setOtDeductMins] = useState(30);
   const [otSettingId, setOtSettingId] = useState('');
-  const [leaveQuotas, setLeaveQuotas] = useState({ sick: 30, personal: 6, vacation: 10 });
+  const [leaveQuotas, setLeaveQuotas] = useState({ sick: 0, personal: 0, vacation: 0 });
 
   const [dIn, setDIn] = useState('');
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
   const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'yearly'
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showProfileIncomplete, setShowProfileIncomplete] = useState(false);
 
   // ── Load user profile from Google Sheets on login ──
   useEffect(() => {
@@ -159,9 +160,9 @@ export default function App() {
             salary_monthly: 0,
             ot_hourly: 0,
             working_hour: 8,
-            sick_leave_day: 30,
-            personal_leave_day: 6,
-            annual_leave_day: 10,
+            sick_leave_day: 0,
+            personal_leave_day: 0,
+            annual_leave_day: 0,
             payment_type: 'monthly',
             daily_rate: 0,
             work_days_per_week: 5
@@ -391,27 +392,31 @@ export default function App() {
       // Check for profile completeness: salary/dailyRate and otRate must be configured
       const isRateIncomplete = paymentType === 'monthly' ? !salary : !dailyRate;
       if (isRateIncomplete || !otRate) {
-        Swal.fire({
-          title: t.profile_incomplete_title || 'Profile Incomplete',
-          text: t.profile_incomplete_msg || 'Please complete your salary and OT rate in the profile page first.',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonColor: '#3B4FE4',
-          cancelButtonColor: '#9CA3AF',
-          confirmButtonText: t.go_to_profile || 'Go to Profile',
-          cancelButtonText: t.cancel || 'Cancel',
-          customClass: {
-            container: 'font-sans',
-            popup: 'rounded-2xl',
-            confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
-            cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
-          }
-        }).then((result) => {
-          if (result.isConfirmed) {
-            setPage('profile');
-          }
-        });
-        if (isMobile) setSelectedKey(null);
+        if (isMobile) {
+          setShowProfileIncomplete(true);
+          setSelectedKey(null);
+        } else {
+          Swal.fire({
+            title: t.profile_incomplete_title || 'Profile Incomplete',
+            text: t.profile_incomplete_msg || 'Please complete your salary and OT rate in the profile page first.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3B4FE4',
+            cancelButtonColor: '#9CA3AF',
+            confirmButtonText: t.go_to_profile || 'Go to Profile',
+            cancelButtonText: t.cancel || 'Cancel',
+            customClass: {
+              container: 'font-sans',
+              popup: 'rounded-2xl',
+              confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
+              cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
+            }
+          }).then((result) => {
+            if (result.isConfirmed) {
+              setPage('profile');
+            }
+          });
+        }
         return;
       }
 
@@ -1240,15 +1245,19 @@ export default function App() {
       {/* Mobile Delete Confirmation Bottom Sheet */}
       {showDeleteConfirm && (
         <div 
-          className="xl:hidden fixed inset-0 z-[250] bg-[#111827]/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
+          className="xl:hidden fixed inset-0 z-[250] bg-black/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
           onClick={() => setShowDeleteConfirm(false)}
         >
           <div 
-            className="bg-white w-full rounded-t-[20px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
+            className="bg-white w-full rounded-t-[24px] shadow-xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-col items-center justify-center p-6 pb-8 gap-4">
-              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full mb-2 cursor-grab"></div>
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center p-6 pb-10 gap-4">
               <div className="w-14 h-14 bg-[#FEF2F2] rounded-full flex items-center justify-center mb-1 text-[#EF4444]">
                 <Trash2 size={24} />
               </div>
@@ -1290,24 +1299,29 @@ export default function App() {
       {/* Mobile Time Input Bottom Sheet */}
       {showMobileTimeInput && selectedKey && (
         <div 
-          className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
+          className="xl:hidden fixed inset-0 z-[200] bg-black/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
           onClick={() => setShowMobileTimeInput(false)}
         >
           <div 
-            className="bg-white w-full rounded-t-[20px] shadow-[0_-10px_40px_rgba(0,0,0,0.1)] flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
+            className="bg-white w-full rounded-t-[24px] shadow-xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+            </div>
+
             <div className="flex items-center justify-between p-6 border-b border-[#E8EAEF]">
               <h3 className="text-[17px] font-bold text-[#111827]">{t.enter_time || 'Enter Work Time'}</h3>
               <button 
                 onClick={() => setShowMobileTimeInput(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
               >
                 <X size={20} />
               </button>
             </div>
 
-            <div className="p-6 flex flex-col gap-4">
+            <div className="p-6 pb-10 flex flex-col gap-4">
               {/* Time inputs */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1348,7 +1362,7 @@ export default function App() {
               <div className="flex gap-3 w-full">
                 <button
                   onClick={() => { setShowMobileTimeInput(false); setSelectedKey(null); }}
-                  className="flex-1 py-3 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
+                  className="flex-1 py-3 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors bg-white cursor-pointer"
                 >
                   {t.cancel || 'Cancel'}
                 </button>
@@ -1359,13 +1373,59 @@ export default function App() {
                     setSelectedKey(null);
                   }}
                   disabled={!dIn || !dOut}
-                  className={`flex-1 py-3 rounded-[10px] text-white text-sm font-bold transition-all flex items-center justify-center gap-2
+                  className={`flex-1 py-3 rounded-[10px] text-white text-sm font-bold transition-all flex items-center justify-center gap-2 border-none
                     ${!dIn || !dOut 
                       ? 'bg-[#D1D5E0] cursor-not-allowed' 
                       : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0]'}`}
                 >
                   <CheckCircle2 size={16} />
                   {t.save_entry || 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Profile Incomplete Warning Bottom Sheet */}
+      {showProfileIncomplete && (
+        <div 
+          className="xl:hidden fixed inset-0 z-[250] bg-black/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
+          onClick={() => setShowProfileIncomplete(false)}
+        >
+          <div 
+            className="bg-white w-full rounded-t-[24px] shadow-xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+            </div>
+
+            <div className="flex flex-col items-center justify-center p-6 pb-10 gap-4">
+              <div className="w-16 h-16 bg-[#FFFBEB] rounded-full flex items-center justify-center mb-1 text-[#F59E0B]">
+                <AlertCircle size={32} />
+              </div>
+              <div className="text-center space-y-1 px-4">
+                <h3 className="text-[18px] font-bold text-[#111827] leading-tight">{t.profile_incomplete_title}</h3>
+                <p className="text-[14px] text-[#6B7280] leading-relaxed">{t.profile_incomplete_msg}</p>
+              </div>
+              
+              <div className="flex w-full gap-3 mt-2">
+                <button
+                  onClick={() => setShowProfileIncomplete(false)}
+                  className="flex-1 py-3.5 rounded-[14px] bg-[#F8F9FB] text-[#6B7280] text-[15px] font-bold border border-[#E8EAEF] transition-all cursor-pointer hover:bg-[#E8EAEF]"
+                >
+                  {t.cancel || 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProfileIncomplete(false);
+                    setPage('profile');
+                  }}
+                  className="flex-1 py-3.5 rounded-[14px] bg-[#3B4FE4] text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
+                >
+                  {t.go_to_profile}
                 </button>
               </div>
             </div>

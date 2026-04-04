@@ -58,9 +58,9 @@ export default function YearlyDashboard({
 
     // ── Define leave types with dynamic max values from props ──
     const LEAVE_TYPES = useMemo(() => [
-        { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', max: leaveQuotas?.sick || 30 },
-        { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3', max: leaveQuotas?.personal || 6 },
-        { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', max: leaveQuotas?.vacation || 10 },
+        { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', max: leaveQuotas?.sick || 0 },
+        { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3', max: leaveQuotas?.personal || 0 },
+        { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', max: leaveQuotas?.vacation || 0 },
     ], [leaveQuotas]);
 
     // ── Calculate leave data from entries ──

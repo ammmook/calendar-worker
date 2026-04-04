@@ -169,7 +169,7 @@ function WorkerIllustration() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-    const { handleGoogleSuccess, signInAsDevMock, loading: authLoading, error, setError, isDev } = useAuth();
+    const { handleGoogleSuccess, loading: authLoading, error, setError } = useAuth();
     const { loading: globalLoading, setLoading } = useLoading();
 
     const loginWithGoogle = useGoogleLogin({
@@ -196,12 +196,7 @@ export default function LoginPage() {
     const handleGoogleClick = () => {
         setLoading(true, 'Signing in...');
         setError(null);
-        if (isDev) {
-            signInAsDevMock();
-            setTimeout(() => setLoading(false), 500);
-        } else {
-            loginWithGoogle();
-        }
+        loginWithGoogle();
     };
 
     const isInteractionDisabled = authLoading || globalLoading;
@@ -295,19 +290,6 @@ export default function LoginPage() {
                             <p className="text-[13px] text-[#9CA3AF] mt-0.5">Sign in with your Google account</p>
                         </div>
 
-                        {/* Dev badge */}
-                        {isDev && (
-                            <div className="flex items-start gap-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl px-3.5 py-3 mb-5">
-                                <div className="w-2 h-2 mt-0.5 rounded-full bg-[#F59E0B] anim-pulse-dot shrink-0" />
-                                <div>
-                                    <div className="text-[11px] font-bold text-[#92400E]">Dev Mode Active</div>
-                                    <div className="text-[10px] text-[#B45309] mt-0.5">
-                                        No real Google Client ID needed — click below to demo instantly
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
                         {/* Error */}
                         {error && (
                             <div className="bg-[#FFF1F3] border border-[#FECDD3] text-[#9F1239] text-[12px] font-medium rounded-xl px-3.5 py-2.5 mb-5 animate-[fadeUp_0.3s_ease_both]">
@@ -363,3 +345,4 @@ export default function LoginPage() {
         </div>
     );
 }
+
