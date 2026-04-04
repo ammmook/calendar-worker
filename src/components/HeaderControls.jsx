@@ -47,6 +47,7 @@ export function HeaderControls({ currentMonth, onPrevMonth, onNextMonth, wageRat
             min="0"
             value={wageRate || ''}
             onChange={(e) => onWageChange(e.target.value === '' ? '' : Number(e.target.value))}
+            onFocus={(e) => e.target.select()}
             className="w-full md:w-36 py-3 px-3 bg-transparent border-none focus:outline-none text-slate-800 font-semibold text-lg"
             placeholder="Hourly Wage"
           />

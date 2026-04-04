@@ -168,8 +168,9 @@ export default function ProfilePage({
                                 <label className={labelCls}>{t.monthly_salary}</label>
                                 <InputWithIcon Icon={Wallet} suffix={t.mo_unit} color="#10B981">
                                     <input
-                                        type="number" min="0" value={salary}
-                                        onChange={(e) => setSalary(Number(e.target.value))}
+                                        type="number" min="0" value={salary || ''}
+                                        onChange={(e) => setSalary(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onFocus={(e) => e.target.select()}
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
                                     />
                                 </InputWithIcon>
@@ -179,8 +180,9 @@ export default function ProfilePage({
                                 <label className={labelCls}>{t.ot_rate}</label>
                                 <InputWithIcon Icon={CircleDollarSign} suffix={t.hr_unit} color="#c29302">
                                     <input
-                                        type="number" min="0" value={otRate}
-                                        onChange={(e) => setOtRate(Number(e.target.value))}
+                                        type="number" min="0" value={otRate || ''}
+                                        onChange={(e) => setOtRate(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onFocus={(e) => e.target.select()}
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
                                     />
                                 </InputWithIcon>
@@ -190,8 +192,9 @@ export default function ProfilePage({
                                 <label className={labelCls}>{t.standard_hours}</label>
                                 <InputWithIcon Icon={Clock} suffix="h" color="#3B4FE4">
                                     <input
-                                        type="number" min="1" max="24" value={std}
-                                        onChange={(e) => setStd(Number(e.target.value))}
+                                        type="number" min="1" max="24" value={std || ''}
+                                        onChange={(e) => setStd(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onFocus={(e) => e.target.select()}
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
                                     />
                                 </InputWithIcon>
@@ -243,8 +246,9 @@ export default function ProfilePage({
                                         <label className={`${labelCls} !text-[#92400E]`}>{t.hrs_per_block}</label>
                                         <InputWithIcon Icon={Clock} suffix="h" color="#c29302">
                                             <input
-                                                type="number" min="1" max="12" value={otBlockHours}
-                                                onChange={(e) => setOtBlockHours(Number(e.target.value))}
+                                                type="number" min="1" max="12" value={otBlockHours || ''}
+                                                onChange={(e) => setOtBlockHours(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={(e) => e.target.select()}
                                                 className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
                                             />
                                         </InputWithIcon>
@@ -253,8 +257,9 @@ export default function ProfilePage({
                                         <label className={`${labelCls} !text-[#92400E]`}>{t.deduct_mins}</label>
                                         <InputWithIcon Icon={Timer} suffix="m" color="#c29302">
                                             <input
-                                                type="number" min="0" max="59" value={otDeductMins}
-                                                onChange={(e) => setOtDeductMins(Number(e.target.value))}
+                                                type="number" min="0" max="59" value={otDeductMins || ''}
+                                                onChange={(e) => setOtDeductMins(e.target.value === '' ? 0 : Number(e.target.value))}
+                                                onFocus={(e) => e.target.select()}
                                                 className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
                                             />
                                         </InputWithIcon>
@@ -281,8 +286,9 @@ export default function ProfilePage({
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <input
-                                                type="number" min="0" max="365" value={quota}
-                                                onChange={(e) => setLeaveQuotas(p => ({ ...p, [key]: Number(e.target.value) }))}
+                                                type="number" min="0" max="365" value={quota || ''}
+                                                onChange={(e) => setLeaveQuotas(p => ({ ...p, [key]: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                                                onFocus={(e) => e.target.select()}
                                                 className="w-16 text-center bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[7px] py-1.5 text-[13px] font-bold outline-none focus:border-[#3B4FE4] transition-colors"
                                                 style={{ color }}
                                             />
