@@ -58,6 +58,8 @@ export const UserAPI = {
   update: (data) => apiCall('updateUser', data),
   upsert: (data) => apiCall('upsertUser', data),
   delete: (email) => apiCall('deleteUser', { email }),
+  /** ย้ายเงินเดือนจากคอลัมน์เก่าใน user → salary_setting (ใช้หลังเพิ่มคอลัมน์ salary_id แล้ว) */
+  migrateLegacySalary: () => apiCall('migrateLegacySalary'),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -38,11 +38,17 @@ const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
 const fmt1 = (n) => n.toFixed(1);
 
+// Weekend rest days for OT (matches App.jsx); not user-configurable
+const DEFAULT_REST_DAYS = [0, 6];
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function YearlyDashboard({
     entries, holidays, salary, otRate, std,
     otMode, otBlockHours, otDeductMins,
-    leaveQuotas, lang
+    leaveQuotas, lang,
+
+    paymentType = 'monthly',
+    dailyRate = 0,
 }) {
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
@@ -79,7 +85,7 @@ export default function YearlyDashboard({
     const monthlyStats = useMemo(() => {
         return t.short_months.map((_, mIdx) => {
             const mKey = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-            let tReg = 0, tOT = 0, daysW = 0, otDays = 0;
+            let tReg = 0, tOT = 0, daysW = 0, otDays = 0, wOTEarn = 0;
 
             Object.keys(entries).forEach((k) => {
                 if (!k.startsWith(mKey)) return;
@@ -92,18 +98,33 @@ export default function YearlyDashboard({
                 if (mins <= 0) return;
                 const total = mins / 60;
                 const stdH = parseFloat(std || 8);
-                const reg = Math.min(total, stdH);
-                const rawOT = Math.max(0, total - stdH);
-                const netOT = applyOTRule(rawOT, otMode, otBlockHours, otDeductMins);
-                
+
+                const [y, m, d] = k.split('-').map(Number);
+                const dow = new Date(y, m - 1, d).getDay();
+                const isRestDay = DEFAULT_REST_DAYS.includes(dow);
+
                 daysW++;
-                tReg += reg;
-                tOT += netOT;
-                if (netOT > 0) otDays++;
+                if (isRestDay) {
+                    const netOT = applyOTRule(total, otMode, otBlockHours, otDeductMins);
+                    tOT += netOT;
+                    if (netOT > 0) otDays++;
+                    wOTEarn += netOT * otRate;
+                } else {
+                    const reg = Math.min(total, stdH);
+                    const rawOT = Math.max(0, total - stdH);
+                    const netOT = applyOTRule(rawOT, otMode, otBlockHours, otDeductMins);
+                    tReg += reg;
+                    tOT += netOT;
+                    if (netOT > 0) otDays++;
+                    wOTEarn += netOT * otRate;
+                }
             });
 
-            const regEarn = daysW > 0 ? (salary / 30) * (tReg / (std || 8)) : 0;
-            const otEarn = tOT * otRate;
+            const regEarn = paymentType === 'daily'
+                ? daysW * dailyRate
+                : (daysW > 0 ? salary : 0); // Full fixed salary if worked at least 1 day in month
+
+            const otEarn = wOTEarn;
             const totalEarn = regEarn + otEarn;
 
             return {
@@ -119,7 +140,7 @@ export default function YearlyDashboard({
                 totalEarn,
             };
         });
-    }, [entries, year, salary, otRate, std, otMode, otBlockHours, otDeductMins]);
+    }, [entries, year, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate]);
 
     // ── Yearly totals ──────────────────────────────────────────────────────────
     const yearTotals = useMemo(() => ({
@@ -375,7 +396,7 @@ export default function YearlyDashboard({
                         const totalW = chartRef.current?.offsetWidth || 800;
                         const { x, bW } = barGroup(mIdx, totalW);
                         const TW = 200;
-                        
+
                         let tx = x + (bW / 2) - (TW / 2);
                         let ty = 20;
 

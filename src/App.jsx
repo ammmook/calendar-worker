@@ -45,13 +45,28 @@ const applyOTRule = (ot, mode, blockHours, deductMins) => {
 };
 
 // Use monthly base (salary), hourly OT (otR) and standard hours (stD) for earnings
-const earn = (reg, ot, sal, otR, stD, otMode, blockH, deductM) => {
+const earn = (reg, ot, sal, otR, stD, otMode, blockH, deductM, paymentType, dailyRate) => {
   const netOT = applyOTRule(ot, otMode, blockH, deductM);
-  return (sal / 30) * (reg / stD) + (netOT * otR);
+  const otEarnings = netOT * otR;
+  
+  if (paymentType === 'daily') {
+    // Daily wage is handled differently - we only calculate earnings per day worked
+    // (dailyRate / stD) * reg is the basic daily earning if they worked reg hours
+    // But usually dailyRate is for a full day (std hours).
+    return (dailyRate * (reg / stD)) + otEarnings;
+  }
+  
+  // Monthly: (sal / 30) * (reg / stD) is an estimation for "this day's worth"
+  // However, the prompt says "Monthly salary: user receive full fixed salary regardless of individual workdays"
+  // So for daily display we show the estimated worth of that day.
+  return (sal / 30) * (reg / stD) + otEarnings;
 };
 
 const fmt1 = (n) => n.toFixed(1);
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
+
+// Weekend rest days for OT rules (Sat/Sun); no longer user-configurable
+const DEFAULT_REST_DAYS = [0, 6];
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -79,6 +94,11 @@ export default function App() {
   const [salary, setSalary] = useState(0);
   const [otRate, setOtRate] = useState(0);
   const [std, setStd] = useState(8);
+
+  // ── Payment Type & Rest Days ──
+  const [paymentType, setPaymentType] = useState('monthly'); // 'monthly' | 'daily'
+  const [dailyRate, setDailyRate] = useState(0);
+  const [workDaysPerWeek, setWorkDaysPerWeek] = useState(5);
 
   // ── OT Calculation Mode (from ProfilePage) ──
   const [otMode, setOtMode] = useState(OT_MODE.HOURLY);
@@ -114,6 +134,10 @@ export default function App() {
           if (u.personal_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, personal: Number(u.personal_leave_day) }));
           if (u.annual_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, vacation: Number(u.annual_leave_day) }));
           if (u.ot_setting_id) setOtSettingId(u.ot_setting_id);
+          
+          if (u.payment_type) setPaymentType(u.payment_type);
+          if (u.daily_rate) setDailyRate(Number(u.daily_rate));
+          if (u.work_days_per_week) setWorkDaysPerWeek(Number(u.work_days_per_week));
 
           // Load OT settings if linked
           if (u.ot_setting_id) {
@@ -126,7 +150,7 @@ export default function App() {
               if (ot.ot_deduct_mins) setOtDeductMins(Number(ot.ot_deduct_mins));
             }
           }
-          console.log('[TimeFlow] ✅ User profile loaded:', { salary: u.salary_monthly, otRate: u.ot_hourly, std: u.working_hour });
+          console.log('[TimeFlow] ✅ User profile loaded');
         } else {
           // User ไม่เจอ → สร้างใหม่ด้วย defaults
           console.log('[TimeFlow] User not found, creating new user...');
@@ -138,6 +162,9 @@ export default function App() {
             sick_leave_day: 30,
             personal_leave_day: 6,
             annual_leave_day: 10,
+            payment_type: 'monthly',
+            daily_rate: 0,
+            work_days_per_week: 5
           });
         }
       } catch (err) {
@@ -198,26 +225,42 @@ export default function App() {
   }, [selectedKey, selEntry.in, selEntry.out]);
 
   // ── Monthly aggregates ──
-  const { totalReg, totalOT, otDays, daysWorked } = useMemo(() => {
-    let tR = 0, tO = 0, oD = 0, dW = 0;
+  const { totalReg, totalOT, otDays, daysWorked, workdayOTEarn } = useMemo(() => {
+    let tR = 0, tO = 0, oD = 0, dW = 0, wOT = 0;
     Object.keys(entries).forEach((k) => {
-      const [y, m] = k.split('-').map(Number);
+      const [y, m, d] = k.split('-').map(Number);
       if (y === viewY && m === viewM + 1) {
         const h = calc(entries[k].in, entries[k].out, std);
+        const dow = new Date(y, m - 1, d).getDay();
+        const isRestDay = DEFAULT_REST_DAYS.includes(dow);
+
         if (h.total > 0) {
           dW++;
-          tR += h.reg;
-          const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-          tO += netOT;
-          if (netOT > 0) oD++;
+          
+          if (isRestDay) {
+            // All hours on rest day are OT
+            const netOT = applyOTRule(h.total, otMode, otBlockHours, otDeductMins);
+            tO += netOT;
+            if (netOT > 0) oD++;
+            wOT += netOT * otRate;
+          } else {
+            tR += h.reg;
+            const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
+            tO += netOT;
+            if (netOT > 0) oD++;
+            wOT += netOT * otRate;
+          }
         }
       }
     });
-    return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW };
-  }, [entries, viewY, viewM, std, otMode, otBlockHours, otDeductMins]);
+    return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW, workdayOTEarn: wOT };
+  }, [entries, viewY, viewM, std, otMode, otBlockHours, otDeductMins, otRate]);
 
-  const regEarn = (salary / 30) * (totalReg / std);
-  const otEarn = totalOT * otRate;
+  const regEarn = paymentType === 'daily' 
+    ? daysWorked * dailyRate 
+    : salary; // Full monthly salary as requested
+
+  const otEarn = workdayOTEarn;
   const totalEarn = regEarn + otEarn;
 
   // ── Calendar cells ──
@@ -345,6 +388,33 @@ export default function App() {
     
     const isMobile = window.innerWidth < 1280;
     if (!leaveData.leave) {
+      // Check for profile completeness: salary/dailyRate and otRate must be configured
+      const isRateIncomplete = paymentType === 'monthly' ? !salary : !dailyRate;
+      if (isRateIncomplete || !otRate) {
+        Swal.fire({
+          title: t.profile_incomplete_title || 'Profile Incomplete',
+          text: t.profile_incomplete_msg || 'Please complete your salary and OT rate in the profile page first.',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#3B4FE4',
+          cancelButtonColor: '#9CA3AF',
+          confirmButtonText: t.go_to_profile || 'Go to Profile',
+          cancelButtonText: t.cancel || 'Cancel',
+          customClass: {
+            container: 'font-sans',
+            popup: 'rounded-2xl',
+            confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
+            cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            setPage('profile');
+          }
+        });
+        if (isMobile) setSelectedKey(null);
+        return;
+      }
+
       // Work day selected — just update local state, user will fill time later
       setEntries((p) => ({
         ...p,
@@ -417,7 +487,7 @@ export default function App() {
 
   // ── Detail panel calc ──
   const detH = calc(dIn, dOut, std);
-  const detE = earn(detH.reg, detH.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins);
+  const detE = earn(detH.reg, detH.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
   const netDetOT = applyOTRule(detH.ot, otMode, otBlockHours, otDeductMins);
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
@@ -466,6 +536,11 @@ export default function App() {
         otDeductMins={otDeductMins} setOtDeductMins={setOtDeductMins}
         otSettingId={otSettingId} setOtSettingId={setOtSettingId}
         leaveQuotas={leaveQuotas} setLeaveQuotas={setLeaveQuotas}
+        
+        paymentType={paymentType} setPaymentType={setPaymentType}
+        dailyRate={dailyRate} setDailyRate={setDailyRate}
+        workDaysPerWeek={workDaysPerWeek} setWorkDaysPerWeek={setWorkDaysPerWeek}
+
         lang={lang}
         onBack={() => setPage('dashboard')}
       />
@@ -614,6 +689,8 @@ export default function App() {
               otBlockHours={otBlockHours}
               otDeductMins={otDeductMins}
               leaveQuotas={leaveQuotas}
+              paymentType={paymentType}
+              dailyRate={dailyRate}
               lang={lang}
             />
           )}
@@ -723,7 +800,7 @@ export default function App() {
                       const isWE = dow === 0 || dow === 6;
                       const h = entry ? calc(entry.in, entry.out, std) : { total: 0, reg: 0, ot: 0 };
                       const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-                      const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins);
+                      const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
                       const hasOT = netOT > 0;
                       const hasEntry = !!entry;
                       
@@ -979,7 +1056,7 @@ export default function App() {
                         const dw = new Date(k + 'T00:00:00').getDay();
                         const h = calc(e.in, e.out, std);
                         const netOt = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-                        const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins);
+                        const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
                         const hasOT = netOt > 0;
                         const isLeaveEntry = e.leave !== null && e.leave !== undefined;
                         const isSel = k === selectedKey;

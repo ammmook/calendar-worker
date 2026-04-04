@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     Briefcase, Wallet, Clock, CircleDollarSign,
     Stethoscope, UmbrellaOff, Plane,
@@ -35,7 +35,6 @@ const LEAVE_QUOTAS = [
 
 // Shared classes
 const labelCls = 'block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] mb-1.5';
-const inputCls = 'w-full bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[8px] text-[#111827] text-[13px] font-medium px-3 py-2.5 outline-none transition-colors focus:border-[#3B4FE4] focus:bg-white';
 const cardCls = 'bg-white border border-[#E8EAEF] rounded-2xl p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)]';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,6 +48,11 @@ export default function ProfilePage({
     otDeductMins, setOtDeductMins,    // minutes to deduct if above threshold
     otSettingId, setOtSettingId,
     leaveQuotas, setLeaveQuotas,
+    
+    paymentType, setPaymentType,
+    dailyRate, setDailyRate,
+    workDaysPerWeek, setWorkDaysPerWeek,
+
     lang,
     onBack,
 }) {
@@ -58,11 +62,19 @@ export default function ProfilePage({
     const [saved, setSaved] = useState(false);
     const [isSavingLocal, setIsSavingLocal] = useState(false);
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (!user?.email) return;
         setLoading(true, lang === 'th' ? 'กำลังบันทึก...' : 'Saving...');
         setIsSavingLocal(true);
         try {
+            // Clear irrelevant rate based on paymentType
+            const finalSalary = paymentType === 'monthly' ? salary : 0;
+            const finalDailyRate = paymentType === 'daily' ? dailyRate : 0;
+
+            // Sync back to local state so UI reflects the "deletion"
+            if (paymentType === 'monthly') setDailyRate(0);
+            else setSalary(0);
+
             // 1. บันทึก OT Setting
             const otData = { ot_mode: otMode };
             // ถ้าเป็น block mode → เก็บ hrs per block + deduct mins ด้วย
@@ -95,13 +107,17 @@ export default function ProfilePage({
             // 2. บันทึก User Profile + link currentOtSettingId
             await UserAPI.update({
                 email: user.email,
-                salary_monthly: salary,
+                salary_monthly: finalSalary,
                 ot_hourly: otRate,
                 working_hour: std,
                 sick_leave_day: leaveQuotas.sick,
                 personal_leave_day: leaveQuotas.personal,
                 annual_leave_day: leaveQuotas.vacation,
                 ...(currentOtSettingId && { ot_setting_id: currentOtSettingId }),
+                
+                payment_type: paymentType,
+                daily_rate: finalDailyRate,
+                work_days_per_week: workDaysPerWeek,
             });
 
             console.log('[TimeFlow] ✅ Profile & OT settings saved');
@@ -113,7 +129,7 @@ export default function ProfilePage({
             setIsSavingLocal(false);
             setLoading(false);
         }
-    };
+    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, lang, setLoading, setOtSettingId, setSalary, setDailyRate]);
 
     // ── OT example preview ───────────────────────────────────────────────────
     const previewOT = (rawOT) => {
@@ -159,22 +175,56 @@ export default function ProfilePage({
                 {/* ── Work Settings ── */}
                 <div className="flex flex-col gap-4 animate-[fadeUp_0.3s_ease_both]">
 
-                    {/* ── Section 1: Earnings ── */}
+                    {/* ── Section 1: Payment Type ── */}
                     <div className={cardCls}>
-                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.work_rate}</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.payment_type || 'Payment Type'}</h3>
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <button
+                                type="button"
+                                onClick={() => setPaymentType('monthly')}
+                                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer
+                                    ${paymentType === 'monthly' ? 'border-[#3B4FE4] bg-[#EEF0FD] text-[#3B4FE4]' : 'border-[#E8EAEF] bg-white text-[#6B7280] hover:border-[#D1D5E0]'}`}
+                            >
+                                <Wallet size={20} />
+                                <span className="text-sm font-bold">{t.monthly_salary}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPaymentType('daily')}
+                                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer
+                                    ${paymentType === 'daily' ? 'border-[#3B4FE4] bg-[#EEF0FD] text-[#3B4FE4]' : 'border-[#E8EAEF] bg-white text-[#6B7280] hover:border-[#D1D5E0]'}`}
+                            >
+                                <CircleDollarSign size={20} />
+                                <span className="text-sm font-bold">{t.daily_wage || 'Daily Wage'}</span>
+                            </button>
+                        </div>
 
-                            <div>
-                                <label className={labelCls}>{t.monthly_salary}</label>
-                                <InputWithIcon Icon={Wallet} suffix={t.mo_unit} color="#10B981">
-                                    <input
-                                        type="number" min="0" value={salary || ''}
-                                        onChange={(e) => setSalary(e.target.value === '' ? 0 : Number(e.target.value))}
-                                        onFocus={(e) => e.target.select()}
-                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                    />
-                                </InputWithIcon>
-                            </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {paymentType === 'monthly' ? (
+                                <div>
+                                    <label className={labelCls}>{t.monthly_salary}</label>
+                                    <InputWithIcon Icon={Wallet} suffix={t.mo_unit} color="#10B981">
+                                        <input
+                                            type="number" min="0" value={salary || ''}
+                                            onChange={(e) => setSalary(e.target.value === '' ? 0 : Number(e.target.value))}
+                                            onFocus={(e) => e.target.select()}
+                                            className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                        />
+                                    </InputWithIcon>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className={labelCls}>{t.daily_rate || 'Daily Rate'}</label>
+                                    <InputWithIcon Icon={CircleDollarSign} suffix={t.day_unit || 'day'} color="#10B981">
+                                        <input
+                                            type="number" min="0" value={dailyRate || ''}
+                                            onChange={(e) => setDailyRate(e.target.value === '' ? 0 : Number(e.target.value))}
+                                            onFocus={(e) => e.target.select()}
+                                            className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                        />
+                                    </InputWithIcon>
+                                </div>
+                            )}
 
                             <div>
                                 <label className={labelCls}>{t.ot_rate}</label>
@@ -187,7 +237,13 @@ export default function ProfilePage({
                                     />
                                 </InputWithIcon>
                             </div>
+                        </div>
+                    </div>
 
+                    {/* ── Section 2: Work Schedule ── */}
+                    <div className={cardCls}>
+                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.work_schedule || 'Work Schedule'}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
                                 <label className={labelCls}>{t.standard_hours}</label>
                                 <InputWithIcon Icon={Clock} suffix="h" color="#3B4FE4">
@@ -199,10 +255,21 @@ export default function ProfilePage({
                                     />
                                 </InputWithIcon>
                             </div>
+                            <div>
+                                <label className={labelCls}>{t.work_days_per_week || 'Work Days Per Week'}</label>
+                                <InputWithIcon Icon={Briefcase} suffix={t.day_unit || 'days'} color="#3B4FE4">
+                                    <input
+                                        type="number" min="1" max="7" value={workDaysPerWeek || ''}
+                                        onChange={(e) => setWorkDaysPerWeek(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onFocus={(e) => e.target.select()}
+                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                    />
+                                </InputWithIcon>
+                            </div>
                         </div>
                     </div>
 
-                    {/* ── Section 2: OT Calculation Mode ── */}
+                    {/* ── Section 3: OT Calculation Mode ── */}
                     <div className={cardCls}>
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-[13px] font-bold text-[#111827]">{t.ot_calc_method}</h3>
