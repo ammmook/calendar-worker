@@ -1595,27 +1595,36 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
       </span>
 
       {/* Leave Tag Icon OR Holiday Toggle */}
-      {!isHol && isLeave && leaveInfo ? (
-        <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center">
+      {isLeave && leaveInfo ? (
+        <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center z-20">
           <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
         </div>
       ) : (
-        <button
-          title={isHol ? 'Mark as workday' : 'Mark as holiday'}
-          onClick={(e) => toggleHoliday(e, k)}
-          className={[
-            'absolute top-[5px] right-[5px]',
-            'w-[18px] h-[18px] rounded-[4px]',
-            'grid place-items-center cursor-pointer',
-            'transition-all duration-150',
-            (isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'),
-            (isHol
-              ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
-              : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]'),
-          ].join(' ')}
-        >
-          <CornerIcon size={10} strokeWidth={2.5} />
-        </button>
+        <>
+          {/* Mobile-only Holiday Icon (Static) */}
+          {isHol && (
+            <div className="sm:hidden absolute top-[5px] right-[5px] w-[18px] h-[18px] rounded-[4px] grid place-items-center text-[#998ed9] bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]">
+              <CornerIcon size={10} strokeWidth={2.5} />
+            </div>
+          )}
+          {/* Desktop-only Holiday Toggle Button */}
+          <button
+            title={isHol ? 'Mark as workday' : 'Mark as holiday'}
+            onClick={(e) => toggleHoliday(e, k)}
+            className={[
+              'absolute top-[5px] right-[5px]',
+              'w-[18px] h-[18px] rounded-[4px]',
+              'hidden sm:grid place-items-center cursor-pointer',
+              'transition-all duration-150',
+              (isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'),
+              (isHol
+                ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
+                : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]'),
+            ].join(' ')}
+          >
+            <CornerIcon size={10} strokeWidth={2.5} />
+          </button>
+        </>
       )}
 
       {/* Entry data */}
