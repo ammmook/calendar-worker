@@ -64,7 +64,6 @@ export default function ProfilePage({
 
     const handleSave = useCallback(async () => {
         if (!user?.email) return;
-        setLoading(true, lang === 'th' ? 'กำลังบันทึก...' : 'Saving...');
         setIsSavingLocal(true);
         try {
             // Clear irrelevant rate based on paymentType
@@ -127,9 +126,8 @@ export default function ProfilePage({
             console.error('[TimeFlow] Failed to save profile:', err);
         } finally {
             setIsSavingLocal(false);
-            setLoading(false);
         }
-    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, lang, setLoading, setOtSettingId, setSalary, setDailyRate]);
+    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, lang, setOtSettingId, setSalary, setDailyRate]);
 
     // ── OT example preview ───────────────────────────────────────────────────
     const previewOT = (rawOT) => {
@@ -371,11 +369,18 @@ export default function ProfilePage({
                     <button
                         onClick={handleSave}
                         disabled={isSavingLocal}
-                        className={`flex items-center justify-center gap-2 w-full py-3 rounded-[12px] text-white text-[14px] font-bold border-none transition-all
-                              ${isSavingLocal ? 'bg-[#7B8CED] cursor-wait' : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(59,79,228,0.32)]'}`}
+                        className={`relative overflow-hidden flex items-center justify-center gap-2 w-full py-3 rounded-[12px] text-white text-[14px] font-bold border-none transition-all
+                              ${isSavingLocal ? 'bg-[#7B8CED] cursor-wait text-transparent' : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(59,79,228,0.32)]'}`}
                     >
-                        {isSavingLocal ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                        {isSavingLocal ? (lang === 'th' ? 'กำลังบันทึก...' : 'Saving...') : saved ? t.saved_success : t.save_settings}
+                        <div className={`flex items-center gap-2 transition-opacity ${isSavingLocal ? 'opacity-0' : 'opacity-100'}`}>
+                            <CheckCircle2 size={16} />
+                            <span>{saved ? t.saved_success : t.save_settings}</span>
+                        </div>
+                        {isSavingLocal && (
+                            <div className="absolute inset-0 flex items-center justify-center text-white">
+                                <AnimatedWaitText />
+                            </div>
+                        )}
                     </button>
 
                 </div>
@@ -432,3 +437,14 @@ function OTModeCard({ active, onClick, Icon, title, desc, example, accentColor }
 }
 
 function fmt1(n) { return typeof n === 'number' ? n.toFixed(1) : '—'; }
+
+const AnimatedWaitText = () => {
+    const [dots, ReactSetDots] = React.useState('');
+    React.useEffect(() => {
+        const seq = ['.  ', '.. ', '...', '.. '];
+        let i = 0;
+        const t = setInterval(() => { i = (i + 1) % seq.length; ReactSetDots(seq[i]); }, 300);
+        return () => clearInterval(t);
+    }, []);
+    return <span className="inline-block text-left whitespace-pre">{dots}</span>;
+};

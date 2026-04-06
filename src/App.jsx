@@ -65,8 +65,18 @@ const earn = (reg, ot, sal, otR, stD, otMode, blockH, deductM, paymentType, dail
 const fmt1 = (n) => n.toFixed(1);
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
 
-// Weekend rest days for OT rules (Sat/Sun); no longer user-configurable
-const DEFAULT_REST_DAYS = [0, 6];
+// Weekend rest days removed due to custom monthly logic not matching daily work log
+
+const AnimatedWaitText = () => {
+  const [dots, setDots] = useState('');
+  useEffect(() => {
+    const seq = ['.  ', '.. ', '...', '.. '];
+    let i = 0;
+    const t = setInterval(() => { i = (i + 1) % seq.length; setDots(seq[i]); }, 300);
+    return () => clearInterval(t);
+  }, []);
+  return <span className="inline-block text-left whitespace-pre">{dots}</span>;
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -89,7 +99,6 @@ export default function App() {
   const [viewM, setViewM] = useState(today.getMonth());
   const [showLeaveSelector, setShowLeaveSelector] = useState(false);
   const [leaveSelectorKey, setLeaveSelectorKey] = useState(null);
-  const [showMobileTimeInput, setShowMobileTimeInput] = useState(false);
 
   const [salary, setSalary] = useState(0);
   const [otRate, setOtRate] = useState(0);
@@ -113,6 +122,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'yearly'
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProfileIncomplete, setShowProfileIncomplete] = useState(false);
+  const [isSavingEntry, setIsSavingEntry] = useState(false);
 
   // ── Load user profile from Google Sheets on login ──
   useEffect(() => {
@@ -226,42 +236,31 @@ export default function App() {
   }, [selectedKey, selEntry.in, selEntry.out]);
 
   // ── Monthly aggregates ──
-  const { totalReg, totalOT, otDays, daysWorked, workdayOTEarn } = useMemo(() => {
-    let tR = 0, tO = 0, oD = 0, dW = 0, wOT = 0;
+  const { totalReg, totalOT, otDays, daysWorked } = useMemo(() => {
+    let tR = 0, tO = 0, oD = 0, dW = 0;
     Object.keys(entries).forEach((k) => {
       const [y, m, d] = k.split('-').map(Number);
       if (y === viewY && m === viewM + 1) {
         const h = calc(entries[k].in, entries[k].out, std);
-        const dow = new Date(y, m - 1, d).getDay();
-        const isRestDay = DEFAULT_REST_DAYS.includes(dow);
 
         if (h.total > 0) {
           dW++;
-          
-          if (isRestDay) {
-            // All hours on rest day are OT
-            const netOT = applyOTRule(h.total, otMode, otBlockHours, otDeductMins);
-            tO += netOT;
-            if (netOT > 0) oD++;
-            wOT += netOT * otRate;
-          } else {
-            tR += h.reg;
-            const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-            tO += netOT;
-            if (netOT > 0) oD++;
-            wOT += netOT * otRate;
-          }
+          tR += h.reg;
+          const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
+          tO += netOT;
+          if (netOT > 0) oD++;
         }
       }
     });
-    return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW, workdayOTEarn: wOT };
-  }, [entries, viewY, viewM, std, otMode, otBlockHours, otDeductMins, otRate]);
+    return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW };
+  }, [entries, viewY, viewM, std, otMode, otBlockHours, otDeductMins]);
 
   const regEarn = paymentType === 'daily' 
     ? daysWorked * dailyRate 
     : salary; // Full monthly salary as requested
 
-  const otEarn = workdayOTEarn;
+  // คำนวนโอทีรายเดือน โดยเอาจำนวนโอทีที่ทำทั้งเดือนมารวมกัน แล้วคูณกับเรท
+  const otEarn = totalOT * otRate;
   const totalEarn = regEarn + otEarn;
 
   // ── Calendar cells ──
@@ -299,8 +298,20 @@ export default function App() {
   };
 
   const saveSelectedEntry = async () => {
-    if (!dIn || !dOut || !selectedKey || !user?.email) return;
-    setLoading(true, lang === 'th' ? 'กำลังบันทึกข้อมูล...' : 'Saving data...');
+    if (!dIn || !dOut || !selectedKey || !user?.email) return false;
+    
+    // Optimistic update so data is shown on screen immediately
+    setEntries((prev) => ({
+      ...prev,
+      [selectedKey]: {
+        ...(prev[selectedKey] || {}),
+        in: dIn,
+        out: dOut,
+        leave: null
+      }
+    }));
+
+    setIsSavingEntry(true);
     try {
       const entryData = frontendEntryToSheet(
         selectedKey,
@@ -310,17 +321,26 @@ export default function App() {
       );
       const res = await WorkEntryAPI.upsert(entryData);
       if (res.success) {
-        // Reload entries จาก Sheet เพื่อ sync _id
-        await loadEntries(true);
         showToast(lang === 'th' ? 'บันทึกแล้ว' : 'Entry saved');
+        
+        // Close modal/pane immediately without waiting for background reload
+        setSelectedKey(null);
+        
+        // Reload in background to sync _id
+        loadEntries(true);
+        return true;
       } else {
         showToast(res.error || 'Save failed');
+        loadEntries(true); // rollback on fail
+        return false;
       }
     } catch (err) {
       console.error('[TimeFlow] Save error:', err);
       showToast('Save failed');
+      loadEntries(true);
+      return false;
     } finally {
-      setLoading(false);
+      setIsSavingEntry(false);
     }
   };
 
@@ -425,9 +445,7 @@ export default function App() {
         ...p,
         [dateStr]: { ...p[dateStr], ...leaveData }
       }));
-      if (isMobile) {
-        setShowMobileTimeInput(true);
-      } else {
+      if (!isMobile) {
         showToast(lang === 'th' ? 'กรุณากรอกเวลา' : 'Please enter time');
       }
     } else {
@@ -824,10 +842,12 @@ export default function App() {
             </div>
 
             {/* ── Right panel ── */}
-            <div className="flex flex-col gap-4 min-w-0 overflow-hidden animate-[fadeUp_0.4s_0.20s_ease_both] order-4 xl:order-4">
+            <div className="relative order-4 xl:order-4 min-w-0 xl:h-full">
+              <div className="flex flex-col gap-4 min-w-0 overflow-hidden animate-[fadeUp_0.4s_0.20s_ease_both] w-full xl:absolute xl:inset-0">
 
                 {/* Day detail card */}
-                <div className="hidden xl:block bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+                {selectedKey && (
+                  <div className="hidden xl:flex flex-col bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden shrink-0">
                   <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF]">
                     <span className="text-sm font-bold text-[#111827]">{selLabel}</span>
                     {isTodaySelected && (
@@ -838,11 +858,7 @@ export default function App() {
                   </div>
 
                   <div className="p-4 w-full overflow-hidden">
-                    {!selectedKey ? (
-                      <p className="text-sm text-[#9CA3AF] text-center py-4">
-                        {t.click_any_day}
-                      </p>
-                    ) : selEntry.leave !== null && selEntry.leave !== undefined ? (
+                    {selEntry.leave !== null && selEntry.leave !== undefined ? (
                       /* Leave info display */
                       <div className="flex flex-col gap-3 w-full">
                         <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
@@ -937,28 +953,38 @@ export default function App() {
                           )}
                           <button
                             onClick={saveSelectedEntry}
-                            disabled={isSelectedHoliday}
-                            className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2
+                            disabled={isSelectedHoliday || isSavingEntry}
+                            className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2 relative overflow-hidden
                               ${isSelectedHoliday 
                                 ? 'bg-[#D1D5E0] cursor-not-allowed' 
-                                : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
+                                : isSavingEntry
+                                  ? 'bg-[#7B8CED] cursor-wait text-transparent'
+                                  : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
                           >
-                            <CheckCircle2 size={14} />
-                            {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
+                            <div className={`flex items-center gap-2 transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
+                              <CheckCircle2 size={14} />
+                              <span>{entries[selectedKey]?.in ? t.update_entry : t.save_entry}</span>
+                            </div>
+                            {isSavingEntry && (
+                              <div className="absolute inset-0 flex items-center justify-center text-white">
+                                <AnimatedWaitText />
+                              </div>
+                            )}
                           </button>
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
+                )}
 
                 {/* Work log */}
-                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex-1">
-                  <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF]">
+                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex-1 flex flex-col min-h-0">
+                  <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF] shrink-0">
                     <span className="text-sm font-bold text-[#111827]">{t.work_log}</span>
                     <span className="text-[11px] text-[#9CA3AF] font-medium">{recentLogs.length} {t.entries}</span>
                   </div>
-                  <div className="p-2.5 max-h-[240px] overflow-y-auto flex flex-col gap-1">
+                  <div className="p-2.5 max-h-[240px] xl:max-h-none flex-1 overflow-y-auto flex flex-col gap-1 min-h-0">
                     {recentLogs.length === 0 ? (
                       <p className="text-[12px] text-[#9CA3AF] text-center py-4">{t.no_entries}</p>
                     ) : (
@@ -1025,6 +1051,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            </div>
 
             {/* Legend */}
             <div className="flex gap-5 flex-wrap px-1 animate-[fadeUp_0.4s_0.24s_ease_both] order-5 xl:col-span-2">
@@ -1042,8 +1069,8 @@ export default function App() {
               ))}
             </div>
 
-            {/* Mobile Modal for Date Details — only shown after leave/work flow completes */}
-            {selectedKey && !showLeaveSelector && !showMobileTimeInput && (
+            {/* Mobile Modal for Date Details — handles both new and existing entries */}
+            {selectedKey && !showLeaveSelector && (
               <div 
                 className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
                 onClick={() => setSelectedKey(null)}
@@ -1123,20 +1150,24 @@ export default function App() {
                           </button>
                         )}
                         <button
-                          onClick={() => {
-                            if (dIn && dOut && selectedKey) {
-                               saveSelectedEntry(); 
-                               setSelectedKey(null); 
-                            }
-                          }}
-                          disabled={isSelectedHoliday}
-                          className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5
+                          onClick={saveSelectedEntry}
+                          disabled={isSelectedHoliday || isSavingEntry}
+                          className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 relative overflow-hidden
                             ${isSelectedHoliday 
                               ? 'bg-[#D1D5E0] cursor-not-allowed' 
-                              : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
+                              : isSavingEntry
+                                ? 'bg-[#7B8CED] cursor-wait text-transparent'
+                                : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
                         >
-                          <CheckCircle2 size={16} />
-                          {entries[selectedKey]?.in ? t.update_entry : t.save_entry}
+                          <div className={`flex items-center gap-2.5 transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
+                            <CheckCircle2 size={16} />
+                            <span>{entries[selectedKey]?.in ? t.update_entry : t.save_entry}</span>
+                          </div>
+                          {isSavingEntry && (
+                            <div className="absolute inset-0 flex items-center justify-center text-white">
+                              <AnimatedWaitText />
+                            </div>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -1193,7 +1224,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Leave Selector Modal */}
       <LeaveSelector
         isOpen={showLeaveSelector}
         dateStr={leaveSelectorKey}
@@ -1202,97 +1232,6 @@ export default function App() {
         onCancel={handleLeaveCancel}
         lang={lang}
       />
-
-      {/* Mobile Time Input Bottom Sheet */}
-      {showMobileTimeInput && selectedKey && (
-        <div 
-          className="xl:hidden fixed inset-0 z-[200] bg-black/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
-          onClick={() => setShowMobileTimeInput(false)}
-        >
-          <div 
-            className="bg-white w-full rounded-t-[24px] shadow-xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
-            </div>
-
-            <div className="flex items-center justify-between p-6 border-b border-[#E8EAEF]">
-              <h3 className="text-[17px] font-bold text-[#111827]">{t.enter_time || 'Enter Work Time'}</h3>
-              <button 
-                onClick={() => setShowMobileTimeInput(false)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6 pb-10 flex flex-col gap-4">
-              {/* Time inputs */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>{t.clock_in}</label>
-                  <input type="time" className={inputCls} value={dIn} onChange={(e) => setDIn(e.target.value)} />
-                </div>
-                <div>
-                  <label className={labelCls}>{t.clock_out}</label>
-                  <input type="time" className={inputCls} value={dOut} onChange={(e) => setDOut(e.target.value)} />
-                </div>
-              </div>
-
-              {/* Summary */}
-              {dIn && dOut && (
-                <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                    <span className="text-[14px] font-bold text-[#111827]">{fmt1(detH.total)}h</span>
-                  </div>
-                  <div className="h-px bg-[#E8EAEF]" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                    <span className="text-[14px] font-bold text-[#3B4FE4]">{fmt1(detH.reg)}h</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                    <span className="text-[14px] font-bold text-[#c29302]">{fmt1(detH.ot)}h</span>
-                  </div>
-                  <div className="h-px bg-[#E8EAEF]" />
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                    <span className="text-[16px] font-bold text-[#10B981]">{fmtB(detE)}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Buttons */}
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => { setShowMobileTimeInput(false); setSelectedKey(null); }}
-                  className="flex-1 py-3 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors bg-white cursor-pointer"
-                >
-                  {t.cancel || 'Cancel'}
-                </button>
-                <button
-                  onClick={() => {
-                    saveSelectedEntry();
-                    setShowMobileTimeInput(false);
-                    setSelectedKey(null);
-                  }}
-                  disabled={!dIn || !dOut}
-                  className={`flex-1 py-3 rounded-[10px] text-white text-sm font-bold transition-all flex items-center justify-center gap-2 border-none
-                    ${!dIn || !dOut 
-                      ? 'bg-[#D1D5E0] cursor-not-allowed' 
-                      : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0]'}`}
-                >
-                  <CheckCircle2 size={16} />
-                  {t.save_entry || 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Mobile Profile Incomplete Warning Bottom Sheet */}
       {showProfileIncomplete && (

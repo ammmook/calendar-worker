@@ -38,8 +38,7 @@ const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
 const fmt1 = (n) => n.toFixed(1);
 
-// Weekend rest days for OT (matches App.jsx); not user-configurable
-const DEFAULT_REST_DAYS = [0, 6];
+// Weekend rest days removed due to custom monthly logic not matching daily work log
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function YearlyDashboard({
@@ -99,32 +98,21 @@ export default function YearlyDashboard({
                 const total = mins / 60;
                 const stdH = parseFloat(std || 8);
 
-                const [y, m, d] = k.split('-').map(Number);
-                const dow = new Date(y, m - 1, d).getDay();
-                const isRestDay = DEFAULT_REST_DAYS.includes(dow);
-
                 daysW++;
-                if (isRestDay) {
-                    const netOT = applyOTRule(total, otMode, otBlockHours, otDeductMins);
-                    tOT += netOT;
-                    if (netOT > 0) otDays++;
-                    wOTEarn += netOT * otRate;
-                } else {
-                    const reg = Math.min(total, stdH);
-                    const rawOT = Math.max(0, total - stdH);
-                    const netOT = applyOTRule(rawOT, otMode, otBlockHours, otDeductMins);
-                    tReg += reg;
-                    tOT += netOT;
-                    if (netOT > 0) otDays++;
-                    wOTEarn += netOT * otRate;
-                }
+                const reg = Math.min(total, stdH);
+                const rawOT = Math.max(0, total - stdH);
+                const netOT = applyOTRule(rawOT, otMode, otBlockHours, otDeductMins);
+                tReg += reg;
+                tOT += netOT;
+                if (netOT > 0) otDays++;
             });
 
             const regEarn = paymentType === 'daily'
                 ? daysW * dailyRate
                 : (daysW > 0 ? salary : 0); // Full fixed salary if worked at least 1 day in month
 
-            const otEarn = wOTEarn;
+            // คำนวนโอทีรายเดือน โดยเอาจำนวนโอทีที่ทำทั้งเดือนมารวมกัน แล้วคูณกับเรท
+            const otEarn = tOT * otRate;
             const totalEarn = regEarn + otEarn;
 
             return {
