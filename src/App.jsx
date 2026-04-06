@@ -298,7 +298,7 @@ export default function App() {
   };
 
   const saveSelectedEntry = async () => {
-    if (!dIn || !dOut || !selectedKey || !user?.email) return false;
+    if (!dIn || !selectedKey || !user?.email) return false;
     
     // Optimistic update so data is shown on screen immediately
     setEntries((prev) => ({
@@ -953,7 +953,7 @@ export default function App() {
                           )}
                           <button
                             onClick={saveSelectedEntry}
-                            disabled={isSelectedHoliday || isSavingEntry}
+                            disabled={!dIn || isSelectedHoliday || isSavingEntry}
                             className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2 relative overflow-hidden
                               ${isSelectedHoliday 
                                 ? 'bg-[#D1D5E0] cursor-not-allowed' 
@@ -1151,7 +1151,7 @@ export default function App() {
                         )}
                         <button
                           onClick={saveSelectedEntry}
-                          disabled={isSelectedHoliday || isSavingEntry}
+                          disabled={!dIn || isSelectedHoliday || isSavingEntry}
                           className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 relative overflow-hidden
                             ${isSelectedHoliday 
                               ? 'bg-[#D1D5E0] cursor-not-allowed' 
