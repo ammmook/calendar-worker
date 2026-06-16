@@ -197,6 +197,55 @@
   animation: fadeIn 0.6s ease both;
 }
 
+/* ── Skeleton Loading ── */
+@keyframes skeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes skeletonPulseIcon {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.7; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #E8EAEF 25%,
+    #F3F4F8 37%,
+    #E8EAEF 63%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton-shimmer-light {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.15) 25%,
+    rgba(255,255,255,0.30) 37%,
+    rgba(255,255,255,0.15) 63%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+  border-radius: 4px;
+}
+
+.skeleton-calendar-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #F8F9FB;
+  transition: opacity 0.2s;
+}
+
+.skeleton-pulse-icon {
+  animation: skeletonPulseIcon 1.8s ease-in-out infinite;
+}
+
 .delay-100 {
   animation-delay: 0.1s;
 }

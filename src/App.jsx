@@ -18,6 +18,7 @@ import { useLoading } from './components/LoadingContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
 import { UserAPI, WorkEntryAPI, HolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
+import { SkeletonDashboard, SkeletonAuthLoading } from './components/SkeletonLoader';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const dateKey = (y, m, d) =>
@@ -123,6 +124,7 @@ export default function App() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProfileIncomplete, setShowProfileIncomplete] = useState(false);
   const [isSavingEntry, setIsSavingEntry] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // ── Load user profile from Google Sheets on login ──
   useEffect(() => {
@@ -187,9 +189,12 @@ export default function App() {
   }, [user?.email]);
 
   // ── Load work entries and holidays from Google Sheets ──
+  const initialLoadDoneRef = useRef(false);
   const loadEntries = useCallback(async (silent = false) => {
     if (!user?.email) return;
-    if (!silent) setLoading(true, lang === 'th' ? 'กำลังเตรียมข้อมูล...' : 'Loading data...');
+    // Only show the overlay for explicit non-silent reloads AFTER the first load
+    // The first load uses skeleton loading (no overlay)
+    if (!silent && initialLoadDoneRef.current) setLoading(true, lang === 'th' ? 'กำลังเตรียมข้อมูล...' : 'Loading data...');
     console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
     try {
       // 1. Load work entries
@@ -215,7 +220,9 @@ export default function App() {
     } catch (err) {
       console.error('[TimeFlow] Failed to load data:', err);
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent && initialLoadDoneRef.current) setLoading(false);
+      initialLoadDoneRef.current = true;
+      setDataLoaded(true);
     }
   }, [user?.email, setLoading, lang]);
 
@@ -534,16 +541,7 @@ export default function App() {
 
   // ── Auth guard — show login if not signed in ──────────────────────────────
   if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#F8F9FB] grid place-items-center font-sans">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 bg-[#3B4FE4] rounded-2xl grid place-items-center shadow-lg animate-pulse">
-            <CalendarDays size={20} className="text-white" />
-          </div>
-          <div className="text-[13px] text-[#9CA3AF]">กำลังโหลด...</div>
-        </div>
-      </div>
-    );
+    return <SkeletonAuthLoading />;
   }
   if (!user) return <LoginPage />;
 
@@ -719,7 +717,11 @@ export default function App() {
           )}
 
           {/* ══ MONTHLY VIEW ══ */}
-          {activeTab === 'monthly' && (
+          {activeTab === 'monthly' && !dataLoaded && (
+            <SkeletonDashboard daysShort={t.days_short} />
+          )}
+
+          {activeTab === 'monthly' && dataLoaded && (
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_284px] gap-6 w-full">
 
             {/* Dashboard header */}
