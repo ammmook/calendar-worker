@@ -7,7 +7,7 @@ import {
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
-  Stethoscope, UmbrellaOff, AlertCircle,
+  Stethoscope, UmbrellaOff, AlertCircle, Loader2,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
@@ -1293,6 +1293,13 @@ export default function App() {
         ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <CheckCircle2 size={14} className="text-[#10B981]" />
         {toast.msg}
+      </div>
+
+      {/* Saving Toast */}
+      <div className={`fixed bottom-6 right-6 bg-[#111827] text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
+        ${(isSavingEntry || isDeletingEntry || isSavingLeave) && !toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        <Loader2 size={14} className="text-[#3B4FE4] animate-spin" />
+        {lang === 'th' ? 'กำลังบันทึก...' : 'Saving...'}
       </div>
 
     </div>
