@@ -14,16 +14,6 @@ export function LoadingProvider({ children }) {
   return (
     <LoadingContext.Provider value={{ loading, setLoading }}>
       {children}
-      {loading && (
-        <div className="fixed inset-0 z-[9999] bg-white/60 backdrop-blur-[2px] flex flex-col items-center justify-center animate-[fadeIn_0.2s_ease_both] gap-4">
-          <div className="uiverse-loader"></div>
-          {message && (
-            <span className="text-[14px] font-bold text-[#3B4FE4] mt-4 tracking-wide">
-              {message}
-            </span>
-          )}
-        </div>
-      )}
     </LoadingContext.Provider>
   );
 }

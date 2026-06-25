@@ -3,10 +3,10 @@ import {
     Briefcase, Wallet, Clock, CircleDollarSign,
     Stethoscope, UmbrellaOff, Plane,
     ChevronLeft, CheckCircle2,
-    Zap, Timer, AlertCircle, Loader2,
+    Zap, Timer, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { useLoading } from './LoadingContext';
+
 import { getLang } from '../locales';
 import { UserAPI, OtSettingAPI } from '../services/api';
 
@@ -57,7 +57,6 @@ export default function ProfilePage({
     onBack,
 }) {
     const { user } = useAuth();
-    const { setLoading } = useLoading();
     const t = getLang(lang);
     const [saved, setSaved] = useState(false);
     const [isSavingLocal, setIsSavingLocal] = useState(false);

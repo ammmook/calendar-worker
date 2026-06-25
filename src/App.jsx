@@ -7,14 +7,13 @@ import {
   Timer, CircleDollarSign, Banknote,
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
-  Stethoscope, UmbrellaOff, Loader2, AlertCircle,
+  Stethoscope, UmbrellaOff, AlertCircle,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
 import { LeaveSelector } from './components/LeaveSelector';
 import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
-import { useLoading } from './components/LoadingContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
 import { UserAPI, WorkEntryAPI, HolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
@@ -85,13 +84,21 @@ export default function App() {
 
   // ── Auth ──
   const { user, loading: authLoading, signOut } = useAuth();
-  const { setLoading } = useLoading();
 
   // ── Page routing ──
   const [page, setPage] = useState('dashboard'); // 'dashboard' | 'profile'
 
-  const [lang, setLang] = useState('en');
+  const [lang, setLang] = useState(() => {
+    try {
+      return localStorage.getItem('timeflow_lang') || 'en';
+    } catch { return 'en'; }
+  });
   const t = getLang(lang);
+
+  // Persist language to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('timeflow_lang', lang); } catch {}
+  }, [lang]);
 
   const [entries, setEntries] = useState({});
   const [holidays, setHolidays] = useState(new Set());
@@ -125,6 +132,8 @@ export default function App() {
   const [showProfileIncomplete, setShowProfileIncomplete] = useState(false);
   const [isSavingEntry, setIsSavingEntry] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isDeletingEntry, setIsDeletingEntry] = useState(false);
+  const [isSavingLeave, setIsSavingLeave] = useState(false);
 
   // ── Load user profile from Google Sheets on login ──
   useEffect(() => {
@@ -192,9 +201,7 @@ export default function App() {
   const initialLoadDoneRef = useRef(false);
   const loadEntries = useCallback(async (silent = false) => {
     if (!user?.email) return;
-    // Only show the overlay for explicit non-silent reloads AFTER the first load
-    // The first load uses skeleton loading (no overlay)
-    if (!silent && initialLoadDoneRef.current) setLoading(true, lang === 'th' ? 'กำลังเตรียมข้อมูล...' : 'Loading data...');
+    // The first load uses skeleton loading; subsequent reloads are silent
     console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
     try {
       // 1. Load work entries
@@ -220,11 +227,10 @@ export default function App() {
     } catch (err) {
       console.error('[TimeFlow] Failed to load data:', err);
     } finally {
-      if (!silent && initialLoadDoneRef.current) setLoading(false);
       initialLoadDoneRef.current = true;
       setDataLoaded(true);
     }
-  }, [user?.email, setLoading, lang]);
+  }, [user?.email, lang]);
 
   useEffect(() => {
     loadEntries();
@@ -354,13 +360,13 @@ export default function App() {
   const performDelete = async () => {
     if (!selectedKey || !entries[selectedKey]) return;
     const entry = entries[selectedKey];
-    setLoading(true, lang === 'th' ? 'กำลังบันทึกข้อมูล...' : 'Saving data...');
+    setIsDeletingEntry(true);
     try {
       if (entry._id) {
         const res = await WorkEntryAPI.delete(entry._id);
         if (!res.success) {
           showToast(res.error || 'Delete failed');
-          setLoading(false);
+          setIsDeletingEntry(false);
           return;
         }
       }
@@ -372,7 +378,7 @@ export default function App() {
       console.error('[TimeFlow] Delete error:', err);
       showToast('Delete failed');
     } finally {
-      setLoading(false);
+      setIsDeletingEntry(false);
     }
   };
 
@@ -458,7 +464,7 @@ export default function App() {
     } else {
       // Leave recorded — save to Google Sheets
       if (user?.email) {
-        setLoading(true, lang === 'th' ? 'กำลังบันทึกข้อมูล...' : 'Saving data...');
+        setIsSavingLeave(true);
         try {
           const entryData = frontendEntryToSheet(
             dateStr,
@@ -472,7 +478,7 @@ export default function App() {
         } catch (err) {
           console.error('[TimeFlow] Leave save error:', err);
         } finally {
-          setLoading(false);
+          setIsSavingLeave(false);
         }
       }
       showToast(lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded');
@@ -943,14 +949,14 @@ export default function App() {
                           {entries[selectedKey]?.in && (
                             <button
                               onClick={deleteSelectedEntry}
-                              disabled={isSelectedHoliday}
+                              disabled={isSelectedHoliday || isDeletingEntry}
                               title={t.delete_entry}
                               className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                                ${isSelectedHoliday 
+                                ${isSelectedHoliday || isDeletingEntry
                                   ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
                                   : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
                             >
-                              <Trash2 size={16} />
+                              {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
                             </button>
                           )}
                           <button
@@ -1141,14 +1147,14 @@ export default function App() {
                         {entries[selectedKey]?.in && (
                           <button
                             onClick={deleteSelectedEntry}
-                            disabled={isSelectedHoliday}
+                            disabled={isSelectedHoliday || isDeletingEntry}
                             title={t.delete_entry}
                             className={`px-5 py-3.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                              ${isSelectedHoliday 
+                              ${isSelectedHoliday || isDeletingEntry
                                 ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
                                 : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
                           >
-                            <Trash2 size={18} />
+                            {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={18} />}
                           </button>
                         )}
                         <button

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { CalendarDays, Clock, TrendingUp } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { useLoading } from './LoadingContext';
 import { useGoogleLogin } from '@react-oauth/google';
 
 
@@ -170,7 +169,7 @@ function WorkerIllustration() {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
     const { handleGoogleSuccess, loading: authLoading, error, setError } = useAuth();
-    const { loading: globalLoading, setLoading } = useLoading();
+    const [isSigningIn, setIsSigningIn] = useState(false);
 
     const loginWithGoogle = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
@@ -183,23 +182,23 @@ export default function LoginPage() {
             } catch {
                 setError('Error fetching profile from Google');
             } finally {
-                setLoading(false);
+                setIsSigningIn(false);
             }
         },
         onError: () => {
             setError('Sign-in cancelled or encountered an error');
-            setLoading(false);
+            setIsSigningIn(false);
         },
-        onNonOAuthError: () => setLoading(false),
+        onNonOAuthError: () => setIsSigningIn(false),
     });
 
     const handleGoogleClick = () => {
-        setLoading(true, 'Signing in...');
+        setIsSigningIn(true);
         setError(null);
         loginWithGoogle();
     };
 
-    const isInteractionDisabled = authLoading || globalLoading;
+    const isInteractionDisabled = authLoading || isSigningIn;
 
     return (
         <div className="min-h-screen bg-[#F8F9FB] flex flex-col lg:flex-row font-sans overflow-hidden">
@@ -310,7 +309,7 @@ export default function LoginPage() {
                 disabled:opacity-50 disabled:cursor-not-allowed
                 shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
                         >
-                            {globalLoading ? (
+                            {isSigningIn ? (
                                 /* Spinner */
                                 <svg className="animate-spin shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none">
                                     <circle cx="12" cy="12" r="10" stroke="#D1D5E0" strokeWidth="3" />
@@ -325,7 +324,7 @@ export default function LoginPage() {
                                     <path d="M24.48 9.667c3.548 0 6.733 1.22 9.237 3.617l6.93-6.93C36.456 2.413 30.994 0 24.48 0 15.118 0 6.916 5.142 2.94 13.38l8.002 6.253c1.905-5.714 7.24-9.966 13.538-9.966z" fill="#EA4335" />
                                 </svg>
                             )}
-                            {globalLoading ? 'Signing in...' : 'Continue with Google'}
+                            {isSigningIn ? 'Signing in...' : 'Continue with Google'}
                         </button>
 
 
