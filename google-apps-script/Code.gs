@@ -41,11 +41,22 @@ function initSheets() {
     work_entry: [
       'work_entry_id', 'date', 'month_num', 'year_num',
       'clock_in', 'clock_out', 'leave_type', 'working_hour',
-      'ot_hour', 'ot_earning', 'user_email'
+      'ot_hour', 'ot_earning', 'user_email',
+      'regular_earning', 'total_earning'
     ],
     ot_setting: [
       'ot_setting_id', 'ot_mode', 'ot_block_hours', 'ot_deduct_mins'
     ],
+    monthly_summary: [
+      'summary_id', 'user_email', 'month_num', 'year_num',
+      'days_worked', 'ot_days', 'total_working_hour', 'total_ot_hour',
+      'total_regular_earning', 'total_ot_earning', 'total_earning'
+    ],
+    yearly_summary: [
+      'summary_id', 'user_email', 'year_num',
+      'total_days_worked', 'total_ot_days', 'total_working_hour', 'total_ot_hour',
+      'total_regular_earning', 'total_ot_earning', 'total_earning'
+    ]
   };
 
   Object.entries(schemas).forEach(([sheetName, headers]) => {
@@ -129,6 +140,9 @@ function doGet(e) {
           Number(data.month),
           Number(data.year)
         );
+        break;
+      case 'getEarningsSummary':
+        result = getEarningsSummary(data.email, Number(data.year));
         break;
 
       // ── Work Entry WRITE ──
@@ -593,6 +607,17 @@ function updateWorkEntry(data) {
 function deleteWorkEntry(workEntryId) {
   if (!workEntryId) return { success: false, error: 'work_entry_id is required' };
 
+  // หา entry ก่อนลบ เพื่อเอา user_email, month_num, year_num สำหรับ recalc
+  const entries = sheetToObjects('work_entry');
+  const existing = entries.find(e => String(e.work_entry_id) === String(workEntryId));
+  
+  var userEmail = null, monthNum = null, yearNum = null;
+  if (existing) {
+    userEmail = existing.user_email;
+    monthNum = Number(existing.month_num);
+    yearNum = Number(existing.year_num);
+  }
+
   const rowNum = findRowByKey('work_entry', 'work_entry_id', workEntryId);
   if (rowNum === -1) {
     return { success: false, error: 'Work entry not found' };
@@ -600,6 +625,13 @@ function deleteWorkEntry(workEntryId) {
 
   const sheet = getSheet('work_entry');
   sheet.deleteRow(rowNum);
+  
+  // คำนวณสรุปรายเดือนและรายปีใหม่หลังลบ
+  if (userEmail && monthNum && yearNum) {
+    recalcMonthlySummary(userEmail, monthNum, yearNum);
+    recalcYearlySummary(userEmail, yearNum);
+  }
+  
   return { success: true, message: 'Work entry deleted' };
 }
 
@@ -667,29 +699,324 @@ function updateOtSetting(data) {
 //  UPSERT HELPERS (สะดวกสำหรับ Frontend)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+
+
 /**
  * Upsert Work Entry — ถ้ามี entry สำหรับ user+date อยู่แล้ว จะ update
  *                      ถ้าไม่มี จะ create ใหม่
- * ส่ง data.user_email + data.date เป็น composite key
+ * คำนวณเงินจาก DB และบันทึกลง table earnings
  */
 function upsertWorkEntry(data) {
   if (!data || !data.user_email || !data.date) {
     return { success: false, error: 'user_email and date are required' };
   }
 
-  // หา existing entry ด้วย user_email + date
+  // 1. คำนวณเงินโดยดึงข้อมูลจาก DB เท่านั้น
+  const users = sheetToObjects('user');
+  const user = users.find(u => String(u.email) === String(data.user_email));
+  if (user) {
+    expandUserWithSalary(user);
+    
+    let workingHour = 0;
+    let otHour = 0;
+    
+    if (data.clock_in && data.clock_out) {
+      const partsIn = data.clock_in.split(':');
+      const partsOut = data.clock_out.split(':');
+      const ih = Number(partsIn[0] || 0), im = Number(partsIn[1] || 0);
+      const oh = Number(partsOut[0] || 0), om = Number(partsOut[1] || 0);
+      
+      let totalMins = (oh * 60 + om) - (ih * 60 + im);
+      if (totalMins < 0) totalMins += 1440; // ข้ามวัน
+      
+      if (totalMins > 0) {
+        const totalH = totalMins / 60;
+        const stdH = Number(user.working_hour) || 8;
+        workingHour = Math.min(totalH, stdH);
+        
+        let rawOT = Math.max(0, totalH - stdH);
+        let netOT = rawOT;
+        
+        const otMode = user.ot_mode || 'none';
+        const blockH = Number(user.ot_block_hours) || 0;
+        const deductM = Number(user.ot_deduct_mins) || 0;
+        
+        if (otMode === 'block' && rawOT > 0) {
+          if (rawOT <= blockH) {
+             netOT = rawOT;
+          } else {
+             netOT = Math.max(0, rawOT - (deductM / 60));
+          }
+        }
+        otHour = netOT;
+      }
+    }
+    
+    data.working_hour = workingHour;
+    data.ot_hour = otHour;
+    
+    const paymentType = user.payment_type || 'monthly';
+    const dailyRate = Number(user.daily_rate) || 0;
+    const salaryMonthly = Number(user.salary_monthly) || 0;
+    const otRate = Number(user.ot_hourly) || 0;
+    const stdH = Number(user.working_hour) || 8;
+    
+    let regularEarning = 0;
+    if (paymentType === 'daily') {
+      regularEarning = dailyRate * (stdH > 0 ? workingHour / stdH : 0);
+    } else {
+      regularEarning = (salaryMonthly / 30) * (stdH > 0 ? workingHour / stdH : 0);
+    }
+    
+    let otEarning = otHour * otRate;
+    let totalEarning = regularEarning + otEarning;
+    
+    data.ot_earning = otEarning;
+    data.regular_earning = regularEarning;
+    data.total_earning = totalEarning;
+    
+    const d = new Date(data.date);
+    const monthNum = d.getMonth() + 1;
+    const yearNum = d.getFullYear();
+    
+    // อัปเดตตารางสรุปรายเดือนและรายปี (หลังจาก upsert work_entry ข้างล่าง)
+    data._monthNum = monthNum;
+    data._yearNum = yearNum;
+  }
+
+  // 2. หา existing entry ด้วย user_email + date
   const entries = sheetToObjects('work_entry');
   const existing = entries.find(e =>
     String(e.user_email) === String(data.user_email) &&
     String(e.date) === String(data.date)
   );
 
+  var result;
   if (existing) {
     data.work_entry_id = existing.work_entry_id;
-    return updateWorkEntry(data);
+    result = updateWorkEntry(data);
   } else {
-    return createWorkEntry(data);
+    result = createWorkEntry(data);
   }
+  
+  // อัปเดตตารางสรุปรายเดือนและรายปีหลังบันทึก work_entry แล้ว
+  if (data._monthNum && data._yearNum) {
+    recalcMonthlySummary(data.user_email, data._monthNum, data._yearNum);
+    recalcYearlySummary(data.user_email, data._yearNum);
+  }
+  
+  return result;
+}
+
+/**
+ * คำนวณสรุปรายเดือนจาก work_entry table แล้วบันทึกลง monthly_summary
+ */
+function recalcMonthlySummary(userEmail, monthNum, yearNum) {
+  var allEntries = sheetToObjects('work_entry');
+  var filtered = allEntries.filter(function(e) {
+    return String(e.user_email) === String(userEmail) &&
+           Number(e.month_num) === monthNum &&
+           Number(e.year_num) === yearNum;
+  });
+
+  var days_worked = 0, ot_days = 0;
+  var total_working_hour = 0, total_ot_hour = 0;
+  var total_regular_earning = 0, total_ot_earning = 0, total_earning = 0;
+
+  filtered.forEach(function(e) {
+    var wh = Number(e.working_hour) || 0;
+    var oh = Number(e.ot_hour) || 0;
+    if (wh > 0 || oh > 0) days_worked++;
+    if (oh > 0) ot_days++;
+    total_working_hour += wh;
+    total_ot_hour += oh;
+    total_regular_earning += Number(e.regular_earning) || 0;
+    total_ot_earning += Number(e.ot_earning) || 0;
+    total_earning += Number(e.total_earning) || 0;
+  });
+
+  var summaryData = {
+    user_email: userEmail,
+    month_num: monthNum,
+    year_num: yearNum,
+    days_worked: days_worked,
+    ot_days: ot_days,
+    total_working_hour: total_working_hour,
+    total_ot_hour: total_ot_hour,
+    total_regular_earning: total_regular_earning,
+    total_ot_earning: total_ot_earning,
+    total_earning: total_earning
+  };
+
+  // Upsert monthly_summary
+  var rows = sheetToObjects('monthly_summary');
+  var existing = rows.find(function(r) {
+    return String(r.user_email) === String(userEmail) &&
+           Number(r.month_num) === monthNum &&
+           Number(r.year_num) === yearNum;
+  });
+
+  var sheet = getSheet('monthly_summary');
+  var headers = getHeaders('monthly_summary');
+
+  if (existing) {
+    summaryData.summary_id = existing.summary_id;
+    var rowNum = findRowByKey('monthly_summary', 'summary_id', existing.summary_id);
+    var currentRow = sheet.getRange(rowNum, 1, 1, headers.length).getValues()[0];
+    var updatedRow = headers.map(function(h, i) {
+      return (summaryData[h] !== undefined && summaryData[h] !== null) ? summaryData[h] : currentRow[i];
+    });
+    sheet.getRange(rowNum, 1, 1, headers.length).setValues([updatedRow]);
+  } else {
+    summaryData.summary_id = generateId('MS');
+    var row = headers.map(function(h) {
+      return (summaryData[h] !== undefined && summaryData[h] !== null) ? summaryData[h] : '';
+    });
+    sheet.appendRow(row);
+  }
+}
+
+/**
+ * คำนวณสรุปรายปีจาก monthly_summary table แล้วบันทึกลง yearly_summary
+ */
+function recalcYearlySummary(userEmail, yearNum) {
+  var allMonthly = sheetToObjects('monthly_summary');
+  var filtered = allMonthly.filter(function(r) {
+    return String(r.user_email) === String(userEmail) &&
+           Number(r.year_num) === yearNum;
+  });
+
+  var total_days_worked = 0, total_ot_days = 0;
+  var total_working_hour = 0, total_ot_hour = 0;
+  var total_regular_earning = 0, total_ot_earning = 0, total_earning = 0;
+
+  filtered.forEach(function(m) {
+    total_days_worked += Number(m.days_worked) || 0;
+    total_ot_days += Number(m.ot_days) || 0;
+    total_working_hour += Number(m.total_working_hour) || 0;
+    total_ot_hour += Number(m.total_ot_hour) || 0;
+    total_regular_earning += Number(m.total_regular_earning) || 0;
+    total_ot_earning += Number(m.total_ot_earning) || 0;
+    total_earning += Number(m.total_earning) || 0;
+  });
+
+  var summaryData = {
+    user_email: userEmail,
+    year_num: yearNum,
+    total_days_worked: total_days_worked,
+    total_ot_days: total_ot_days,
+    total_working_hour: total_working_hour,
+    total_ot_hour: total_ot_hour,
+    total_regular_earning: total_regular_earning,
+    total_ot_earning: total_ot_earning,
+    total_earning: total_earning
+  };
+
+  // Upsert yearly_summary
+  var rows = sheetToObjects('yearly_summary');
+  var existing = rows.find(function(r) {
+    return String(r.user_email) === String(userEmail) &&
+           Number(r.year_num) === yearNum;
+  });
+
+  var sheet = getSheet('yearly_summary');
+  var headers = getHeaders('yearly_summary');
+
+  if (existing) {
+    summaryData.summary_id = existing.summary_id;
+    var rowNum = findRowByKey('yearly_summary', 'summary_id', existing.summary_id);
+    var currentRow = sheet.getRange(rowNum, 1, 1, headers.length).getValues()[0];
+    var updatedRow = headers.map(function(h, i) {
+      return (summaryData[h] !== undefined && summaryData[h] !== null) ? summaryData[h] : currentRow[i];
+    });
+    sheet.getRange(rowNum, 1, 1, headers.length).setValues([updatedRow]);
+  } else {
+    summaryData.summary_id = generateId('YS');
+    var row = headers.map(function(h) {
+      return (summaryData[h] !== undefined && summaryData[h] !== null) ? summaryData[h] : '';
+    });
+    sheet.appendRow(row);
+  }
+}
+
+/**
+ * ดึงสรุปข้อมูลเงินจาก table earnings (รายวัน), monthly_summary (รายเดือน), yearly_summary (รายปี)
+ */
+function getEarningsSummary(email, year) {
+  if (!email) return { success: false, error: 'email is required' };
+  if (!year) return { success: false, error: 'year is required' };
+
+  // ── Daily: ดึงจาก work_entry table ──
+  var allEntries = sheetToObjects('work_entry');
+  var filtered = allEntries.filter(function(e) {
+    return String(e.user_email) === String(email) && Number(e.year_num) === year;
+  });
+
+  var daily = {};
+  filtered.forEach(function(e) {
+    daily[String(e.date)] = {
+      working_hour: Number(e.working_hour) || 0,
+      ot_hour: Number(e.ot_hour) || 0,
+      ot_earning: Number(e.ot_earning) || 0,
+      regular_earning: Number(e.regular_earning) || 0,
+      total_earning: Number(e.total_earning) || 0
+    };
+  });
+
+  // ── Monthly: ดึงจาก monthly_summary table ──
+  var allMonthly = sheetToObjects('monthly_summary');
+  var monthlyFiltered = allMonthly.filter(function(m) {
+    return String(m.user_email) === String(email) && Number(m.year_num) === year;
+  });
+
+  var monthly = [];
+  for (var m = 1; m <= 12; m++) {
+    var found = monthlyFiltered.find(function(r) { return Number(r.month_num) === m; });
+    if (found) {
+      monthly.push({
+        month_num: m,
+        year_num: year,
+        days_worked: Number(found.days_worked) || 0,
+        ot_days: Number(found.ot_days) || 0,
+        total_working_hour: Number(found.total_working_hour) || 0,
+        total_ot_hour: Number(found.total_ot_hour) || 0,
+        total_ot_earning: Number(found.total_ot_earning) || 0,
+        total_regular_earning: Number(found.total_regular_earning) || 0,
+        total_earning: Number(found.total_earning) || 0
+      });
+    } else {
+      monthly.push({
+        month_num: m, year_num: year,
+        days_worked: 0, ot_days: 0,
+        total_working_hour: 0, total_ot_hour: 0,
+        total_ot_earning: 0, total_regular_earning: 0, total_earning: 0
+      });
+    }
+  }
+
+  // ── Yearly: ดึงจาก yearly_summary table ──
+  var allYearly = sheetToObjects('yearly_summary');
+  var yearlyFound = allYearly.find(function(r) {
+    return String(r.user_email) === String(email) && Number(r.year_num) === year;
+  });
+
+  var yearlyTotals = yearlyFound ? {
+    year_num: year,
+    total_days_worked: Number(yearlyFound.total_days_worked) || 0,
+    total_ot_days: Number(yearlyFound.total_ot_days) || 0,
+    total_working_hour: Number(yearlyFound.total_working_hour) || 0,
+    total_ot_hour: Number(yearlyFound.total_ot_hour) || 0,
+    total_ot_earning: Number(yearlyFound.total_ot_earning) || 0,
+    total_regular_earning: Number(yearlyFound.total_regular_earning) || 0,
+    total_earning: Number(yearlyFound.total_earning) || 0
+  } : {
+    year_num: year,
+    total_days_worked: 0, total_ot_days: 0,
+    total_working_hour: 0, total_ot_hour: 0,
+    total_ot_earning: 0, total_regular_earning: 0, total_earning: 0
+  };
+
+  return { success: true, data: { monthly: monthly, yearly: yearlyTotals, daily: daily } };
 }
 
 /**

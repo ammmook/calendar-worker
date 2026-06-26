@@ -20,17 +20,21 @@ async function apiCall(action, data = null) {
     url.searchParams.set('data', JSON.stringify(data));
   }
 
+  // ป้องกันเบราว์เซอร์แคชข้อมูล (cache busting)
+  url.searchParams.set('t', Date.now());
+
   console.log(`[TimeFlow API] → ${action}`, data || '');
 
   try {
     const res = await fetch(url.toString(), {
       method: 'GET',
       redirect: 'follow',
+      cache: 'no-store'
     });
 
     // Google Apps Script อาจ return HTML error page แทน JSON
     const text = await res.text();
-    
+
     let json;
     try {
       json = JSON.parse(text);
@@ -72,6 +76,10 @@ export const WorkEntryAPI = {
   getByMonth: (email, month, year) =>
     apiCall('getWorkEntriesByMonth', { email, month, year }),
 
+  /** ดึงสรุปข้อมูลเงินจากตาราง earnings */
+  getEarningsSummary: (email, year) =>
+    apiCall('getEarningsSummary', { email, year }),
+
   create: (data) => apiCall('createWorkEntry', data),
   update: (data) => apiCall('updateWorkEntry', data),
   upsert: (data) => apiCall('upsertWorkEntry', data),
@@ -112,10 +120,10 @@ export const HolidayAPI = {
 function normalizeDate(raw) {
   if (!raw) return '';
   const str = String(raw).trim();
-  
+
   // ถ้าเป็น YYYY-MM-DD อยู่แล้ว
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  
+
   // ถ้าเป็น ISO string หรือ date string
   try {
     const d = new Date(str);
@@ -125,8 +133,8 @@ function normalizeDate(raw) {
       const dd = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${dd}`;
     }
-  } catch (_) {}
-  
+  } catch (_) { }
+
   return str;
 }
 
@@ -140,24 +148,24 @@ function normalizeDate(raw) {
 function normalizeTime(raw) {
   if (!raw) return '';
   const str = String(raw).trim();
-  
+
   // ถ้าเป็น HH:mm หรือ HH:mm:ss อยู่แล้ว
   if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(str)) return str.substring(0, 5);
-  
+
   // ถ้าเป็น ISO string เช่น "1899-12-30T10:17:56.000Z"
   const isoMatch = str.match(/T(\d{2}):(\d{2})/);
   if (isoMatch) {
     return `${isoMatch[1]}:${isoMatch[2]}`;
   }
-  
+
   // ถ้าเป็น Date string อื่นๆ
   try {
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
       return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
     }
-  } catch (_) {}
-  
+  } catch (_) { }
+
   return str;
 }
 
@@ -200,39 +208,11 @@ export function sheetEntriesToFrontend(sheetEntries) {
 }
 
 /**
- * แปลง frontend entry → Sheet format สำหรับ upsert
+ * แปลง frontend entry → Sheet format สำหรับ upsert (Backend เป็นคนคำนวณเงิน)
  */
-export function frontendEntryToSheet(dateStr, entry, userEmail, std, salary, otRate, otMode, otBlockHours, otDeductMins) {
-  const [ih, im] = (entry.in || '').split(':').map(Number);
-  const [oh, om] = (entry.out || '').split(':').map(Number);
-  let workingHour = 0, otHour = 0, otEarning = 0;
-
-  if (entry.in && entry.out && !isNaN(ih) && !isNaN(oh)) {
-    let totalMins = oh * 60 + om - (ih * 60 + im);
-    if (totalMins < 0) totalMins += 1440; // handle overnight shift
-    if (totalMins > 0) {
-      const totalH = totalMins / 60;
-      const stdH = parseFloat(std || 8);
-      workingHour = Math.min(totalH, stdH);
-      const rawOT = Math.max(0, totalH - stdH);
-      
-      // Apply OT block rule
-      let netOT = rawOT;
-      if (otMode === 'block' && rawOT > 0) {
-        if (rawOT <= (otBlockHours || 0)) {
-          netOT = rawOT;
-        } else {
-          netOT = Math.max(0, rawOT - ((otDeductMins || 0) / 60));
-        }
-      }
-      
-      otHour = netOT;
-      otEarning = netOT * (otRate || 0);
-    }
-  }
-
+export function frontendEntryToSheet(dateStr, entry, userEmail) {
   const d = new Date(dateStr + 'T00:00:00');
-
+  
   return {
     user_email: userEmail,
     date: dateStr,
@@ -240,9 +220,6 @@ export function frontendEntryToSheet(dateStr, entry, userEmail, std, salary, otR
     year_num: d.getFullYear(),
     clock_in: entry.in || '',
     clock_out: entry.out || '',
-    leave_type: entry.leave?.type || '',
-    working_hour: workingHour,
-    ot_hour: otHour,
-    ot_earning: otEarning,
+    leave_type: entry.leave?.type || ''
   };
 }

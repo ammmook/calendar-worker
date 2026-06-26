@@ -6,6 +6,7 @@ import {
     ArrowUpRight, Award,
 } from 'lucide-react';
 import { getLang } from '../locales';
+import { WorkEntryAPI } from '../services/api';
 
 import { OT_MODE } from './ProfilePage';
 
@@ -42,10 +43,8 @@ const fmt1 = (n) => n.toFixed(1);
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function YearlyDashboard({
-    entries, holidays, salary, otRate, std,
-    otMode, otBlockHours, otDeductMins,
-    leaveQuotas, lang,
-
+    userEmail, entries, earningsSummary, holidays, salary, otRate, std,
+    otMode, leaveQuotas, lang,
     paymentType = 'monthly',
     dailyRate = 0,
 }) {
@@ -54,6 +53,28 @@ export default function YearlyDashboard({
     const [year, setYear] = useState(today.getFullYear());
     const [tooltip, setTooltip] = useState(null);   // { monthIdx, x, y }
     const chartRef = useRef(null);
+
+    const [localEarningsSummary, setLocalEarningsSummary] = useState(earningsSummary || { monthly: [], yearly: {} });
+    const [loadingYear, setLoadingYear] = useState(false);
+
+    React.useEffect(() => {
+        if (year === today.getFullYear() && earningsSummary?.yearly?.year_num === year) {
+            setLocalEarningsSummary(earningsSummary);
+            return;
+        }
+        let active = true;
+        setLoadingYear(true);
+        WorkEntryAPI.getEarningsSummary(userEmail, year).then(res => {
+            if (active && res.success && res.data) {
+                setLocalEarningsSummary(res.data);
+            }
+            if (active) setLoadingYear(false);
+        }).catch(err => {
+            console.error('Failed to fetch yearly earnings', err);
+            if (active) setLoadingYear(false);
+        });
+        return () => { active = false; };
+    }, [year, userEmail, earningsSummary]);
 
     // ── Define leave types with dynamic max values from props ──
     const LEAVE_TYPES = useMemo(() => [
@@ -74,61 +95,31 @@ export default function YearlyDashboard({
         return counts;
     }, [entries]);
 
-    const applyOTRule = (ot, mode, blockH, deductM) => {
-        if (mode !== OT_MODE.BLOCK || ot <= 0) return ot;
-        if (ot <= blockH) return ot;
-        return Math.max(0, ot - (deductM / 60));
-    };
-
     // ── Compute per-month stats ────────────────────────────────────────────────
     const monthlyStats = useMemo(() => {
         return t.short_months.map((_, mIdx) => {
-            const mKey = `${year}-${String(mIdx + 1).padStart(2, '0')}`;
-            let tReg = 0, tOT = 0, daysW = 0, otDays = 0, wOTEarn = 0;
-
-            Object.keys(entries).forEach((k) => {
-                if (!k.startsWith(mKey)) return;
-                const e = entries[k];
-                if (!e?.in || !e?.out) return;
-                const [ih, im] = e.in.split(':').map(Number);
-                const [oh, om] = e.out.split(':').map(Number);
-                let mins = (oh * 60 + om) - (ih * 60 + im);
-                if (mins < 0) mins += 1440; // handle overnight shift
-                if (mins <= 0) return;
-                const total = mins / 60;
-                const stdH = parseFloat(std || 8);
-
-                daysW++;
-                const reg = Math.min(total, stdH);
-                const rawOT = Math.max(0, total - stdH);
-                const netOT = applyOTRule(rawOT, otMode, otBlockHours, otDeductMins);
-                tReg += reg;
-                tOT += netOT;
-                if (netOT > 0) otDays++;
-            });
-
+            const beMonth = (localEarningsSummary.monthly || []).find(m => m.month_num === mIdx + 1);
+            
             const regEarn = paymentType === 'daily'
-                ? daysW * dailyRate
-                : (daysW > 0 ? salary : 0); // Full fixed salary if worked at least 1 day in month
-
-            // คำนวนโอทีรายเดือน โดยเอาจำนวนโอทีที่ทำทั้งเดือนมารวมกัน แล้วคูณกับเรท
-            const otEarn = tOT * otRate;
-            const totalEarn = regEarn + otEarn;
+                ? (beMonth?.total_regular_earning || 0)
+                : (beMonth?.days_worked > 0 ? salary : 0);
+            
+            const otEarn = beMonth?.total_ot_earning || 0;
 
             return {
                 month: t.short_months[mIdx],
                 fullMonth: t.months[mIdx],
                 mIdx,
-                regHours: tReg,
-                otHours: tOT,
-                daysWorked: daysW,
-                otDays,
+                regHours: beMonth?.total_working_hour || 0,
+                otHours: beMonth?.total_ot_hour || 0,
+                daysWorked: beMonth?.days_worked || 0,
+                otDays: beMonth?.ot_days || 0,
                 regEarn,
                 otEarn,
-                totalEarn,
+                totalEarn: regEarn + otEarn,
             };
         });
-    }, [entries, year, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate]);
+    }, [localEarningsSummary.monthly, t, paymentType, salary]);
 
     // ── Yearly totals ──────────────────────────────────────────────────────────
     const yearTotals = useMemo(() => ({
@@ -137,7 +128,7 @@ export default function YearlyDashboard({
         totalRegEarn: monthlyStats.reduce((s, m) => s + m.regEarn, 0),
         totalOTHrs: monthlyStats.reduce((s, m) => s + m.otHours, 0),
         totalDays: monthlyStats.reduce((s, m) => s + m.daysWorked, 0),
-        bestMonth: monthlyStats.reduce((best, m) => m.totalEarn > best.totalEarn ? m : best, monthlyStats[0]),
+        bestMonth: monthlyStats.reduce((best, m) => m.totalEarn > best.totalEarn ? m : best, monthlyStats[0] || { totalEarn: 0 }),
     }), [monthlyStats]);
 
     const totalLeave = LEAVE_TYPES.reduce((s, lt) => s + (leaveData[lt.key] || 0), 0);

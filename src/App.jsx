@@ -26,41 +26,6 @@ const todayKey = () => {
   const t = new Date();
   return dateKey(t.getFullYear(), t.getMonth() + 1, t.getDate());
 };
-const calc = (inT, outT, stdVal) => {
-  if (!inT || !outT) return { total: 0, reg: 0, ot: 0 };
-  const [ih, im] = inT.split(':').map(Number);
-  const [oh, om] = outT.split(':').map(Number);
-  let mins = oh * 60 + om - (ih * 60 + im);
-  if (mins < 0) mins += 1440; // handle overnight shift
-  if (mins <= 0) return { total: 0, reg: 0, ot: 0 };
-  const total = mins / 60;
-  const std = parseFloat(stdVal || 8);
-  return { total, reg: Math.min(total, std), ot: Math.max(0, total - std) };
-};
-
-const applyOTRule = (ot, mode, blockHours, deductMins) => {
-  if (mode !== OT_MODE.BLOCK || ot <= 0) return ot;
-  if (ot <= blockHours) return ot;
-  return Math.max(0, ot - (deductMins / 60));
-};
-
-// Use monthly base (salary), hourly OT (otR) and standard hours (stD) for earnings
-const earn = (reg, ot, sal, otR, stD, otMode, blockH, deductM, paymentType, dailyRate) => {
-  const netOT = applyOTRule(ot, otMode, blockH, deductM);
-  const otEarnings = netOT * otR;
-  
-  if (paymentType === 'daily') {
-    // Daily wage is handled differently - we only calculate earnings per day worked
-    // (dailyRate / stD) * reg is the basic daily earning if they worked reg hours
-    // But usually dailyRate is for a full day (std hours).
-    return (dailyRate * (reg / stD)) + otEarnings;
-  }
-  
-  // Monthly: (sal / 30) * (reg / stD) is an estimation for "this day's worth"
-  // However, the prompt says "Monthly salary: user receive full fixed salary regardless of individual workdays"
-  // So for daily display we show the estimated worth of that day.
-  return (sal / 30) * (reg / stD) + otEarnings;
-};
 
 const fmt1 = (n) => n.toFixed(1);
 const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
@@ -101,6 +66,7 @@ export default function App() {
   }, [lang]);
 
   const [entries, setEntries] = useState({});
+  const [earningsSummary, setEarningsSummary] = useState({ monthly: [], yearly: {}, daily: {} });
   const [holidays, setHolidays] = useState(new Set());
   const [selectedKey, setSelectedKey] = useState(null);
   const [viewY, setViewY] = useState(today.getFullYear());
@@ -224,6 +190,12 @@ export default function App() {
       } else {
         setHolidays(new Set());
       }
+      
+      // 3. Load earnings summary
+      const earnRes = await WorkEntryAPI.getEarningsSummary(user.email, today.getFullYear());
+      if (earnRes.success && earnRes.data) {
+        setEarningsSummary(earnRes.data);
+      }
     } catch (err) {
       console.error('[TimeFlow] Failed to load data:', err);
     } finally {
@@ -249,31 +221,28 @@ export default function App() {
   }, [selectedKey, selEntry.in, selEntry.out]);
 
   // ── Monthly aggregates ──
-  const { totalReg, totalOT, otDays, daysWorked } = useMemo(() => {
-    let tR = 0, tO = 0, oD = 0, dW = 0;
-    Object.keys(entries).forEach((k) => {
-      const [y, m, d] = k.split('-').map(Number);
-      if (y === viewY && m === viewM + 1) {
-        const h = calc(entries[k].in, entries[k].out, std);
+  const currentMonthSummary = useMemo(() => {
+    return earningsSummary.monthly.find(m => m.month_num === viewM + 1 && m.year_num === viewY) || {
+      days_worked: 0,
+      ot_days: 0,
+      total_working_hour: 0,
+      total_ot_hour: 0,
+      total_ot_earning: 0,
+      total_regular_earning: 0,
+      total_earning: 0
+    };
+  }, [earningsSummary.monthly, viewY, viewM]);
 
-        if (h.total > 0) {
-          dW++;
-          tR += h.reg;
-          const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-          tO += netOT;
-          if (netOT > 0) oD++;
-        }
-      }
-    });
-    return { totalReg: tR, totalOT: tO, otDays: oD, daysWorked: dW };
-  }, [entries, viewY, viewM, std, otMode, otBlockHours, otDeductMins]);
+  const totalReg = currentMonthSummary.total_working_hour;
+  const totalOT = currentMonthSummary.total_ot_hour;
+  const otDays = currentMonthSummary.ot_days;
+  const daysWorked = currentMonthSummary.days_worked;
 
   const regEarn = paymentType === 'daily' 
-    ? daysWorked * dailyRate 
+    ? currentMonthSummary.total_regular_earning 
     : salary; // Full monthly salary as requested
-
-  // คำนวนโอทีรายเดือน โดยเอาจำนวนโอทีที่ทำทั้งเดือนมารวมกัน แล้วคูณกับเรท
-  const otEarn = totalOT * otRate;
+  
+  const otEarn = currentMonthSummary.total_ot_earning;
   const totalEarn = regEarn + otEarn;
 
   // ── Calendar cells ──
@@ -329,18 +298,17 @@ export default function App() {
       const entryData = frontendEntryToSheet(
         selectedKey,
         { in: dIn, out: dOut, leave: null },
-        user.email, std, salary, otRate,
-        otMode, otBlockHours, otDeductMins
+        user.email
       );
       const res = await WorkEntryAPI.upsert(entryData);
       if (res.success) {
-        showToast(lang === 'th' ? 'บันทึกแล้ว' : 'Entry saved');
+        // Reload to sync _id and get calculated earnings before closing
+        await loadEntries(true);
+
+        showToast(lang === 'th' ? 'บันทึกและคำนวณเงินแล้ว' : 'Saved and calculated');
         
-        // Close modal/pane immediately without waiting for background reload
+        // Close modal/pane immediately
         setSelectedKey(null);
-        
-        // Reload in background to sync _id
-        loadEntries(true);
         return true;
       } else {
         showToast(res.error || 'Save failed');
@@ -522,9 +490,11 @@ export default function App() {
   const goToday = () => { setViewY(today.getFullYear()); setViewM(today.getMonth()); };
 
   // ── Detail panel calc ──
-  const detH = calc(dIn, dOut, std);
-  const detE = earn(detH.reg, detH.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
-  const netDetOT = applyOTRule(detH.ot, otMode, otBlockHours, otDeductMins);
+  const selDailyEarning = selectedKey ? earningsSummary.daily[selectedKey] : null;
+  const detHReg = selDailyEarning?.working_hour || 0;
+  const netDetOT = selDailyEarning?.ot_hour || 0;
+  const detE = selDailyEarning?.total_earning || 0;
+  const detOTRateEarn = selDailyEarning?.ot_earning || 0;
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
   const selLabel = selDateObj
@@ -707,14 +677,12 @@ export default function App() {
           {/* ══ YEARLY VIEW ══ */}
           {activeTab === 'yearly' && (
             <YearlyDashboard
+              userEmail={user.email}
               entries={entries}
+              earningsSummary={earningsSummary}
               holidays={holidays}
               salary={salary}
               otRate={otRate}
-              std={std}
-              otMode={otMode}
-              otBlockHours={otBlockHours}
-              otDeductMins={otDeductMins}
               leaveQuotas={leaveQuotas}
               paymentType={paymentType}
               dailyRate={dailyRate}
@@ -832,14 +800,7 @@ export default function App() {
                         holidays={holidays}
                         viewY={viewY}
                         viewM={viewM}
-                        std={std}
-                        otMode={otMode}
-                        otBlockHours={otBlockHours}
-                        otDeductMins={otDeductMins}
-                        salary={salary}
-                        otRate={otRate}
-                        paymentType={paymentType}
-                        dailyRate={dailyRate}
+                        dailyEarning={earningsSummary.daily[dateKey(viewY, viewM + 1, d)]}
                         handleDayClick={handleDayClick}
                         toggleHoliday={toggleHoliday}
                         t={t}
@@ -919,28 +880,27 @@ export default function App() {
 
                         {/* Calc summary */}
                         <div className="bg-[#F8F9FB] rounded-[10px] p-3 flex flex-col gap-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                            <span className="text-[13px] font-bold text-[#111827]">{dIn && dOut ? fmt1(detH.total) + 'h' : '—'}</span>
-                          </div>
-                          <hr className="border-[#E8EAEF]" />
-                          <div className="flex justify-between items-center">
+                          <div className="flex justify-between items-center mb-2.5">
                             <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                            <span className="text-[13px] font-bold text-[#3B4FE4]">{dIn && dOut ? fmt1(detH.reg) + 'h' : '—'}</span>
+                            <span className="text-[13px] font-bold text-[#3B4FE4]">{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
                             <div className="text-right">
-                              <div className="text-[13px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(netDetOT) + 'h' : '—'}</div>
-                              {dIn && dOut && netDetOT > 0 && (
-                                <div className="text-[10px] font-bold text-[#c29302] leading-none">+{fmtB(netDetOT * otRate)}</div>
+                              <div className="text-[13px] font-bold text-[#c29302]">{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
+                              {netDetOT > 0 && detOTRateEarn > 0 && (
+                                <div className="text-[10px] font-bold text-[#c29302] leading-none">+{fmtB(detOTRateEarn)}</div>
                               )}
                             </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
+                            <span className="text-[13px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
                           </div>
                           <hr className="border-[#E8EAEF]" />
                           <div className="flex justify-between items-center">
                             <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                            <span className="text-[13px] font-bold text-[#10B981]">{dIn && dOut ? fmtB(detE) : '—'}</span>
+                            <span className="text-[13px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
                           </div>
                         </div>
 
@@ -1000,9 +960,10 @@ export default function App() {
                         const e = entries[k];
                         const d = k.split('-')[2];
                         const dw = new Date(k + 'T00:00:00').getDay();
-                        const h = calc(e.in, e.out, std);
-                        const netOt = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-                        const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
+                        const dailyEarning = earningsSummary.daily[k];
+                        const hTotal = dailyEarning?.working_hour || 0;
+                        const netOt = dailyEarning?.ot_hour || 0;
+                        const eEarn = dailyEarning?.total_earning || 0;
                         const hasOT = netOt > 0;
                         const isLeaveEntry = e.leave !== null && e.leave !== undefined;
                         const isSel = k === selectedKey;
@@ -1037,16 +998,16 @@ export default function App() {
                                 <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
                                 <div className="flex flex-col items-end gap-0.5">
                                   <div className="flex items-center gap-1">
-                                    <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(h.reg)}h</span>
+                                    <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(hTotal)}h</span>
                                     {hasOT && (
                                       <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">
                                         +{fmt1(netOt)}h OT
                                       </span>
                                     )}
                                   </div>
-                                  {hasOT && (
+                                  {hasOT && dailyEarning?.ot_earning > 0 && (
                                     <span className="text-[9px] font-bold text-[#c29302] leading-none">
-                                      +{fmtB(netOt * otRate)}
+                                      +{fmtB(dailyEarning.ot_earning)}
                                     </span>
                                   )}
                                 </div>
@@ -1117,28 +1078,27 @@ export default function App() {
 
                       {/* Calc summary */}
                       <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                          <span className="text-[14px] font-bold text-[#111827]">{dIn && dOut ? fmt1(detH.total) + 'h' : '—'}</span>
-                        </div>
-                        <div className="h-px bg-[#E8EAEF] w-full" />
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center mb-2">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                          <span className="text-[14px] font-bold text-[#3B4FE4]">{dIn && dOut ? fmt1(detH.reg) + 'h' : '—'}</span>
+                          <span className="text-[14px] font-bold text-[#3B4FE4]">{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
                           <div className="text-right">
-                            <div className="text-[14px] font-bold text-[#c29302]">{dIn && dOut ? fmt1(netDetOT) + 'h' : '—'}</div>
-                            {dIn && dOut && netDetOT > 0 && (
-                              <div className="text-[11px] font-bold text-[#c29302] leading-none">+{fmtB(netDetOT * otRate)}</div>
+                            <div className="text-[14px] font-bold text-[#c29302]">{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
+                            {netDetOT > 0 && detOTRateEarn > 0 && (
+                              <div className="text-[11px] font-bold text-[#c29302] leading-none">+{fmtB(detOTRateEarn)}</div>
                             )}
                           </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
+                          <span className="text-[14px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
                         </div>
                         <div className="h-px bg-[#E8EAEF] w-full" />
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                          <span className="text-[16px] font-bold text-[#10B981]">{dIn && dOut ? fmtB(detE) : '—'}</span>
+                          <span className="text-[16px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
                         </div>
                       </div>
 
@@ -1299,7 +1259,7 @@ export default function App() {
       <div className={`fixed bottom-6 right-6 bg-[#111827] text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
         ${(isSavingEntry || isDeletingEntry || isSavingLeave) && !toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <Loader2 size={14} className="text-[#3B4FE4] animate-spin" />
-        {lang === 'th' ? 'กำลังบันทึก...' : 'Saving...'}
+        {lang === 'th' ? 'กำลังบันทึกและคำนวณเงิน...' : 'Saving and calculating...'}
       </div>
 
     </div>
@@ -1458,8 +1418,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     // ── DayCell Sub-component ───────────────────────────────────────────────────
     function DayCell({
     d, k, entries, todayKey, selectedKey, holidays, viewY, viewM,
-    std, otMode, otBlockHours, otDeductMins, salary, otRate,
-    paymentType, dailyRate, handleDayClick, toggleHoliday, t
+    dailyEarning, handleDayClick, toggleHoliday, t
     }) {
     const entry = entries[k];
     const isToday = k === todayKey;
@@ -1467,9 +1426,10 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     const isHol = holidays.has(k);
     const dow = new Date(viewY, viewM, d).getDay();
     const isWE = dow === 0 || dow === 6;
-    const h = entry ? calc(entry.in, entry.out, std) : { total: 0, reg: 0, ot: 0 };
-    const netOT = applyOTRule(h.ot, otMode, otBlockHours, otDeductMins);
-    const eEarn = earn(h.reg, h.ot, salary, otRate, std, otMode, otBlockHours, otDeductMins, paymentType, dailyRate);
+
+    const hTotal = dailyEarning?.working_hour || 0;
+    const netOT = dailyEarning?.ot_hour || 0;
+    const eEarn = dailyEarning?.total_earning || 0;
     const hasOT = netOT > 0;
     const hasEntry = !!entry;
 
@@ -1591,14 +1551,18 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
             {hasOT ? (
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
-                <span className="text-[8px] font-bold text-[#c29302] leading-none mt-0.5">+{fmtB(netOT * otRate)}</span>
+                {dailyEarning?.ot_earning > 0 && (
+                  <span className="text-[8px] font-bold text-[#c29302] leading-none mt-0.5">+{fmtB(dailyEarning.ot_earning)}</span>
+                )}
               </div>
             ) : (
-              <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(h.total)}h</span>
+              <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(hTotal)}h</span>
             )}
-            <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
-              {fmtB(eEarn)}
-            </span>
+            {eEarn > 0 && (
+              <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
+                {fmtB(eEarn)}
+              </span>
+            )}
           </div>
         </div>
       )}
