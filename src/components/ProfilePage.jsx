@@ -38,28 +38,24 @@ const labelCls = 'block text-[10px] font-bold text-[#9CA3AF] uppercase tracking-
 const cardCls = 'bg-white border border-[#E8EAEF] rounded-2xl p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)]';
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function ProfilePage({
-    // work settings (lifted to App state so changes propagate globally)
-    salary, setSalary,
-    otRate, setOtRate,
-    std, setStd,
-    otMode, setOtMode,
-    otBlockHours, setOtBlockHours,    // threshold for full OT payment
-    otDeductMins, setOtDeductMins,    // minutes to deduct if above threshold
-    otSettingId, setOtSettingId,
-    leaveQuotas, setLeaveQuotas,
-    
-    paymentType, setPaymentType,
-    dailyRate, setDailyRate,
-    workDaysPerWeek, setWorkDaysPerWeek,
-
-    lang,
-    onBack,
-}) {
+export default function ProfilePage(props) {
     const { user } = useAuth();
-    const t = getLang(lang);
+    const t = getLang(props.lang);
     const [saved, setSaved] = useState(false);
     const [isSavingLocal, setIsSavingLocal] = useState(false);
+
+    // Initialize local state from props to prevent unsaved changes from propagating
+    const [salary, setSalary] = useState(props.salary);
+    const [otRate, setOtRate] = useState(props.otRate);
+    const [std, setStd] = useState(props.std);
+    const [otMode, setOtMode] = useState(props.otMode);
+    const [otBlockHours, setOtBlockHours] = useState(props.otBlockHours);
+    const [otDeductMins, setOtDeductMins] = useState(props.otDeductMins);
+    const [leaveQuotas, setLeaveQuotas] = useState(props.leaveQuotas);
+    const [paymentType, setPaymentType] = useState(props.paymentType);
+    const [dailyRate, setDailyRate] = useState(props.dailyRate);
+    const [workDaysPerWeek, setWorkDaysPerWeek] = useState(props.workDaysPerWeek);
+    const [otSettingId, setOtSettingId] = useState(props.otSettingId);
 
     const handleSave = useCallback(async () => {
         if (!user?.email) return;
@@ -118,6 +114,19 @@ export default function ProfilePage({
                 work_days_per_week: workDaysPerWeek,
             });
 
+            // 3. Sync changes back to App.jsx global state ONLY after successful save
+            props.setSalary(finalSalary);
+            props.setDailyRate(finalDailyRate);
+            props.setOtRate(otRate);
+            props.setStd(std);
+            props.setOtMode(otMode);
+            props.setOtBlockHours(otBlockHours);
+            props.setOtDeductMins(otDeductMins);
+            props.setOtSettingId(currentOtSettingId);
+            props.setLeaveQuotas(leaveQuotas);
+            props.setPaymentType(paymentType);
+            props.setWorkDaysPerWeek(workDaysPerWeek);
+
             console.log('[TimeFlow] ✅ Profile & OT settings saved');
             setSaved(true);
             setTimeout(() => setSaved(false), 2200);
@@ -126,7 +135,7 @@ export default function ProfilePage({
         } finally {
             setIsSavingLocal(false);
         }
-    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, lang, setOtSettingId, setSalary, setDailyRate]);
+    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, props]);
 
     // ── OT example preview ───────────────────────────────────────────────────
     const previewOT = (rawOT) => {
@@ -145,7 +154,7 @@ export default function ProfilePage({
             {/* ── TOP BAR ── */}
             <header className="sticky top-0 z-50 w-full h-[60px] bg-white border-b border-[#E8EAEF] flex items-center gap-3 px-6">
                 <button
-                    onClick={onBack}
+                    onClick={props.onBack}
                     className="w-8 h-8 rounded-lg bg-[#F8F9FB] border border-[#E8EAEF] grid place-items-center text-[#6B7280] cursor-pointer hover:bg-[#EEF0FD] hover:border-[#3B4FE4] hover:text-[#3B4FE4] transition-all"
                 >
                     <ChevronLeft size={16} />

@@ -803,6 +803,7 @@ export default function App() {
                         dailyEarning={earningsSummary.daily[dateKey(viewY, viewM + 1, d)]}
                         handleDayClick={handleDayClick}
                         toggleHoliday={toggleHoliday}
+                        paymentType={paymentType}
                         t={t}
                       />
                     ))}
@@ -851,18 +852,33 @@ export default function App() {
                             <div className="text-xs text-[#9CA3AF] mt-1">{lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day'}</div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            setEntries((p) => ({
-                              ...p,
-                              [selectedKey]: { ...p[selectedKey], leave: null }
-                            }));
-                            showToast(lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Changed to working day');
-                          }}
-                          className="w-full py-2.5 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
-                        >
-                          {lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Change to Working Day'}
-                        </button>
+                        <div className="flex gap-2 w-full">
+                          {(entries[selectedKey]?._id || entries[selectedKey]?.leave) && (
+                            <button
+                              onClick={deleteSelectedEntry}
+                              disabled={isDeletingEntry}
+                              title={t.delete_entry || 'Delete'}
+                              className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
+                                ${isDeletingEntry
+                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
+                                  : 'bg-[#FFF1F3] text-[#F43F5E] cursor-pointer hover:bg-[#FEE2E2]'}`}
+                            >
+                              {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setEntries((p) => ({
+                                ...p,
+                                [selectedKey]: { ...p[selectedKey], leave: null }
+                              }));
+                              showToast(lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Changed to working day');
+                            }}
+                            className="flex-1 py-2.5 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
+                          >
+                            {lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Change to Working Day'}
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3 w-full min-w-0">
@@ -898,15 +914,17 @@ export default function App() {
                             <span className="text-[13px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
                           </div>
                           <hr className="border-[#E8EAEF]" />
-                          <div className="flex justify-between items-center">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                            <span className="text-[13px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
-                          </div>
+                          {(paymentType !== 'monthly' || detE > 0) && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
+                              <span className="text-[13px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Save / Update / Delete */}
                         <div className="flex gap-2 w-full mt-1">
-                          {entries[selectedKey]?.in && (
+                          {(entries[selectedKey]?._id || entries[selectedKey]?.in) && (
                             <button
                               onClick={deleteSelectedEntry}
                               disabled={isSelectedHoliday || isDeletingEntry}
@@ -1418,7 +1436,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     // ── DayCell Sub-component ───────────────────────────────────────────────────
     function DayCell({
     d, k, entries, todayKey, selectedKey, holidays, viewY, viewM,
-    dailyEarning, handleDayClick, toggleHoliday, t
+    dailyEarning, handleDayClick, toggleHoliday, paymentType, t
     }) {
     const entry = entries[k];
     const isToday = k === todayKey;
@@ -1544,7 +1562,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
       {/* Entry data */}
       {hasEntry && (
         <div className="mt-auto flex flex-col gap-[2px]">
-          <span className="text-[9px] font-medium text-[#9CA3AF] leading-tight hidden sm:block">
+          <span className="text-[8px] sm:text-[9px] font-medium text-[#9CA3AF] leading-tight truncate">
             {entry.in}–{entry.out}
           </span>
           <div className="flex justify-between items-end">
@@ -1556,9 +1574,11 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
                 )}
               </div>
             ) : (
-              <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(hTotal)}h</span>
+              paymentType !== 'monthly' ? (
+                <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(hTotal)}h</span>
+              ) : null
             )}
-            {eEarn > 0 && (
+            {eEarn > 0 && paymentType !== 'monthly' && (
               <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
                 {fmtB(eEarn)}
               </span>

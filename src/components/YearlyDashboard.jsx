@@ -100,9 +100,7 @@ export default function YearlyDashboard({
         return t.short_months.map((_, mIdx) => {
             const beMonth = (localEarningsSummary.monthly || []).find(m => m.month_num === mIdx + 1);
             
-            const regEarn = paymentType === 'daily'
-                ? (beMonth?.total_regular_earning || 0)
-                : (beMonth?.days_worked > 0 ? salary : 0);
+            const regEarn = beMonth?.total_regular_earning || 0;
             
             const otEarn = beMonth?.total_ot_earning || 0;
 

@@ -765,7 +765,8 @@ function upsertWorkEntry(data) {
     if (paymentType === 'daily') {
       regularEarning = dailyRate * (stdH > 0 ? workingHour / stdH : 0);
     } else {
-      regularEarning = (salaryMonthly / 30) * (stdH > 0 ? workingHour / stdH : 0);
+      // Monthly Salary: ไม่คิดเงินรายวัน
+      regularEarning = 0;
     }
     
     let otEarning = otHour * otRate;
@@ -834,6 +835,23 @@ function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_ot_earning += Number(e.ot_earning) || 0;
     total_earning += Number(e.total_earning) || 0;
   });
+
+  // Fetch user info for payment_type check
+  var users = sheetToObjects('user');
+  var user = users.find(function(u) { return String(u.email) === String(userEmail); });
+  if (user) expandUserWithSalary(user);
+  var paymentType = user ? (user.payment_type || 'monthly') : 'monthly';
+  var salaryMonthly = user ? (Number(user.salary_monthly) || 0) : 0;
+
+  // ถ้าเป็นรายเดือน ให้ใส่เงินเดือนเป็นฐานรายได้หลัก (ถ้ามีข้อมูลการลงเวลาในเดือนนั้น)
+  if (paymentType === 'monthly') {
+    if (filtered.length > 0) {
+      total_regular_earning = salaryMonthly;
+    } else {
+      total_regular_earning = 0;
+    }
+    total_earning = total_regular_earning + total_ot_earning;
+  }
 
   var summaryData = {
     user_email: userEmail,
