@@ -47,6 +47,7 @@ export default function YearlyDashboard({
     otMode, leaveQuotas, lang,
     paymentType = 'monthly',
     dailyRate = 0,
+    viewY
 }) {
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
@@ -56,6 +57,13 @@ export default function YearlyDashboard({
 
     const [localEarningsSummary, setLocalEarningsSummary] = useState(earningsSummary || { monthly: [], yearly: {} });
     const [loadingYear, setLoadingYear] = useState(false);
+
+    // Sync local year with viewY when viewY changes from the header dropdown
+    React.useEffect(() => {
+        if (viewY && viewY !== year) {
+            setYear(viewY);
+        }
+    }, [viewY]);
 
     React.useEffect(() => {
         if (year === today.getFullYear() && earningsSummary?.yearly?.year_num === year) {
@@ -87,13 +95,16 @@ export default function YearlyDashboard({
     const leaveData = useMemo(() => {
         const counts = { sick: 0, personal: 0, vacation: 0 };
         Object.keys(entries).forEach((dateStr) => {
+            const [y] = dateStr.split('-');
+            if (Number(y) !== year) return;
+            
             const entry = entries[dateStr];
             if (entry?.leave?.type) {
                 counts[entry.leave.type] = (counts[entry.leave.type] || 0) + 1;
             }
         });
         return counts;
-    }, [entries]);
+    }, [entries, year]);
 
     // ── Compute per-month stats ────────────────────────────────────────────────
     const monthlyStats = useMemo(() => {
@@ -171,14 +182,20 @@ export default function YearlyDashboard({
                 {/* Year picker */}
                 <div className="flex items-center gap-2 bg-white border border-[#E8EAEF] rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
                     <button
-                        onClick={() => setYear(y => y - 1)}
+                        onClick={() => {
+                            if (setViewY) setViewY(year - 1);
+                            else setYear(y => y - 1);
+                        }}
                         className="w-8 h-8 rounded-lg grid place-items-center text-[#6B7280] hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all"
                     >
                         <ChevronLeft size={15} />
                     </button>
-                    <span className="px-2 text-[15px] font-bold text-[#111827] tabular-nums">{year}</span>
+                    <span className="px-2 text-[15px] font-bold text-[#111827] tabular-nums">{lang === 'th' ? year + 543 : year}</span>
                     <button
-                        onClick={() => setYear(y => y + 1)}
+                        onClick={() => {
+                            if (setViewY) setViewY(year + 1);
+                            else setYear(y => y + 1);
+                        }}
                         className="w-8 h-8 rounded-lg grid place-items-center text-[#6B7280] hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all"
                     >
                         <ChevronRight size={15} />

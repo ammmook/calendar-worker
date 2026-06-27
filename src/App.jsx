@@ -165,34 +165,46 @@ export default function App() {
 
   // ── Load work entries and holidays from Google Sheets ──
   const initialLoadDoneRef = useRef(false);
-  const loadEntries = useCallback(async (silent = false) => {
+  const loadEntries = useCallback(async (silent = false, forceReload = false) => {
     if (!user?.email) return;
+    if (!silent) setDataLoaded(false);
     // The first load uses skeleton loading; subsequent reloads are silent
     console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
     try {
-      // 1. Load work entries
-      const res = await WorkEntryAPI.getByUser(user.email);
-      console.log('[TimeFlow] Work entries response:', res);
-      if (res.success && Array.isArray(res.data)) {
-        const converted = sheetEntriesToFrontend(res.data);
-        console.log('[TimeFlow] ✅ Entries loaded:', Object.keys(converted).length, 'dates');
-        setEntries(converted);
-      } else {
-        console.warn('[TimeFlow] No entries found or unexpected response:', res);
-        setEntries({});
-      }
+      // Fetch all data concurrently to reduce wait time
+      const promises = [];
+      const needsFullLoad = forceReload || !initialLoadDoneRef.current;
 
-      // 2. Load holidays
-      const holRes = await HolidayAPI.get(user.email);
-      if (holRes.success && Array.isArray(holRes.data)) {
-        console.log('[TimeFlow] ✅ Holidays loaded:', holRes.data.length, 'days');
-        setHolidays(new Set(holRes.data));
+      if (needsFullLoad) {
+        promises.push(WorkEntryAPI.getByUser(user.email));
+        promises.push(HolidayAPI.get(user.email));
       } else {
-        setHolidays(new Set());
+        promises.push(Promise.resolve({ success: true, cached: true }));
+        promises.push(Promise.resolve({ success: true, cached: true }));
+      }
+      promises.push(WorkEntryAPI.getEarningsSummary(user.email, viewY));
+
+      const [res, holRes, earnRes] = await Promise.all(promises);
+
+      if (needsFullLoad) {
+        console.log('[TimeFlow] Work entries response:', res);
+        if (res.success && Array.isArray(res.data)) {
+          const converted = sheetEntriesToFrontend(res.data);
+          console.log('[TimeFlow] ✅ Entries loaded:', Object.keys(converted).length, 'dates');
+          setEntries(converted);
+        } else if (!res.cached) {
+          console.warn('[TimeFlow] No entries found or unexpected response:', res);
+          setEntries({});
+        }
+
+        if (holRes.success && Array.isArray(holRes.data)) {
+          console.log('[TimeFlow] ✅ Holidays loaded:', holRes.data.length, 'days');
+          setHolidays(new Set(holRes.data));
+        } else if (!holRes.cached) {
+          setHolidays(new Set());
+        }
       }
       
-      // 3. Load earnings summary
-      const earnRes = await WorkEntryAPI.getEarningsSummary(user.email, today.getFullYear());
       if (earnRes.success && earnRes.data) {
         setEarningsSummary(earnRes.data);
       }
@@ -202,7 +214,7 @@ export default function App() {
       initialLoadDoneRef.current = true;
       setDataLoaded(true);
     }
-  }, [user?.email, lang]);
+  }, [user?.email, lang, viewY]);
 
   useEffect(() => {
     loadEntries();
@@ -303,7 +315,7 @@ export default function App() {
       const res = await WorkEntryAPI.upsert(entryData);
       if (res.success) {
         // Reload to sync _id and get calculated earnings before closing
-        await loadEntries(true);
+        await loadEntries(true, true);
 
         showToast(lang === 'th' ? 'บันทึกและคำนวณเงินแล้ว' : 'Saved and calculated');
         
@@ -312,13 +324,13 @@ export default function App() {
         return true;
       } else {
         showToast(res.error || 'Save failed');
-        loadEntries(true); // rollback on fail
+        loadEntries(true, true); // rollback on fail
         return false;
       }
     } catch (err) {
       console.error('[TimeFlow] Save error:', err);
       showToast('Save failed');
-      loadEntries(true);
+      loadEntries(true, true);
       return false;
     } finally {
       setIsSavingEntry(false);
@@ -338,8 +350,8 @@ export default function App() {
           return;
         }
       }
-      // Reload entries จาก Sheet
-      await loadEntries(true);
+        // Reload entries จาก Sheet (force reload)
+        await loadEntries(true, true);
       setSelectedKey(null);
       showToast(t.entry_deleted || 'Entry deleted');
     } catch (err) {
@@ -442,7 +454,9 @@ export default function App() {
           );
           entryData.leave_type = leaveData.leave?.type || '';
           await WorkEntryAPI.upsert(entryData);
-          await loadEntries(true);
+          // Save successful, update local state directly instead of full reload?
+          // For simplicity, we just force reload for now as user expects everything up-to-date
+          await loadEntries(true, true);
         } catch (err) {
           console.error('[TimeFlow] Leave save error:', err);
         } finally {
@@ -582,7 +596,7 @@ export default function App() {
               className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[#111827] text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-[#3B4FE4] hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-[#3B4FE4] focus:shadow-[0_0_0_3px_#EEF0FD]"
             >
               {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
               ))}
             </select>
             <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
@@ -687,6 +701,8 @@ export default function App() {
               paymentType={paymentType}
               dailyRate={dailyRate}
               lang={lang}
+              viewY={viewY}
+              setViewY={setViewY}
             />
           )}
 
@@ -703,7 +719,7 @@ export default function App() {
               <div>
                 <h1 className="text-[26px] font-bold text-[#111827] tracking-tight leading-tight">{t.dashboard}</h1>
                 <p className="text-sm text-[#9CA3AF] mt-0.5">
-                  {t.months[viewM]} {viewY} · {daysWorked} {t.worked_days} · {fmt1(totalOT)}h {t.with_overtime}
+                  {t.months[viewM]} {lang === 'th' ? viewY + 543 : viewY} · {daysWorked} {t.worked_days} · {fmt1(totalOT)}h {t.with_overtime}
                 </p>
               </div>
 
@@ -720,7 +736,7 @@ export default function App() {
                   <select value={viewY} onChange={(e) => setViewY(Number(e.target.value))}
                     className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-[#3B4FE4]">
                     {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
-                      <option key={y} value={y}>{y}</option>
+                      <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
                     ))}
                   </select>
                   <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
@@ -758,7 +774,7 @@ export default function App() {
 
                 {/* Calendar header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                  <span className="text-[17px] font-bold text-[#111827]">{t.months[viewM]} {viewY}</span>
+                  <span className="text-[17px] font-bold text-[#111827]">{t.months[viewM]} {lang === 'th' ? viewY + 543 : viewY}</span>
                   <div className="flex items-center gap-1.5">
                     <button onClick={prevMonth}
                       className="w-[30px] h-[30px] rounded-lg bg-[#F8F9FB] border border-[#E8EAEF] text-[#6B7280] grid place-items-center cursor-pointer transition-all hover:bg-[#EEF0FD] hover:border-[#3B4FE4] hover:text-[#3B4FE4]">
@@ -1013,7 +1029,9 @@ export default function App() {
                             </div>
                             {!isLeaveEntry && (
                               <div className="text-right flex flex-col items-end gap-0.5">
-                                <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
+                                {(paymentType !== 'monthly' || eEarn > 0) && (
+                                  <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
+                                )}
                                 <div className="flex flex-col items-end gap-0.5">
                                   <div className="flex items-center gap-1">
                                     <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(hTotal)}h</span>
@@ -1216,6 +1234,10 @@ export default function App() {
         currentData={leaveSelectorKey ? entries[leaveSelectorKey] : {}}
         onSelect={handleLeaveSelect}
         onCancel={handleLeaveCancel}
+        onDelete={() => {
+          setShowLeaveSelector(false);
+          deleteSelectedEntry();
+        }}
         lang={lang}
       />
 

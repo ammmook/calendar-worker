@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Stethoscope, UmbrellaOff, Plane, Clock } from 'lucide-react';
+import { X, Stethoscope, UmbrellaOff, Plane, Clock, Trash2 } from 'lucide-react';
 
 const LEAVE_TYPES = [
   { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3' },
@@ -7,7 +7,7 @@ const LEAVE_TYPES = [
   { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD' },
 ];
 
-export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel, lang = 'en', onWorkSelected = null }) {
+export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel, onDelete, lang = 'en', onWorkSelected = null }) {
   const [mode, setMode] = useState('choice'); // 'choice' | 'leaveType'
 
   // Reset mode when opening
@@ -62,12 +62,23 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
           <h2 className="text-lg font-bold text-[#111827]">
             {mode === 'choice' ? (lang === 'th' ? 'เลือกสถานะ' : 'Select Status') : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select Leave Type')}
           </h2>
-          <button 
-            onClick={handleClose} 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex gap-2">
+            {(currentData?._id || currentData?.in || currentData?.leave) && (
+              <button 
+                onClick={() => onDelete && onDelete()} 
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#F43F5E] hover:bg-[#FFF1F3] transition-colors bg-transparent border-none cursor-pointer"
+                title={lang === 'th' ? 'ลบข้อมูล' : 'Delete Entry'}
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            <button 
+              onClick={handleClose} 
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
