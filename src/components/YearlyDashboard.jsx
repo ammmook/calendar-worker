@@ -47,7 +47,9 @@ export default function YearlyDashboard({
     otMode, leaveQuotas, lang,
     paymentType = 'monthly',
     dailyRate = 0,
-    viewY
+    viewY,
+    setViewY,
+    showToast
 }) {
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
@@ -190,7 +192,22 @@ export default function YearlyDashboard({
                     >
                         <ChevronLeft size={15} />
                     </button>
-                    <span className="px-2 text-[15px] font-bold text-[#111827] tabular-nums">{lang === 'th' ? year + 543 : year}</span>
+                    <div className="relative flex items-center justify-center">
+                        <select
+                            value={year}
+                            onChange={(e) => {
+                                const newY = Number(e.target.value);
+                                if (setViewY) setViewY(newY);
+                                else setYear(newY);
+                                if (showToast) showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...');
+                            }}
+                            className="appearance-none bg-transparent font-bold text-[15px] text-[#111827] tabular-nums px-2 cursor-pointer outline-none text-center hover:text-[#3B4FE4]"
+                        >
+                            {Array.from({ length: 7 }, (_, i) => today.getFullYear() - 3 + i).map((y) => (
+                                <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
+                            ))}
+                        </select>
+                    </div>
                     <button
                         onClick={() => {
                             if (setViewY) setViewY(year + 1);

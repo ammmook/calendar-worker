@@ -592,7 +592,10 @@ export default function App() {
           <div className="relative">
             <select
               value={viewY}
-              onChange={(e) => setViewY(Number(e.target.value))}
+              onChange={(e) => {
+                setViewY(Number(e.target.value));
+                showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...');
+              }}
               className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[#111827] text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-[#3B4FE4] hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-[#3B4FE4] focus:shadow-[0_0_0_3px_#EEF0FD]"
             >
               {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
@@ -703,6 +706,7 @@ export default function App() {
               lang={lang}
               viewY={viewY}
               setViewY={setViewY}
+              showToast={showToast}
             />
           )}
 
@@ -733,7 +737,10 @@ export default function App() {
                   <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
                 </div>
                 <div className="relative">
-                  <select value={viewY} onChange={(e) => setViewY(Number(e.target.value))}
+                  <select value={viewY} onChange={(e) => {
+                      setViewY(Number(e.target.value));
+                      showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...');
+                  }}
                     className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-[#3B4FE4]">
                     {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
                       <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
@@ -1075,7 +1082,7 @@ export default function App() {
             </div>
 
             {/* Mobile Modal for Date Details — handles both new and existing entries */}
-            {selectedKey && !showLeaveSelector && (
+            {selectedKey && !showLeaveSelector && !showDeleteConfirm && (
               <div 
                 className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
                 onClick={() => setSelectedKey(null)}
