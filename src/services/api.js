@@ -40,22 +40,6 @@ function parseHHMM(str) {
   return h * 60 + m;
 }
 
-/**
- * true ถ้าช่วงเวลาทำงาน [inMin, inMin+durMin] คาบเกี่ยวกับช่วงกะ [ss, se]
- * รองรับทั้งเวลาทำงานและกะที่ข้ามเที่ยงคืน (ตรวจสองวันซ้อนเผื่อกรณี wrap)
- */
-function worksDuringShift(inMin, durMin, ss, se) {
-  if (ss == null || se == null || ss === se || durMin <= 0) return false;
-  const wStart = inMin;
-  const wEnd = inMin + durMin;
-  const ivals = [];
-  for (const off of [0, 1440]) {
-    if (se > ss) ivals.push([ss + off, se + off]);
-    else ivals.push([ss + off, se + 1440 + off]); // กะข้ามเที่ยงคืน
-  }
-  return ivals.some(([a, b]) => wStart < b && a < wEnd);
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SALARY SETTING (แยกจาก user — user เก็บแค่ salary_id)
 //  salary_type = 'monthly' | 'daily' (ตรงกับ payment_type ฝั่ง frontend)
@@ -392,7 +376,6 @@ async function upsertWorkEntry(data) {
     let deductM = 0;
     let shiftAllowance = 0;
     let shiftStart = '';
-    let shiftEnd = '';
     if (user.ot_setting_id) {
       const { data: otSetting, error: otErr } = await supabase
         .from('ot_setting')
@@ -406,7 +389,6 @@ async function upsertWorkEntry(data) {
         deductM = Number(otSetting.ot_deduct_mins) || 0;
         shiftAllowance = Number(otSetting.shift_allowance) || 0;
         shiftStart = otSetting.shift_start || '';
-        shiftEnd = otSetting.shift_end || '';
       }
     }
 
@@ -448,10 +430,12 @@ async function upsertWorkEntry(data) {
         otHour = netOT;
       }
 
-      // ── Shift allowance: ถ้าเวลาทำงานคาบเกี่ยวช่วงกะที่ตั้งไว้ ให้บวกเบี้ยกะของวันนั้น ──
+      // ── Shift allowance: ได้เบี้ยกะเฉพาะเมื่อเวลาเข้างาน "ตรงกับ" เวลาเริ่มกะพอดี ──
+      //    เข้าก่อนเวลาเริ่มกะ หรือไม่ตรงเวลาเริ่มกะ = งานปกติ ไม่ได้เบี้ยกะ
+      //    (เวลาที่เกินยังคิดเป็น OT ตามปกติจากส่วน working_hour ด้านบน)
       const inMin = ih * 60 + im;
-      if (shiftAllowance > 0 &&
-          worksDuringShift(inMin, totalMins, parseHHMM(shiftStart), parseHHMM(shiftEnd))) {
+      const shiftStartMin = parseHHMM(shiftStart);
+      if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
         shiftEarning = shiftAllowance;
       }
     }
