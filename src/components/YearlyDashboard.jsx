@@ -3,7 +3,7 @@ import {
     TrendingUp, Banknote, CircleDollarSign, Timer,
     UmbrellaOff, Stethoscope, Baby, Plane, BookOpen,
     CalendarDays, ChevronLeft, ChevronRight, Info,
-    ArrowUpRight, Award,
+    ArrowUpRight, Award, Moon,
 } from 'lucide-react';
 import { getLang } from '../locales';
 import { WorkEntryAPI } from '../services/api';
@@ -114,8 +114,9 @@ export default function YearlyDashboard({
             const beMonth = (localEarningsSummary.monthly || []).find(m => m.month_num === mIdx + 1);
             
             const regEarn = beMonth?.total_regular_earning || 0;
-            
+
             const otEarn = beMonth?.total_ot_earning || 0;
+            const shiftEarn = beMonth?.total_shift_allowance || 0;
 
             return {
                 month: t.short_months[mIdx],
@@ -125,9 +126,14 @@ export default function YearlyDashboard({
                 otHours: beMonth?.total_ot_hour || 0,
                 daysWorked: beMonth?.days_worked || 0,
                 otDays: beMonth?.ot_days || 0,
+                shiftDays: beMonth?.shift_days || 0,
                 regEarn,
                 otEarn,
-                totalEarn: regEarn + otEarn,
+                shiftEarn,
+                // ใช้ยอด total_earning ที่ backend คำนวณจากข้อมูลทั้งหมดใน DB (รวมเบี้ยกะแล้ว)
+                totalEarn: beMonth?.total_earning != null
+                    ? beMonth.total_earning
+                    : (regEarn + otEarn + shiftEarn),
             };
         });
     }, [localEarningsSummary.monthly, t, paymentType, salary]);
@@ -139,6 +145,8 @@ export default function YearlyDashboard({
         totalRegEarn: monthlyStats.reduce((s, m) => s + m.regEarn, 0),
         totalOTHrs: monthlyStats.reduce((s, m) => s + m.otHours, 0),
         totalDays: monthlyStats.reduce((s, m) => s + m.daysWorked, 0),
+        totalShiftEarn: monthlyStats.reduce((s, m) => s + m.shiftEarn, 0),
+        totalShiftDays: monthlyStats.reduce((s, m) => s + m.shiftDays, 0),
         bestMonth: monthlyStats.reduce((best, m) => m.totalEarn > best.totalEarn ? m : best, monthlyStats[0] || { totalEarn: 0 }),
     }), [monthlyStats]);
 
@@ -221,7 +229,7 @@ export default function YearlyDashboard({
             </div>
 
             {/* ── Annual KPI cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-[fadeUp_0.4s_0.06s_ease_both]">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 animate-[fadeUp_0.4s_0.06s_ease_both]">
 
                 {/* OT Earnings */}
                 <AnnualCard
@@ -232,6 +240,17 @@ export default function YearlyDashboard({
                     iconCls="bg-[#fffdef] text-[#c29302]"
                     valCls="text-[#c29302]"
                     stripe="bg-[#fbde3a]"
+                />
+
+                {/* Shift Pay */}
+                <AnnualCard
+                    Icon={Moon}
+                    label={t.shift_earnings}
+                    value={fmtB(yearTotals.totalShiftEarn)}
+                    sub={`${yearTotals.totalShiftDays} ${t.shift_days_label}`}
+                    iconCls="bg-[#FFF3E6] text-[#E8730C]"
+                    valCls="text-[#E8730C]"
+                    stripe="bg-[#FDBA74]"
                 />
 
                 {/* Regular */}
@@ -289,6 +308,7 @@ export default function YearlyDashboard({
                     <div className="hidden sm:flex items-center gap-4">
                         <LegendDot color="#3B4FE4" label={t.regular} />
                         <LegendDot color="#fbde3a" label={t.overtime} />
+                        <LegendDot color="#FDBA74" label={t.shift_short} />
                     </div>
                 </div>
 
@@ -332,7 +352,8 @@ export default function YearlyDashboard({
                             const { x, bW } = barGroup(idx, totalW);
                             const regH = m.regEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.regEarn / maxVal) : 0;
                             const otH = m.otEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.otEarn / maxVal) : 0;
-                            const totalH = regH + otH;
+                            const shiftH = m.shiftEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.shiftEarn / maxVal) : 0;
+                            const totalH = regH + otH + shiftH;
                             const baseY = CHART_H - CHART_PAD.bottom;
                             const isActive = tooltip?.mIdx === idx;
 
@@ -374,6 +395,16 @@ export default function YearlyDashboard({
                                             x={x} y={baseY - regH - otH}
                                             width={bW} height={otH}
                                             fill={isActive ? '#fbde3a' : '#FDE68A'}
+                                            style={{ transition: 'fill 0.15s' }}
+                                        />
+                                    )}
+
+                                    {/* Shift bar (light orange, stacked on top of OT) */}
+                                    {shiftH > 0 && (
+                                        <rect
+                                            x={x} y={baseY - regH - otH - shiftH}
+                                            width={bW} height={shiftH}
+                                            fill={isActive ? '#FB923C' : '#FED7AA'}
                                             style={{ transition: 'fill 0.15s' }}
                                         />
                                     )}
@@ -428,6 +459,7 @@ export default function YearlyDashboard({
                                     <div className="border-t border-[#E8EAEF] my-0.5" />
                                     <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="#3B4FE4" />
                                     <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="#c29302" />
+                                    <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="#E8730C" />
                                     <div className="border-t border-[#E8EAEF] my-0.5" />
                                     <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="#9CA3AF" />
                                 </div>
@@ -450,7 +482,7 @@ export default function YearlyDashboard({
                         <table className="w-full text-[13px] sm:text-sm">
                             <thead>
                                 <tr className="border-b border-[#E8EAEF]">
-                                    {[t.table_month, t.table_days, t.table_reg, t.table_ot, t.table_total].map((h, i) => (
+                                    {[t.table_month, t.table_days, t.table_reg, t.table_ot, t.table_shift, t.table_total].map((h, i) => (
                                         <th key={h} className={`px-2 sm:px-4 py-2.5 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] ${i === 0 ? 'text-left' : 'text-right'}`}>
                                             {h}
                                         </th>
@@ -481,6 +513,9 @@ export default function YearlyDashboard({
                                             <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#c29302]">
                                                 {m.otEarn > 0 ? fmtB(m.otEarn) : <span className="text-[#D1D5E0]">—</span>}
                                             </td>
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#E8730C]">
+                                                {m.shiftEarn > 0 ? fmtB(m.shiftEarn) : <span className="text-[#D1D5E0]">—</span>}
+                                            </td>
                                             <td className="px-2 sm:px-4 py-2.5 text-right">
                                                 <span className={`text-[13px] font-bold ${m.totalEarn > 0 ? 'text-[#111827]' : 'text-[#D1D5E0]'}`}>
                                                     {m.totalEarn > 0 ? fmtB(m.totalEarn) : '—'}
@@ -497,6 +532,7 @@ export default function YearlyDashboard({
                                     <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#374151]">{yearTotals.totalDays}</td>
                                     <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#10B981]">{fmtB(yearTotals.totalRegEarn)}</td>
                                     <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#c29302]">{fmtB(yearTotals.totalOTEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#E8730C]">{fmtB(yearTotals.totalShiftEarn)}</td>
                                     <td className="px-2 sm:px-4 py-3 text-right text-[14px] font-bold text-[#3B4FE4]">{fmtB(yearTotals.totalEarn)}</td>
                                 </tr>
                             </tfoot>

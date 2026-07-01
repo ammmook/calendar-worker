@@ -8,6 +8,7 @@ import {
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
   Stethoscope, UmbrellaOff, AlertCircle, Loader2,
+  Moon,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
@@ -90,6 +91,11 @@ export default function App() {
   const [otSettingId, setOtSettingId] = useState('');
   const [leaveQuotas, setLeaveQuotas] = useState({ sick: 0, personal: 0, vacation: 0 });
 
+  // ── Shift Allowance (เบี้ยกะ) — เก็บใน ot_setting ──
+  const [shiftAllowance, setShiftAllowance] = useState(0);
+  const [shiftStart, setShiftStart] = useState('');
+  const [shiftEnd, setShiftEnd] = useState('');
+
   const [dIn, setDIn] = useState('');
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
@@ -136,6 +142,9 @@ export default function App() {
               if (ot.ot_mode) setOtMode(ot.ot_mode);
               if (ot.ot_block_hours) setOtBlockHours(Number(ot.ot_block_hours));
               if (ot.ot_deduct_mins) setOtDeductMins(Number(ot.ot_deduct_mins));
+              if (ot.shift_allowance !== undefined && ot.shift_allowance !== null) setShiftAllowance(Number(ot.shift_allowance) || 0);
+              if (ot.shift_start) setShiftStart(ot.shift_start);
+              if (ot.shift_end) setShiftEnd(ot.shift_end);
             }
           }
           console.log('[TimeFlow] ✅ User profile loaded');
@@ -237,10 +246,12 @@ export default function App() {
     return earningsSummary.monthly.find(m => m.month_num === viewM + 1 && m.year_num === viewY) || {
       days_worked: 0,
       ot_days: 0,
+      shift_days: 0,
       total_working_hour: 0,
       total_ot_hour: 0,
       total_ot_earning: 0,
       total_regular_earning: 0,
+      total_shift_allowance: 0,
       total_earning: 0
     };
   }, [earningsSummary.monthly, viewY, viewM]);
@@ -250,12 +261,15 @@ export default function App() {
   const otDays = currentMonthSummary.ot_days;
   const daysWorked = currentMonthSummary.days_worked;
 
-  const regEarn = paymentType === 'daily' 
-    ? currentMonthSummary.total_regular_earning 
+  const regEarn = paymentType === 'daily'
+    ? currentMonthSummary.total_regular_earning
     : salary; // Full monthly salary as requested
-  
+
   const otEarn = currentMonthSummary.total_ot_earning;
-  const totalEarn = regEarn + otEarn;
+  // เบี้ยกะรวมของเดือน (backend เก็บ total_shift_allowance + shift_days ไว้ใน monthly_summary)
+  const shiftEarn = currentMonthSummary.total_shift_allowance || 0;
+  const shiftDays = currentMonthSummary.shift_days || 0;
+  const totalEarn = regEarn + otEarn + shiftEarn;
 
   // ── Calendar cells ──
   const daysInM = new Date(viewY, viewM + 1, 0).getDate();
@@ -547,6 +561,10 @@ export default function App() {
         otDeductMins={otDeductMins} setOtDeductMins={setOtDeductMins}
         otSettingId={otSettingId} setOtSettingId={setOtSettingId}
         leaveQuotas={leaveQuotas} setLeaveQuotas={setLeaveQuotas}
+
+        shiftAllowance={shiftAllowance} setShiftAllowance={setShiftAllowance}
+        shiftStart={shiftStart} setShiftStart={setShiftStart}
+        shiftEnd={shiftEnd} setShiftEnd={setShiftEnd}
         
         paymentType={paymentType} setPaymentType={setPaymentType}
         dailyRate={dailyRate} setDailyRate={setDailyRate}
@@ -752,14 +770,15 @@ export default function App() {
             </div>
 
             {/* ── SUMMARY CARDS ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-[fadeUp_0.4s_0.08s_ease_both] order-3 xl:order-2 xl:col-span-2">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 animate-[fadeUp_0.4s_0.08s_ease_both] order-3 xl:order-2 xl:col-span-2">
 
               <SummaryCard variant="amber" Icon={Timer} label={t.total_ot_hours} value={`${fmt1(totalOT)}h`} sub={`${otDays} ${t.with_overtime}`} />
+              <SummaryCard variant="orange" Icon={Moon} label={t.shift_earnings} value={fmtB(shiftEarn)} sub={`${shiftDays} ${t.shift_days_label}`} />
               <SummaryCard variant="indigo" Icon={TrendingUp} label={t.ot_earnings} value={fmtB(otEarn)} sub={`${t.at_rate} ${otRate}${t.hr_unit}`} />
               <SummaryCard variant="green" Icon={Banknote} label={t.regular_earnings} value={fmtB(regEarn)} sub={t.est_daily_base} />
 
-              {/* Hero card */}
-              <div className="relative overflow-hidden rounded-2xl border-transparent cursor-default
+              {/* Hero card — full-width bottom banner on mobile, in-row on desktop */}
+              <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl border-transparent cursor-default
               bg-gradient-to-br from-[#A5AEFC] to-[#8995F4]
               shadow-[0_8px_24px_rgba(137,149,244,0.3)] p-6
               transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
@@ -883,7 +902,7 @@ export default function App() {
                               title={t.delete_entry || 'Delete'}
                               className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
                                 ${isDeletingEntry
-                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
+                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
                                   : 'bg-[#FFF1F3] text-[#F43F5E] cursor-pointer hover:bg-[#FEE2E2]'}`}
                             >
                               {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
@@ -954,7 +973,7 @@ export default function App() {
                               title={t.delete_entry}
                               className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
                                 ${isSelectedHoliday || isDeletingEntry
-                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
+                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
                                   : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
                             >
                               {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
@@ -1005,7 +1024,9 @@ export default function App() {
                         const hTotal = dailyEarning?.working_hour || 0;
                         const netOt = dailyEarning?.ot_hour || 0;
                         const eEarn = dailyEarning?.total_earning || 0;
+                        const shiftPay = dailyEarning?.shift_allowance || 0;
                         const hasOT = netOt > 0;
+                        const hasShift = shiftPay > 0;
                         const isLeaveEntry = e.leave !== null && e.leave !== undefined;
                         const isSel = k === selectedKey;
                         return (
@@ -1013,13 +1034,15 @@ export default function App() {
                             key={k}
                             onClick={() => handleDayClick(k)}
                             className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
-                            ${isSel ? 'bg-[#EEF0FD] border-[#C7CCFA]'  
+                            ${isSel ? 'bg-[#EEF0FD] border-[#C7CCFA]'
                               : hasOT
                                 ? 'border-l-[3px] border-l-[#fbde3a] border-r-transparent border-t-transparent border-b-transparent hover:bg-[#fffdef]'
-                                : 'border-transparent hover:bg-[#F8F9FB] hover:border-[#E8EAEF]'}`}
+                                : hasShift
+                                  ? 'border-l-[3px] border-l-[#FDBA74] border-r-transparent border-t-transparent border-b-transparent hover:bg-[#FFF3E6]'
+                                  : 'border-transparent hover:bg-[#F8F9FB] hover:border-[#E8EAEF]'}`}
                           >
                             <div className={`w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0
-                            ${hasOT ? 'bg-[#fffdef] text-[#c29302]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
+                            ${hasOT ? 'bg-[#fffdef] text-[#c29302]' : hasShift ? 'bg-[#FFF3E6] text-[#E8730C]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
                               {d}
                             </div>
                             <div className="min-w-0">
@@ -1047,10 +1070,20 @@ export default function App() {
                                         +{fmt1(netOt)}h OT
                                       </span>
                                     )}
+                                    {hasShift && (
+                                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-[#FFF3E6] text-[#E8730C] px-1 py-px rounded">
+                                        <Moon size={8} strokeWidth={2.5} /> {t.shift_short}
+                                      </span>
+                                    )}
                                   </div>
                                   {hasOT && dailyEarning?.ot_earning > 0 && (
                                     <span className="text-[9px] font-bold text-[#c29302] leading-none">
                                       +{fmtB(dailyEarning.ot_earning)}
+                                    </span>
+                                  )}
+                                  {hasShift && (
+                                    <span className="text-[9px] font-bold text-[#E8730C] leading-none">
+                                      +{fmtB(shiftPay)}
                                     </span>
                                   )}
                                 </div>
@@ -1154,7 +1187,7 @@ export default function App() {
                             title={t.delete_entry}
                             className={`px-5 py-3.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
                               ${isSelectedHoliday || isDeletingEntry
-                                ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed' 
+                                ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
                                 : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
                           >
                             {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={18} />}
@@ -1164,8 +1197,8 @@ export default function App() {
                           onClick={saveSelectedEntry}
                           disabled={!dIn || isSelectedHoliday || isSavingEntry}
                           className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 relative overflow-hidden
-                            ${isSelectedHoliday 
-                              ? 'bg-[#D1D5E0] cursor-not-allowed' 
+                            ${isSelectedHoliday
+                              ? 'bg-[#D1D5E0] cursor-not-allowed'
                               : isSavingEntry
                                 ? 'bg-[#7B8CED] cursor-wait text-transparent'
                                 : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
@@ -1333,6 +1366,12 @@ const variantStyles = {
     icon: 'bg-[#ECFDF5] text-[#10B981]',
     val: 'text-[#10B981]',
   },
+  orange: {
+    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
+    stripe: 'bg-[#FDBA74]',
+    icon: 'bg-[#FFF3E6] text-[#E8730C]',
+    val: 'text-[#E8730C]',
+  },
 };
 
 function SummaryCard({ variant, Icon, label, value, sub }) {
@@ -1478,6 +1517,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     const netOT = dailyEarning?.ot_hour || 0;
     const eEarn = dailyEarning?.total_earning || 0;
     const hasOT = netOT > 0;
+    const hasShift = (dailyEarning?.shift_allowance || 0) > 0;
     const hasEntry = !!entry;
 
     // Leave tag
@@ -1497,9 +1537,11 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     ? 'bg-[rgba(153,142,217,0.15)]'
     : hasOT
       ? 'bg-[#fffdef]'
-      : isToday
-        ? 'bg-[#f0f5fa]'
-        : 'bg-transparent hover:bg-[#F8F9FB]';
+      : hasShift
+        ? 'bg-[#FFF3E6]'
+        : isToday
+          ? 'bg-[#f0f5fa]'
+          : 'bg-transparent hover:bg-[#F8F9FB]';
 
     let baseBorder = isSel
     ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
@@ -1594,6 +1636,12 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
           <span className="text-[8px] sm:text-[9px] font-medium text-[#9CA3AF] leading-tight truncate">
             {entry.in}–{entry.out}
           </span>
+          {hasShift && (
+            <span title={t.shift_allowance_title} className="flex items-center gap-0.5 text-[8px] sm:text-[9px] font-bold text-[#E8730C] leading-none">
+              <Moon size={9} strokeWidth={2.5} />
+              +{fmtB(dailyEarning.shift_allowance)}
+            </span>
+          )}
           <div className="flex justify-between items-end">
             {hasOT ? (
               <div className="flex flex-col">

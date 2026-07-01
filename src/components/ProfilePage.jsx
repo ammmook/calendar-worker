@@ -56,6 +56,9 @@ export default function ProfilePage(props) {
     const [dailyRate, setDailyRate] = useState(props.dailyRate);
     const [workDaysPerWeek, setWorkDaysPerWeek] = useState(props.workDaysPerWeek);
     const [otSettingId, setOtSettingId] = useState(props.otSettingId);
+    const [shiftAllowance, setShiftAllowance] = useState(props.shiftAllowance);
+    const [shiftStart, setShiftStart] = useState(props.shiftStart);
+    const [shiftEnd, setShiftEnd] = useState(props.shiftEnd);
 
     const handleSave = useCallback(async () => {
         if (!user?.email) return;
@@ -80,6 +83,11 @@ export default function ProfilePage(props) {
                 otData.ot_block_hours = 0;
                 otData.ot_deduct_mins = 0;
             }
+
+            // ── Shift allowance settings (เบี้ยกะ) ──
+            otData.shift_allowance = shiftAllowance || 0;
+            otData.shift_start = shiftStart || '';
+            otData.shift_end = shiftEnd || '';
 
             let currentOtSettingId = otSettingId;
 
@@ -126,6 +134,9 @@ export default function ProfilePage(props) {
             props.setLeaveQuotas(leaveQuotas);
             props.setPaymentType(paymentType);
             props.setWorkDaysPerWeek(workDaysPerWeek);
+            props.setShiftAllowance(shiftAllowance);
+            props.setShiftStart(shiftStart);
+            props.setShiftEnd(shiftEnd);
 
             console.log('[TimeFlow] ✅ Profile & OT settings saved');
             setSaved(true);
@@ -135,7 +146,7 @@ export default function ProfilePage(props) {
         } finally {
             setIsSavingLocal(false);
         }
-    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, props]);
+    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, shiftAllowance, shiftStart, shiftEnd, props]);
 
     // ── OT example preview ───────────────────────────────────────────────────
     const previewOT = (rawOT) => {
@@ -341,6 +352,46 @@ export default function ProfilePage(props) {
 
                             </div>
                         )}
+                    </div>
+
+                    {/* ── Section 4: Shift Allowance ── */}
+                    <div className={cardCls}>
+                        <h3 className="text-[13px] font-bold text-[#111827] mb-1">{t.shift_allowance_title}</h3>
+                        <p className="text-[11px] text-[#9CA3AF] mb-4">{t.shift_allowance_desc}</p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <label className={labelCls}>{t.shift_allowance_amount}</label>
+                                <InputWithIcon Icon={CircleDollarSign} suffix={t.day_unit || 'day'} color="#10B981">
+                                    <input
+                                        type="number" min="0" value={shiftAllowance || ''}
+                                        onChange={(e) => setShiftAllowance(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onFocus={(e) => e.target.select()}
+                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                    />
+                                </InputWithIcon>
+                            </div>
+                            <div>
+                                <label className={labelCls}>{t.shift_start}</label>
+                                <InputWithIcon Icon={Clock} color="#3B4FE4">
+                                    <input
+                                        type="time" value={shiftStart || ''}
+                                        onChange={(e) => setShiftStart(e.target.value)}
+                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                    />
+                                </InputWithIcon>
+                            </div>
+                            <div>
+                                <label className={labelCls}>{t.shift_end}</label>
+                                <InputWithIcon Icon={Clock} color="#3B4FE4">
+                                    <input
+                                        type="time" value={shiftEnd || ''}
+                                        onChange={(e) => setShiftEnd(e.target.value)}
+                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                    />
+                                </InputWithIcon>
+                            </div>
+                        </div>
                     </div>
 
                     {/* ── Section 3: Leave Quotas ── */}

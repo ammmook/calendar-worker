@@ -62,23 +62,12 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
           <h2 className="text-lg font-bold text-[#111827]">
             {mode === 'choice' ? (lang === 'th' ? 'เลือกสถานะ' : 'Select Status') : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select Leave Type')}
           </h2>
-          <div className="flex gap-2">
-            {(currentData?._id || currentData?.in || currentData?.leave) && (
-              <button 
-                onClick={() => onDelete && onDelete()} 
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#F43F5E] hover:bg-[#FFF1F3] transition-colors bg-transparent border-none cursor-pointer"
-                title={lang === 'th' ? 'ลบข้อมูล' : 'Delete Entry'}
-              >
-                <Trash2 size={18} />
-              </button>
-            )}
-            <button 
-              onClick={handleClose} 
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <button
+            onClick={handleClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Content */}
@@ -125,6 +114,19 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                   </div>
                 </div>
               </button>
+
+              {/* Delete (existing data) — bottom-right of modal */}
+              {(currentData?._id || currentData?.in || currentData?.leave) && (
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => onDelete && onDelete()}
+                    className="flex items-center gap-2 px-4 h-9 rounded-lg text-[13px] font-bold text-[#F43F5E] bg-[#FFF1F3] hover:bg-[#FEE2E2] transition-colors border-none cursor-pointer"
+                  >
+                    <Trash2 size={18} />
+                    <span>{lang === 'th' ? 'ลบข้อมูล' : 'Delete Entry'}</span>
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
