@@ -777,21 +777,21 @@ export default function App() {
               <SummaryCard variant="indigo" Icon={TrendingUp} label={t.ot_earnings} value={fmtB(otEarn)} sub={`${t.at_rate} ${otRate}${t.hr_unit}`} />
               <SummaryCard variant="green" Icon={Banknote} label={t.regular_earnings} value={fmtB(regEarn)} sub={t.est_daily_base} />
 
-              {/* Hero card — full-width bottom banner on mobile, in-row on desktop */}
+              {/* Hero card — full-width bottom banner on mobile, in-row on desktop (matches other card heights) */}
               <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl border-transparent cursor-default
               bg-gradient-to-br from-[#A5AEFC] to-[#8995F4]
-              shadow-[0_8px_24px_rgba(137,149,244,0.3)] p-6
+              shadow-[0_8px_24px_rgba(137,149,244,0.3)] p-4 sm:p-6
               transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
               hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
-                <span className="absolute top-5 right-5 bg-white/25 text-white/90 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
+                <span className="absolute top-4 right-4 sm:top-5 sm:right-5 bg-white/25 text-white/90 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
                   {t.this_month}
                 </span>
-                <div className="w-9 h-9 rounded-[10px] bg-white/25 grid place-items-center mb-4">
-                  <CircleDollarSign size={18} className="text-white" />
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] bg-white/25 grid place-items-center mb-3 sm:mb-4">
+                  <CircleDollarSign size={17} className="text-white" />
                 </div>
-                <div className="text-[11px] font-bold text-white/80 uppercase tracking-[0.1em] mb-1.5">{t.total_earnings}</div>
-                <div className="text-[2.2rem] font-bold text-white leading-none tracking-tight">{fmtB(totalEarn)}</div>
-                <div className="text-[12px] text-white/70 mt-1.5">{daysWorked} {t.worked_days}</div>
+                <div className="text-[10px] sm:text-[11px] font-bold text-white/80 uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 sm:mb-1.5">{t.total_earnings}</div>
+                <div className="text-[1.4rem] sm:text-[2rem] font-bold text-white leading-none tracking-tight">{fmtB(totalEarn)}</div>
+                <div className="text-[10px] sm:text-[12px] text-white/70 mt-1 sm:mt-1.5">{daysWorked} {t.worked_days}</div>
               </div>
             </div>
 

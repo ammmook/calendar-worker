@@ -275,8 +275,8 @@ export default function YearlyDashboard({
                     stripe="bg-[#3B4FE4]"
                 />
 
-                {/* Total annual */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
+                {/* Total annual — full-width bottom banner on mobile, in-row on desktop (matches other card heights) */}
+                <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
                     <div className="flex items-center gap-2 mb-3">
                         <div className="w-8 h-8 rounded-[8px] bg-white/25 grid place-items-center">
                             <CircleDollarSign size={15} className="text-white" />

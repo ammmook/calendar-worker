@@ -216,7 +216,7 @@ export default function ProfilePage(props) {
                             </button>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             {paymentType === 'monthly' ? (
                                 <div>
                                     <label className={labelCls}>{t.monthly_salary}</label>
@@ -260,7 +260,7 @@ export default function ProfilePage(props) {
                     {/* ── Section 2: Work Schedule ── */}
                     <div className={cardCls}>
                         <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.work_schedule || 'Work Schedule'}</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-2 gap-3 sm:gap-6">
                             <div>
                                 <label className={labelCls}>{t.standard_hours}</label>
                                 <InputWithIcon Icon={Clock} suffix="h" color="#3B4FE4">
@@ -292,7 +292,7 @@ export default function ProfilePage(props) {
                             <h3 className="text-[13px] font-bold text-[#111827]">{t.ot_calc_method}</h3>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                        <div className="grid grid-cols-2 gap-3 mb-4">
 
                             {/* Mode A: Hourly */}
                             <OTModeCard
@@ -359,7 +359,7 @@ export default function ProfilePage(props) {
                         <h3 className="text-[13px] font-bold text-[#111827] mb-1">{t.shift_allowance_title}</h3>
                         <p className="text-[11px] text-[#9CA3AF] mb-4">{t.shift_allowance_desc}</p>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="flex flex-col gap-4">
                             <div>
                                 <label className={labelCls}>{t.shift_allowance_amount}</label>
                                 <InputWithIcon Icon={CircleDollarSign} suffix={t.day_unit || 'day'} color="#10B981">
@@ -371,25 +371,27 @@ export default function ProfilePage(props) {
                                     />
                                 </InputWithIcon>
                             </div>
-                            <div>
-                                <label className={labelCls}>{t.shift_start}</label>
-                                <InputWithIcon Icon={Clock} color="#3B4FE4">
-                                    <input
-                                        type="time" value={shiftStart || ''}
-                                        onChange={(e) => setShiftStart(e.target.value)}
-                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                    />
-                                </InputWithIcon>
-                            </div>
-                            <div>
-                                <label className={labelCls}>{t.shift_end}</label>
-                                <InputWithIcon Icon={Clock} color="#3B4FE4">
-                                    <input
-                                        type="time" value={shiftEnd || ''}
-                                        onChange={(e) => setShiftEnd(e.target.value)}
-                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                    />
-                                </InputWithIcon>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                <div>
+                                    <label className={labelCls}>{t.shift_start}</label>
+                                    <InputWithIcon Icon={Clock} color="#3B4FE4">
+                                        <input
+                                            type="time" value={shiftStart || ''}
+                                            onChange={(e) => setShiftStart(e.target.value)}
+                                            className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                        />
+                                    </InputWithIcon>
+                                </div>
+                                <div>
+                                    <label className={labelCls}>{t.shift_end}</label>
+                                    <InputWithIcon Icon={Clock} color="#3B4FE4">
+                                        <input
+                                            type="time" value={shiftEnd || ''}
+                                            onChange={(e) => setShiftEnd(e.target.value)}
+                                            className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                        />
+                                    </InputWithIcon>
+                                </div>
                             </div>
                         </div>
                     </div>
