@@ -413,18 +413,19 @@ async function upsertWorkEntry(data) {
         let rawOT = Math.max(0, totalH - stdH);
         let netOT = rawOT;
 
-        // ── Block mode: ทำ OT ไม่เกิน ot_block_hours จ่ายเต็ม, เกินให้หัก ot_deduct_mins ──
-        if (otMode === 'block' && rawOT > 0) {
+        // ── เงื่อนไข: OT ที่ทำจริง ตั้งแต่ 9 ชม. ขึ้นไป → คิด OT = OT − 1 ชม. ──
+        //    เช่น ทำ OT 9 ชม. → คิด 8 ชม., 10 ชม. → คิด 9 ชม.
+        //    เงื่อนไขนี้มาก่อน (แทน) การคิดแบบ block
+        if (rawOT >= 9) {
+          netOT = rawOT - 1;
+        }
+        // ── Block mode (ใช้เมื่อ OT < 9 ชม.): ไม่เกิน ot_block_hours จ่ายเต็ม, เกินให้หัก ot_deduct_mins ──
+        else if (otMode === 'block' && rawOT > 0) {
           if (rawOT <= blockH) {
             netOT = rawOT;                                 // อยู่ในบล็อก → จ่ายเต็มตามชั่วโมงจริง
           } else {
             netOT = Math.max(0, rawOT - (deductM / 60));   // เกินบล็อก → หักนาทีที่กำหนด
           }
-        }
-
-        // ── OT ตั้งแต่ 9 ชม. ขึ้นไป หักออก 1 ชม. อัตโนมัติ (เช่น OT 9 ชม. → 8 ชม.) ──
-        if (netOT >= 9) {
-          netOT = Math.max(0, netOT - 1);
         }
 
         otHour = netOT;

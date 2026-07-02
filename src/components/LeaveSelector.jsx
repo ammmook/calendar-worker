@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Stethoscope, UmbrellaOff, Plane, Clock, Trash2 } from 'lucide-react';
+import { getLang } from '../locales';
 
 const LEAVE_TYPES = [
   { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3' },
@@ -40,8 +41,15 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
 
   if (!isOpen) return null;
 
+  const t = getLang(lang);
   const isLeave = currentData?.leave !== null && currentData?.leave !== undefined;
   const currentLeaveType = currentData?.leave?.type;
+
+  // ป้ายชื่อ + คำอธิบายตามภาษา (key ตรงกับ LEAVE_TYPES)
+  const leaveLabel = { sick: t.sick_leave, personal: t.personal_leave, vacation: t.vacation_leave };
+  const leaveDesc = lang === 'th'
+    ? { sick: 'ลาเนื่องจากป่วย', personal: 'ลาธุระส่วนตัว', vacation: 'ลาพักผ่อนประจำปี' }
+    : { sick: 'Take a sick day', personal: 'Personal time off', vacation: 'Annual vacation leave' };
 
   return (
     <div 
@@ -108,7 +116,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                   <div className="font-semibold text-[#111827]">{lang === 'th' ? 'ลางาน' : 'Taking Leave'}</div>
                   <div className="text-xs text-[#9CA3AF]">
                     {isLeave && currentLeaveType
-                      ? LEAVE_TYPES.find(t => t.key === currentLeaveType)?.label
+                      ? leaveLabel[currentLeaveType]
                       : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select leave type')
                     }
                   </div>
@@ -147,8 +155,8 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                     <leave.icon size={20} />
                   </div>
                   <div>
-                    <div className="font-semibold text-[#111827]">{leave.label}</div>
-                    <div className="text-xs text-[#9CA3AF]">{lang === 'th' ? `${leave.label}` : `${leave.label}`}</div>
+                    <div className="font-semibold text-[#111827]">{leaveLabel[leave.key]}</div>
+                    <div className="text-xs text-[#9CA3AF]">{leaveDesc[leave.key]}</div>
                   </div>
                 </button>
               ))}
