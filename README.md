@@ -1,16 +1,75 @@
-# React + Vite
+# ⏰ Work Time Tracker | ระบบบันทึกเวลาเข้า-ออกงาน
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+เว็บแอปพลิเคชันสำหรับ **จดบันทึกเวลาเข้า/ออกงาน** เพื่อคำนวณ **ค่าล่วงเวลา (OT)** และ **ค่ากะ (Shift)** ที่จะได้รับในแต่ละเดือน ช่วยให้สรุปรายรับของตนเองได้อย่างสะดวกและแม่นยำ
 
-Currently, two official plugins are available:
+🔗 **ลองใช้งานได้ที่:** https://calendar-worker.vercel.app/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 📌 เกี่ยวกับโปรเจกต์
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+เว็บนี้ถูกพัฒนาขึ้นเพื่อแก้ปัญหาการคำนวณเงินเดือนด้วยตนเอง โดยเฉพาะสำหรับผู้ที่มีการทำงานเป็นกะและมีชั่วโมง OT ที่ไม่แน่นอน ผู้ใช้สามารถ:
 
-## Expanding the ESLint configuration
+- 🕐 **บันทึกเวลาเข้า-ออกงาน** ในแต่ละวัน
+- 💰 **คำนวณค่า OT** จากชั่วโมงทำงานล่วงเวลาโดยอัตโนมัติ
+- 🌙 **คำนวณค่ากะ (Shift)** ตามรอบการทำงาน
+- 📊 **สรุปรายรับรายเดือน** เพื่อวางแผนการเงินส่วนตัว
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## 🛠️ เทคโนโลยีที่ใช้
+
+| ส่วน | เทคโนโลยี |
+|------|-----------|
+| **Frontend** | React + Vite |
+| **Styling** | Tailwind CSS |
+| **Database / Backend** | Supabase (PostgreSQL) |
+| **AI Assistant** | Claude Code (ช่วยในการพัฒนา) |
+
+---
+
+## ✨ ฟีเจอร์หลัก
+
+- ✅ บันทึกเวลาเข้า-ออกงานได้ง่าย
+- ✅ คำนวณ OT และค่ากะอัตโนมัติ
+- ✅ สรุปรายรับรายเดือนแบบเรียลไทม์
+- ✅ ข้อมูลถูกจัดเก็บอย่างปลอดภัยบน Supabase
+
+---
+
+## 🚀 การติดตั้ง (Development)
+
+```bash
+# clone โปรเจกต์
+git clone <repository-url>
+
+# เข้าไปในโฟลเดอร์
+cd work-time-tracker
+
+# ติดตั้ง dependencies
+npm install
+
+# รันเซิร์ฟเวอร์สำหรับพัฒนา
+npm run dev
+```
+
+---
+
+## 🔧 การตั้งค่า Environment Variables
+
+สร้างไฟล์ `.env` และเพิ่มค่าต่อไปนี้:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+---
+
+<div align="center">
+
+💖 พัฒนาด้วยความตั้งใจโดย **Ruthaichanok Kasun**
+
+🌸 *"Code with passion, learn with curiosity, and create with love."* 🌸
+
+</div>
