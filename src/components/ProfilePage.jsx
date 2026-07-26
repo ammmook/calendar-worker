@@ -59,6 +59,7 @@ export default function ProfilePage(props) {
     const [shiftAllowance, setShiftAllowance] = useState(props.shiftAllowance);
     const [shiftStart, setShiftStart] = useState(props.shiftStart);
     const [shiftEnd, setShiftEnd] = useState(props.shiftEnd);
+    const [socialSecurity, setSocialSecurity] = useState(props.socialSecurity);
 
     const handleSave = useCallback(async () => {
         if (!user?.email) return;
@@ -120,6 +121,7 @@ export default function ProfilePage(props) {
                 payment_type: paymentType,
                 daily_rate: finalDailyRate,
                 work_days_per_week: workDaysPerWeek,
+                social_security: socialSecurity || 0,
             });
 
             // 3. Sync changes back to App.jsx global state ONLY after successful save
@@ -137,6 +139,7 @@ export default function ProfilePage(props) {
             props.setShiftAllowance(shiftAllowance);
             props.setShiftStart(shiftStart);
             props.setShiftEnd(shiftEnd);
+            props.setSocialSecurity(socialSecurity);
 
             console.log('[TimeFlow] ✅ Profile & OT settings saved');
             setSaved(true);
@@ -146,7 +149,7 @@ export default function ProfilePage(props) {
         } finally {
             setIsSavingLocal(false);
         }
-    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, shiftAllowance, shiftStart, shiftEnd, props]);
+    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, shiftAllowance, shiftStart, shiftEnd, socialSecurity, props]);
 
     // ── OT example preview ───────────────────────────────────────────────────
     const previewOT = (rawOT) => {
@@ -254,6 +257,20 @@ export default function ProfilePage(props) {
                                     />
                                 </InputWithIcon>
                             </div>
+                        </div>
+
+                        {/* ประกันสังคม — หักออกจากเงินเดือน */}
+                        <div className="mt-4">
+                            <label className={labelCls}>{t.social_security}</label>
+                            <InputWithIcon Icon={CircleDollarSign} suffix={t.mo_unit} color="#EF4444">
+                                <input
+                                    type="number" min="0" value={socialSecurity || ''}
+                                    onChange={(e) => setSocialSecurity(e.target.value === '' ? 0 : Number(e.target.value))}
+                                    onFocus={(e) => e.target.select()}
+                                    className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                />
+                            </InputWithIcon>
+                            <p className="text-[10px] text-[#9CA3AF] mt-1">{t.social_security_desc}</p>
                         </div>
                     </div>
 

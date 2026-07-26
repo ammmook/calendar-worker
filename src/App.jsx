@@ -96,6 +96,9 @@ export default function App() {
   const [shiftStart, setShiftStart] = useState('');
   const [shiftEnd, setShiftEnd] = useState('');
 
+  // ── ประกันสังคม (หักจากเงินเดือน) — เก็บใน user ──
+  const [socialSecurity, setSocialSecurity] = useState(0);
+
   const [dIn, setDIn] = useState('');
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
@@ -132,6 +135,7 @@ export default function App() {
           if (u.payment_type) setPaymentType(u.payment_type);
           if (u.daily_rate) setDailyRate(Number(u.daily_rate));
           if (u.work_days_per_week) setWorkDaysPerWeek(Number(u.work_days_per_week));
+          if (u.social_security !== undefined && u.social_security !== null) setSocialSecurity(Number(u.social_security) || 0);
 
           // Load OT settings if linked
           if (u.ot_setting_id) {
@@ -269,7 +273,8 @@ export default function App() {
   // เบี้ยกะรวมของเดือน (backend เก็บ total_shift_allowance + shift_days ไว้ใน monthly_summary)
   const shiftEarn = currentMonthSummary.total_shift_allowance || 0;
   const shiftDays = currentMonthSummary.shift_days || 0;
-  const totalEarn = regEarn + otEarn + shiftEarn;
+  // หักประกันสังคมออกจากรายได้รวมของเดือน
+  const totalEarn = Math.max(0, regEarn + otEarn + shiftEarn - (socialSecurity || 0));
 
   // ── Calendar cells ──
   const daysInM = new Date(viewY, viewM + 1, 0).getDate();
@@ -565,6 +570,7 @@ export default function App() {
         shiftAllowance={shiftAllowance} setShiftAllowance={setShiftAllowance}
         shiftStart={shiftStart} setShiftStart={setShiftStart}
         shiftEnd={shiftEnd} setShiftEnd={setShiftEnd}
+        socialSecurity={socialSecurity} setSocialSecurity={setSocialSecurity}
         
         paymentType={paymentType} setPaymentType={setPaymentType}
         dailyRate={dailyRate} setDailyRate={setDailyRate}

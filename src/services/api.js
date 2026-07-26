@@ -152,6 +152,7 @@ async function createUser(data) {
     personal_leave_day: data.personal_leave_day !== undefined && data.personal_leave_day !== null ? data.personal_leave_day : 6,
     annual_leave_day: data.annual_leave_day !== undefined && data.annual_leave_day !== null ? data.annual_leave_day : 10,
     work_days_per_week: data.work_days_per_week !== undefined && data.work_days_per_week !== null ? data.work_days_per_week : 5,
+    social_security: data.social_security !== undefined && data.social_security !== null ? data.social_security : 0,
   };
 
   const { error } = await supabase.from('user').insert(row);
@@ -539,11 +540,17 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
   if (user) await expandUserWithSalary(user);
   const paymentType = user ? (user.payment_type || 'monthly') : 'monthly';
   const salaryMonthly = user ? (Number(user.salary_monthly) || 0) : 0;
+  const socialSecurity = user ? (Number(user.social_security) || 0) : 0;
 
   // ถ้าเป็นรายเดือน ให้ใส่เงินเดือนเป็นฐานรายได้หลัก (ถ้ามีข้อมูลการลงเวลาในเดือนนั้น)
   if (paymentType === 'monthly') {
     total_regular_earning = (filtered && filtered.length > 0) ? salaryMonthly : 0;
     total_earning = total_regular_earning + total_ot_earning + total_shift_allowance;
+  }
+
+  // หักประกันสังคม (ต่อเดือน) เมื่อมีการทำงานในเดือนนั้น
+  if (filtered && filtered.length > 0 && socialSecurity > 0) {
+    total_earning = Math.max(0, total_earning - socialSecurity);
   }
 
   const summaryData = {
