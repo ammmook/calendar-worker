@@ -298,6 +298,8 @@ export default function App() {
   const shiftDays = currentMonthSummary.shift_days || 0;
   // หักประกันสังคมออกจากรายได้รวมของเดือน
   const totalEarn = Math.max(0, regEarn + otEarn + shiftEarn - (socialSecurity || 0));
+  // อัตรา OT วันธรรมดาที่แสดงบนการ์ด = base (เงินเดือน ÷ 30 ÷ std) × 1.5 ; รายวัน fallback ค่า OT Rate ที่กรอกเอง
+  const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
 
   // ── Calendar cells ──
   const daysInM = new Date(viewY, viewM + 1, 0).getDate();
@@ -562,8 +564,13 @@ export default function App() {
     if (totalMins <= 0) return { working_hour: 0, ot_hour: 0, ot_earning: 0, regular_earning: 0, shift_allowance: 0, total_earning: 0 };
 
     const totalH = totalMins / 60;
+    // หักเวลาพัก 1 ชม. ออกจากช่วงเวลาทำงานก่อนคิด normal/OT
+    // เช่น std 8 → 9:00–18:00 (9 ชม.) = ปกติเต็ม ; 9:00–19:00 (10 ชม.) = OT 1 ชม.
+    const netH = Math.max(0, totalH - 1);
     const stdH = Number(std) || 8;
     const rate = Number(otRate) || 0;
+    // base ต่อชั่วโมง = เงินเดือน ÷ 30 ÷ std แล้วคูณ 1.5 / 2 / 3 (fallback เป็น OT Rate ที่กรอกเองถ้าไม่มีเงินเดือน)
+    const baseHourly = Number(salary) > 0 ? Number(salary) / 30 / stdH : rate;
 
     // วันหยุด: วันนี้เป็น public holiday? / วันถัดไปเป็นวันหยุด (holiday หรือ public)?
     const nd = new Date(selectedKey + 'T00:00:00'); nd.setDate(nd.getDate() + 1);
@@ -582,16 +589,16 @@ export default function App() {
 
     if (isPublicHolidayToday) {
       // วันหยุดทางการ: OT ล้วน — 0..std = 2x, ส่วนเกิน = 3x
-      const ot2x = Math.min(totalH, stdH);
-      const ot3x = Math.max(0, totalH - stdH);
+      const ot2x = Math.min(netH, stdH);
+      const ot3x = Math.max(0, netH - stdH);
       workingHour = 0;
-      otHour = totalH;
-      ot2Hours = ot2x; ot2Earn = ot2x * 2 * rate;
-      ot3Hours = ot3x; ot3Earn = ot3x * 3 * rate;
+      otHour = netH;
+      ot2Hours = ot2x; ot2Earn = ot2x * 2 * baseHourly;
+      ot3Hours = ot3x; ot3Earn = ot3x * 3 * baseHourly;
       otEarning = ot2Earn + ot3Earn;
     } else {
-      workingHour = Math.min(totalH, stdH);
-      const rawOT = Math.max(0, totalH - stdH);
+      workingHour = Math.min(netH, stdH);
+      const rawOT = Math.max(0, netH - stdH);
       const afterMidnightHours = crossedMidnight ? (oh * 60 + om) / 60 : 0;
       const qualifies3x = crossedMidnight && nextDayIsHoliday && ssMin != null && inMin < ssMin && afterMidnightHours > 0;
       const ot3xHours = qualifies3x ? Math.min(afterMidnightHours, rawOT) : 0;
@@ -603,8 +610,8 @@ export default function App() {
         netNormalOT = normalOTraw <= otBlockHours ? normalOTraw : Math.max(0, normalOTraw - (otDeductMins / 60));
       }
       otHour = netNormalOT + ot3xHours;
-      ot15Hours = netNormalOT; ot15Earn = netNormalOT * rate;
-      ot3Hours = ot3xHours; ot3Earn = ot3xHours * 3 * rate;
+      ot15Hours = netNormalOT; ot15Earn = netNormalOT * 1.5 * baseHourly;
+      ot3Hours = ot3xHours; ot3Earn = ot3xHours * 3 * baseHourly;
       otEarning = ot15Earn + ot3Earn;
       if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
     }
@@ -624,7 +631,7 @@ export default function App() {
       shift_allowance: shiftEarning,
       total_earning: regularEarning + otEarning + shiftEarning,
     };
-  }, [dIn, dOut, selectedKey, std, otRate, otMode, otBlockHours, otDeductMins, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
+  }, [dIn, dOut, selectedKey, std, salary, otRate, otMode, otBlockHours, otDeductMins, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
 
   // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
   const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);
@@ -889,7 +896,7 @@ export default function App() {
 
               <SummaryCard variant="amber" Icon={Timer} label={t.total_ot_hours} value={`${fmt1(totalOT)}h`} sub={`${otDays} ${t.with_overtime}`} />
               <SummaryCard variant="orange" Icon={Moon} label={t.shift_earnings} value={fmtB(shiftEarn)} sub={`${shiftDays} ${t.shift_days_label}`} />
-              <SummaryCard variant="indigo" Icon={TrendingUp} label={t.ot_earnings} value={fmtB(otEarn)} sub={`${t.at_rate} ${otRate}${t.hr_unit}`} />
+              <SummaryCard variant="indigo" Icon={TrendingUp} label={t.ot_earnings} value={fmtB(otEarn)} sub={`${t.at_rate} ${fmt1(otDisplayRate)}${t.hr_unit}`} />
               <SummaryCard variant="green" Icon={Banknote} label={t.regular_earnings} value={fmtB(regEarn)} sub={t.est_daily_base} />
 
               {/* Hero card — full-width bottom banner on mobile, in-row on desktop (matches other card heights) */}

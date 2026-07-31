@@ -288,6 +288,7 @@ export default function ProfilePage(props) {
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
                                     />
                                 </InputWithIcon>
+                                <p className="mt-1.5 text-[11px] font-medium text-[#9CA3AF] leading-snug">{t.standard_hours_hint}</p>
                             </div>
                             <div>
                                 <label className={labelCls}>{t.work_days_per_week || 'Work Days Per Week'}</label>

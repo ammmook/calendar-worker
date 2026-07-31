@@ -407,6 +407,11 @@ async function upsertWorkEntry(data) {
     const dailyRate = Number(user.daily_rate) || 0;
     const otRate = Number(user.ot_hourly) || 0;
     const stdH = Number(user.working_hour) || 8;
+    // base ต่อชั่วโมง = เงินเดือน ÷ 30 วัน ÷ ชั่วโมงมาตรฐาน (เช่น 22,000 ÷ 30 ÷ 8 = 91.67)
+    // แล้วคูณ 1.5 (วันธรรมดา) / 2 (นักขัตฤกษ์ ≤ std) / 3 (นักขัตฤกษ์ > std)
+    // ถ้าไม่มีเงินเดือน (เช่น รายวัน) fallback ไปใช้ค่า OT Rate ที่กรอกเอง
+    const salaryMonthly = Number(user.salary_monthly) || 0;
+    const baseHourly = salaryMonthly > 0 ? salaryMonthly / 30 / stdH : otRate;
 
     let workingHour = 0;
     let otHour = 0;
@@ -430,7 +435,10 @@ async function upsertWorkEntry(data) {
 
       if (totalMins > 0) {
         const totalH = totalMins / 60;
-        workingHour = Math.min(totalH, stdH);
+        // หักเวลาพัก 1 ชม. ออกจากช่วงเวลาทำงานก่อนคิด normal/OT
+        // เช่น std 8 → 9:00–18:00 (9 ชม.) = ปกติเต็ม ; 9:00–19:00 (10 ชม.) = OT 1 ชม.
+        const netH = Math.max(0, totalH - 1);
+        workingHour = Math.min(netH, stdH);
 
         // ── ตรวจวันหยุด: วันนี้เป็น public holiday? / วันถัดไปเป็นวันหยุด (holiday หรือ public)? ──
         const nextDate = addDaysStr(data.date, 1);
@@ -450,14 +458,14 @@ async function upsertWorkEntry(data) {
 
         if (isPublicHolidayToday) {
           // ── วันหยุดทางการ: OT ล้วน — 0..std = 2 เท่า, ส่วนเกิน = 3 เท่า (ไม่หัก block/≥9) ──
-          const ot2x = Math.min(totalH, stdH);
-          const ot3x = Math.max(0, totalH - stdH);
+          const ot2x = Math.min(netH, stdH);
+          const ot3x = Math.max(0, netH - stdH);
           workingHour = 0;                                 // วันหยุด: ไม่มีค่าแรงปกติ
-          otHour = totalH;                                 // ทั้งวันเป็น OT
-          otEarningOverride = (ot2x * 2 + ot3x * 3) * otRate;
+          otHour = netH;                                   // ทั้งวันเป็น OT (หักพักแล้ว)
+          otEarningOverride = (ot2x * 2 + ot3x * 3) * baseHourly;
         } else {
           // ── วันปกติ ──
-          const rawOT = Math.max(0, totalH - stdH);
+          const rawOT = Math.max(0, netH - stdH);
 
           // ชั่วโมงหลังเที่ยงคืนที่ตกวันหยุด → 3 เท่า (เฉพาะเมื่อเข้างานก่อน shift_start)
           const afterMidnightHours = crossedMidnight ? (oh * 60 + om) / 60 : 0;
@@ -475,7 +483,7 @@ async function upsertWorkEntry(data) {
           }
 
           otHour = netNormalOT + ot3xHours;
-          otEarningOverride = (netNormalOT + ot3xHours * 3) * otRate;
+          otEarningOverride = (netNormalOT * 1.5 + ot3xHours * 3) * baseHourly;
 
           // ── เบี้ยกะ: ได้เฉพาะเมื่อเวลาเข้างานตรงกับ shift_start พอดี ──
           if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
@@ -496,7 +504,7 @@ async function upsertWorkEntry(data) {
       regularEarning = 0;
     }
 
-    const otEarning = otEarningOverride != null ? otEarningOverride : otHour * otRate;
+    const otEarning = otEarningOverride != null ? otEarningOverride : otHour * baseHourly * 1.5;
     const totalEarning = regularEarning + otEarning + shiftEarning;
 
     data.ot_earning = otEarning;

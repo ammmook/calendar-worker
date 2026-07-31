@@ -11,6 +11,7 @@ export const TH = {
     monthly_salary: 'เงินเดือน',
     ot_rate: 'เรท OT / ชม.',
     standard_hours: 'ชั่วโมงปกติ',
+    standard_hours_hint: 'กรอกชั่วโมงที่หักเวลาพักแล้วเท่านั้น',
 
     // Monthly Dashboard
     total_ot_hours: 'ชั่วโมง OT รวม',
@@ -145,6 +146,7 @@ export const EN = {
     monthly_salary: 'Monthly Salary',
     ot_rate: 'OT Rate / Hr',
     standard_hours: 'Standard Hours',
+    standard_hours_hint: 'Enter hours already excluding break time only',
 
     // Monthly Dashboard
     total_ot_hours: 'Total OT Hours',
