@@ -1654,29 +1654,38 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     training: { color: '#111827', bg: 'rgba(17,24,39,0.10)', Icon: GraduationCap },
     };
     const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
+    const isTrainingEntry = leaveType === 'training';
+    const trainingLabel = lang === 'th' ? 'อบรม/ดูงานนอกสถานที่' : 'Training / Off-site';
 
     const CornerIcon = isHol ? Palmtree : Sun;
 
     // Cell background / border
+    // วันหยุดทางการที่ยังไม่มีการทำงาน → กรอบแดง + พื้นแดงจางๆ (หาย/เปลี่ยนเมื่อวันนั้นมีการทำงาน)
+    const isPublicHolIdle = !!publicHol && !hasEntry;
+
     let baseBg = isHol
     ? 'bg-[rgba(153,142,217,0.15)]'
-    : hasOT
-      ? 'bg-[#fffdef]'
-      : hasShift
-        ? 'bg-[#FFF3E6]'
-        : isToday
-          ? 'bg-[#f0f5fa]'
-          : 'bg-transparent hover:bg-[#F8F9FB]';
+    : isPublicHolIdle
+      ? 'bg-[rgba(239,68,68,0.07)]'
+      : hasOT
+        ? 'bg-[#fffdef]'
+        : hasShift
+          ? 'bg-[#FFF3E6]'
+          : isToday
+            ? 'bg-[#f0f5fa]'
+            : 'bg-transparent hover:bg-[#F8F9FB]';
 
     let baseBorder = isSel
     ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
-    : isHol
-      ? 'border-transparent'
-      : isToday
-        ? 'border-[#6fa3cb] hover:border-[#5c96bb]'
-        : hasOT
-          ? 'border-transparent hover:border-[#fbde3a]'
-          : 'border-transparent hover:border-[#E8EAEF]';
+    : isPublicHolIdle
+      ? 'border-[#EF4444] hover:border-[#dc2626]'
+      : isHol
+        ? 'border-transparent'
+        : isToday
+          ? 'border-[#6fa3cb] hover:border-[#5c96bb]'
+          : hasOT
+            ? 'border-transparent hover:border-[#fbde3a]'
+            : 'border-transparent hover:border-[#E8EAEF]';
 
     const cellBg = `${baseBg} ${baseBorder}`;
 
@@ -1729,8 +1738,8 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
         </span>
       )}
 
-      {/* Leave Tag Icon / Public Holiday Icon / Holiday Toggle (มุมขวาบน) */}
-      {isLeave && leaveInfo ? (
+      {/* Leave Tag Icon / Public Holiday Icon / Holiday Toggle (มุมขวาบน) — อบรมไปแสดงที่ตำแหน่งเวลาแทน */}
+      {isLeave && leaveInfo && !isTrainingEntry ? (
         <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center z-20">
           <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
         </div>
@@ -1768,6 +1777,12 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
 
       {/* Entry data */}
       {hasEntry && (
+        isTrainingEntry ? (
+          <div className="mt-auto flex items-center gap-1 text-[#111827]" title={trainingLabel}>
+            <GraduationCap size={11} strokeWidth={2.5} className="shrink-0" />
+            <span className="text-[8px] sm:text-[9px] font-bold leading-tight truncate">{trainingLabel}</span>
+          </div>
+        ) : (
         <div className="mt-auto flex flex-col gap-[2px]">
           <span className="text-[8px] sm:text-[9px] font-medium text-[#9CA3AF] leading-tight truncate">
             {entry.in}–{entry.out}
@@ -1798,6 +1813,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
             )}
           </div>
         </div>
+        )
       )}
     </div>
     );
