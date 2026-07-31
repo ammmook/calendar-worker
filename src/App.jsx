@@ -524,10 +524,58 @@ export default function App() {
 
   // ── Detail panel calc ──
   const selDailyEarning = selectedKey ? earningsSummary.daily[selectedKey] : null;
-  const detHReg = selDailyEarning?.working_hour || 0;
-  const netDetOT = selDailyEarning?.ot_hour || 0;
-  const detE = selDailyEarning?.total_earning || 0;
-  const detOTRateEarn = selDailyEarning?.ot_earning || 0;
+
+  // Preview คำนวณสดจากเวลาที่กรอก (ก่อนกดบันทึก) — ใช้ตรรกะเดียวกับ upsertWorkEntry ใน api.js
+  const previewCalc = useMemo(() => {
+    if (!dIn || !dOut) return null;
+    const pIn = String(dIn).split(':'), pOut = String(dOut).split(':');
+    const ih = Number(pIn[0] || 0), im = Number(pIn[1] || 0);
+    const oh = Number(pOut[0] || 0), om = Number(pOut[1] || 0);
+    let totalMins = (oh * 60 + om) - (ih * 60 + im);
+    if (totalMins < 0) totalMins += 1440; // ข้ามเที่ยงคืน
+    if (totalMins <= 0) return { working_hour: 0, ot_hour: 0, ot_earning: 0, regular_earning: 0, shift_allowance: 0, total_earning: 0 };
+
+    const totalH = totalMins / 60;
+    const stdH = Number(std) || 8;
+    const workingHour = Math.min(totalH, stdH);
+
+    const rawOT = Math.max(0, totalH - stdH);
+    let netOT = rawOT;
+    if (rawOT >= 9) {
+      netOT = rawOT - 1;                                   // OT ที่ทำจริง ≥ 9 → ลบ 1 ชม.
+    } else if (otMode === 'block' && rawOT > 0) {
+      netOT = rawOT <= otBlockHours ? rawOT : Math.max(0, rawOT - (otDeductMins / 60));
+    }
+    const otHour = netOT;
+
+    // เบี้ยกะ: ได้เมื่อเวลาเข้างานตรงกับเวลาเริ่มกะพอดี
+    const inMin = ih * 60 + im;
+    const ssParts = String(shiftStart || '').split(':');
+    const ssMin = (ssParts.length >= 2 && !isNaN(Number(ssParts[0])) && !isNaN(Number(ssParts[1])))
+      ? Number(ssParts[0]) * 60 + Number(ssParts[1]) : null;
+    const shiftEarning = (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) ? Number(shiftAllowance) : 0;
+
+    const regularEarning = paymentType === 'daily'
+      ? (Number(dailyRate) || 0) * (stdH > 0 ? workingHour / stdH : 0)
+      : 0;
+    const otEarning = otHour * (Number(otRate) || 0);
+
+    return {
+      working_hour: workingHour,
+      ot_hour: otHour,
+      ot_earning: otEarning,
+      regular_earning: regularEarning,
+      shift_allowance: shiftEarning,
+      total_earning: regularEarning + otEarning + shiftEarning,
+    };
+  }, [dIn, dOut, std, otRate, otMode, otBlockHours, otDeductMins, paymentType, dailyRate, shiftAllowance, shiftStart]);
+
+  // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
+  const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);
+  const netDetOT = previewCalc ? previewCalc.ot_hour : (selDailyEarning?.ot_hour || 0);
+  const detE = previewCalc ? previewCalc.total_earning : (selDailyEarning?.total_earning || 0);
+  const detOTRateEarn = previewCalc ? previewCalc.ot_earning : (selDailyEarning?.ot_earning || 0);
+  const detShift = previewCalc ? previewCalc.shift_allowance : (selDailyEarning?.shift_allowance || 0);
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
   const selLabel = selDateObj
@@ -962,6 +1010,12 @@ export default function App() {
                             <span className="text-[13px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
                           </div>
                           <hr className="border-[#E8EAEF]" />
+                          {detShift > 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.shift_earnings}</span>
+                              <span className="text-[13px] font-bold text-[#E8730C]">+{fmtB(detShift)}</span>
+                            </div>
+                          )}
                           {(paymentType !== 'monthly' || detE > 0) && (
                             <div className="flex justify-between items-center">
                               <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
@@ -1178,6 +1232,12 @@ export default function App() {
                           <span className="text-[14px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
                         </div>
                         <div className="h-px bg-[#E8EAEF] w-full" />
+                        {detShift > 0 && (
+                          <div className="flex justify-between items-center">
+                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.shift_earnings}</span>
+                            <span className="text-[14px] font-bold text-[#E8730C]">+{fmtB(detShift)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
                           <span className="text-[16px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
