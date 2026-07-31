@@ -821,6 +821,22 @@ async function getHolidays(email) {
   return { success: true, data: userHolidays };
 }
 
+/** วันหยุดทางการ (global) — คืน [{ date, name_th, name_en }] */
+async function getPublicHolidays() {
+  const { data, error } = await supabase
+    .from('public_holidays')
+    .select('*');
+  if (error) return { success: false, error: error.message };
+  const out = (data || [])
+    .filter((r) => r.date)
+    .map((r) => ({
+      date: normalizeHolidayDate(r.date),
+      name_th: r.name_th || '',
+      name_en: r.name_en || '',
+    }));
+  return { success: true, data: out };
+}
+
 async function toggleHoliday(email, dateStr, isHoliday) {
   if (!email || !dateStr) return { success: false, error: 'email and date are required' };
 
@@ -902,6 +918,10 @@ export const OtSettingAPI = {
 export const HolidayAPI = {
   get: wrap('getHolidays', getHolidays),
   toggle: wrap('toggleHoliday', toggleHoliday),
+};
+
+export const PublicHolidayAPI = {
+  get: wrap('getPublicHolidays', getPublicHolidays),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

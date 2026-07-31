@@ -17,7 +17,7 @@ import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
-import { UserAPI, WorkEntryAPI, HolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
+import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 import { SkeletonDashboard, SkeletonAuthLoading } from './components/SkeletonLoader';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,6 +69,7 @@ export default function App() {
   const [entries, setEntries] = useState({});
   const [earningsSummary, setEarningsSummary] = useState({ monthly: [], yearly: {}, daily: {} });
   const [holidays, setHolidays] = useState(new Set());
+  const [publicHolidays, setPublicHolidays] = useState({}); // { 'YYYY-MM-DD': { name_th, name_en } } วันหยุดทางการ
   const [selectedKey, setSelectedKey] = useState(null);
   const [viewY, setViewY] = useState(today.getFullYear());
   const [viewM, setViewM] = useState(today.getMonth());
@@ -232,6 +233,28 @@ export default function App() {
   useEffect(() => {
     loadEntries();
   }, [loadEntries]);
+
+  // ── โหลดวันหยุดทางการ (global) ครั้งเดียวหลัง login ──
+  useEffect(() => {
+    if (!user?.email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await PublicHolidayAPI.get();
+        if (cancelled) return;
+        if (res.success && Array.isArray(res.data)) {
+          const map = {};
+          res.data.forEach((h) => {
+            if (h.date) map[h.date] = { name_th: h.name_th || '', name_en: h.name_en || '' };
+          });
+          setPublicHolidays(map);
+        }
+      } catch (err) {
+        console.error('[TimeFlow] Failed to load public holidays:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.email]);
 
   const showToast = (msg) => {
     setToast({ show: true, msg });
@@ -900,6 +923,8 @@ export default function App() {
                         handleDayClick={handleDayClick}
                         toggleHoliday={toggleHoliday}
                         paymentType={paymentType}
+                        publicHolidays={publicHolidays}
+                        lang={lang}
                         t={t}
                       />
                     ))}
@@ -1164,6 +1189,7 @@ export default function App() {
                 { color: 'bg-[#EEF0FD] border border-[#C7CCFA]', label: t.regular_day_legend },
                 { color: 'bg-[#fffdef] border border-[#ffe270]', label: t.ot_day_legend },
                 { color: 'bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]', label: t.holiday_legend },
+                { color: 'bg-[#FEECEC] border border-[#EF4444]', label: t.public_holiday_legend },
                 { color: 'bg-[#f0f5fa] border-2 border-[#6fa3cb]', label: t.today },
                 { color: 'bg-[#f2f8fa] border-2 border-[#6ab9dc]', label: t.selected_legend },
               ].map(({ color, label }) => (
@@ -1570,9 +1596,11 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     // ── DayCell Sub-component ───────────────────────────────────────────────────
     function DayCell({
     d, k, entries, todayKey, selectedKey, holidays, viewY, viewM,
-    dailyEarning, handleDayClick, toggleHoliday, paymentType, t
+    dailyEarning, handleDayClick, toggleHoliday, paymentType, publicHolidays, lang, t
     }) {
     const entry = entries[k];
+    const publicHol = publicHolidays?.[k] || null;
+    const publicHolName = publicHol ? (lang === 'th' ? publicHol.name_th : publicHol.name_en) : '';
     const isToday = k === todayKey;
     const isSel = k === selectedKey;
     const isHol = holidays.has(k);
@@ -1663,10 +1691,21 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
         {d}
       </span>
 
-      {/* Leave Tag Icon OR Holiday Toggle */}
+      {/* ชื่อวันหยุดทางการ (สลับไทย-อังกฤษตามภาษา) */}
+      {publicHol && publicHolName && (
+        <span className="text-[7px] sm:text-[8px] font-bold text-[#EF4444] leading-tight truncate pr-3.5" title={publicHolName}>
+          {publicHolName}
+        </span>
+      )}
+
+      {/* Leave Tag Icon / Public Holiday Icon / Holiday Toggle (มุมขวาบน) */}
       {isLeave && leaveInfo ? (
         <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center z-20">
           <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
+        </div>
+      ) : publicHol ? (
+        <div className="absolute top-[4px] right-[4px] flex items-center justify-center z-20" title={publicHolName}>
+          <CalendarDays size={13} strokeWidth={2.25} className="text-[#EF4444]" />
         </div>
       ) : (
         <>

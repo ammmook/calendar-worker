@@ -48,6 +48,7 @@ export const TH = {
     regular_day_legend: 'วันทำงานปกติ',
     ot_day_legend: 'วันที่มี OT',
     holiday_legend: 'วันหยุด',
+    public_holiday_legend: 'วันหยุดทางการ',
     selected_legend: 'เลือกอยู่',
 
     // Yearly Dashboard
@@ -180,6 +181,7 @@ export const EN = {
     regular_day_legend: 'Regular day',
     ot_day_legend: 'OT day',
     holiday_legend: 'Holiday',
+    public_holiday_legend: 'Public Holiday',
     selected_legend: 'Selected',
 
     // Yearly Dashboard
