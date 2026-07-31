@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Stethoscope, UmbrellaOff, Plane, Clock, Trash2 } from 'lucide-react';
+import { X, Stethoscope, UmbrellaOff, Plane, Clock, Trash2, GraduationCap } from 'lucide-react';
 import { getLang } from '../locales';
 
 const LEAVE_TYPES = [
@@ -34,6 +34,12 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
     onCancel();
   };
 
+  const handleSelectTraining = () => {
+    onSelect(dateStr, { leave: { type: 'training' } });
+    setMode('choice');
+    onCancel();
+  };
+
   const handleClose = () => {
     setMode('choice');
     onCancel();
@@ -42,8 +48,12 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
   if (!isOpen) return null;
 
   const t = getLang(lang);
-  const isLeave = currentData?.leave !== null && currentData?.leave !== undefined;
   const currentLeaveType = currentData?.leave?.type;
+  const isTraining = currentLeaveType === 'training';
+  // ลาจริง (ป่วย/กิจ/พักร้อน) ไม่รวมอบรม
+  const isLeave = currentData?.leave !== null && currentData?.leave !== undefined && !isTraining;
+  // วันทำงาน = ไม่ใช่ลา และไม่ใช่อบรม
+  const isWork = !isLeave && !isTraining;
 
   // ป้ายชื่อ + คำอธิบายตามภาษา (key ตรงกับ LEAVE_TYPES)
   const leaveLabel = { sick: t.sick_leave, personal: t.personal_leave, vacation: t.vacation_leave };
@@ -86,17 +96,35 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               <button
                 onClick={handleSelectWork}
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
-                  ${!isLeave
+                  ${isWork
                     ? 'border-[#3B4FE4] bg-[#EEF0FD] shadow-sm'
                     : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${!isLeave ? 'bg-[#3B4FE4] text-white' : 'bg-[#F0F1F9] text-[#6B7280]'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isWork ? 'bg-[#3B4FE4] text-white' : 'bg-[#F0F1F9] text-[#6B7280]'}`}>
                   <Clock size={20} />
                 </div>
                 <div>
                   <div className="font-semibold text-[#111827]">{lang === 'th' ? 'ทำงาน' : 'Working'}</div>
                   <div className="text-xs text-[#9CA3AF]">{lang === 'th' ? 'บันทึกเวลาทำงาน' : 'Record work time'}</div>
+                </div>
+              </button>
+
+              {/* Training Option (อบรม) */}
+              <button
+                onClick={handleSelectTraining}
+                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
+                  ${isTraining
+                    ? 'border-[#111827] bg-[#F3F4F6] shadow-sm'
+                    : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
+                  }`}
+              >
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isTraining ? 'bg-[#111827] text-white' : 'bg-[#F0F1F9] text-[#6B7280]'}`}>
+                  <GraduationCap size={20} />
+                </div>
+                <div>
+                  <div className="font-semibold text-[#111827]">{lang === 'th' ? 'อบรม' : 'Training'}</div>
+                  <div className="text-xs text-[#9CA3AF]">{lang === 'th' ? 'นอกสถานที่ / ดูงาน (ได้เงินปกติ)' : 'Off-site / study visit (regular pay)'}</div>
                 </div>
               </button>
 

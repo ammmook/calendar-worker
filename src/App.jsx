@@ -8,7 +8,7 @@ import {
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
   Stethoscope, UmbrellaOff, AlertCircle, Loader2,
-  Moon,
+  Moon, GraduationCap,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
@@ -505,7 +505,9 @@ export default function App() {
           setIsSavingLeave(false);
         }
       }
-      showToast(lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded');
+      showToast(leaveData.leave?.type === 'training'
+        ? (lang === 'th' ? 'เพิ่มการอบรมแล้ว' : 'Training recorded')
+        : (lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded'));
       if (isMobile) setSelectedKey(null);
     }
   };
@@ -550,38 +552,60 @@ export default function App() {
 
   // Preview คำนวณสดจากเวลาที่กรอก (ก่อนกดบันทึก) — ใช้ตรรกะเดียวกับ upsertWorkEntry ใน api.js
   const previewCalc = useMemo(() => {
-    if (!dIn || !dOut) return null;
+    if (!dIn || !dOut || !selectedKey) return null;
     const pIn = String(dIn).split(':'), pOut = String(dOut).split(':');
     const ih = Number(pIn[0] || 0), im = Number(pIn[1] || 0);
     const oh = Number(pOut[0] || 0), om = Number(pOut[1] || 0);
     let totalMins = (oh * 60 + om) - (ih * 60 + im);
+    const crossedMidnight = totalMins < 0;
     if (totalMins < 0) totalMins += 1440; // ข้ามเที่ยงคืน
     if (totalMins <= 0) return { working_hour: 0, ot_hour: 0, ot_earning: 0, regular_earning: 0, shift_allowance: 0, total_earning: 0 };
 
     const totalH = totalMins / 60;
     const stdH = Number(std) || 8;
-    const workingHour = Math.min(totalH, stdH);
+    const rate = Number(otRate) || 0;
 
-    const rawOT = Math.max(0, totalH - stdH);
-    let netOT = rawOT;
-    if (rawOT >= 9) {
-      netOT = rawOT - 1;                                   // OT ที่ทำจริง ≥ 9 → ลบ 1 ชม.
-    } else if (otMode === 'block' && rawOT > 0) {
-      netOT = rawOT <= otBlockHours ? rawOT : Math.max(0, rawOT - (otDeductMins / 60));
-    }
-    const otHour = netOT;
+    // วันหยุด: วันนี้เป็น public holiday? / วันถัดไปเป็นวันหยุด (holiday หรือ public)?
+    const nd = new Date(selectedKey + 'T00:00:00'); nd.setDate(nd.getDate() + 1);
+    const nextDate = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`;
+    const isPublicHolidayToday = !!publicHolidays?.[selectedKey];
+    const nextDayIsHoliday = !!publicHolidays?.[nextDate] || (holidays && holidays.has(nextDate));
 
-    // เบี้ยกะ: ได้เมื่อเวลาเข้างานตรงกับเวลาเริ่มกะพอดี
     const inMin = ih * 60 + im;
     const ssParts = String(shiftStart || '').split(':');
     const ssMin = (ssParts.length >= 2 && !isNaN(Number(ssParts[0])) && !isNaN(Number(ssParts[1])))
       ? Number(ssParts[0]) * 60 + Number(ssParts[1]) : null;
-    const shiftEarning = (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) ? Number(shiftAllowance) : 0;
+
+    let workingHour = 0, otHour = 0, otEarning = 0, shiftEarning = 0;
+
+    if (isPublicHolidayToday) {
+      // วันหยุดทางการ: OT ล้วน — 0..std = 2x, ส่วนเกิน = 3x
+      const ot2x = Math.min(totalH, stdH);
+      const ot3x = Math.max(0, totalH - stdH);
+      workingHour = 0;
+      otHour = totalH;
+      otEarning = (ot2x * 2 + ot3x * 3) * rate;
+    } else {
+      workingHour = Math.min(totalH, stdH);
+      const rawOT = Math.max(0, totalH - stdH);
+      const afterMidnightHours = crossedMidnight ? (oh * 60 + om) / 60 : 0;
+      const qualifies3x = crossedMidnight && nextDayIsHoliday && ssMin != null && inMin < ssMin && afterMidnightHours > 0;
+      const ot3xHours = qualifies3x ? Math.min(afterMidnightHours, rawOT) : 0;
+      const normalOTraw = Math.max(0, rawOT - ot3xHours);
+      let netNormalOT = normalOTraw;
+      if (rawOT >= 9) {
+        netNormalOT = Math.max(0, normalOTraw - 1);
+      } else if (otMode === 'block' && normalOTraw > 0) {
+        netNormalOT = normalOTraw <= otBlockHours ? normalOTraw : Math.max(0, normalOTraw - (otDeductMins / 60));
+      }
+      otHour = netNormalOT + ot3xHours;
+      otEarning = (netNormalOT + ot3xHours * 3) * rate;
+      if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
+    }
 
     const regularEarning = paymentType === 'daily'
       ? (Number(dailyRate) || 0) * (stdH > 0 ? workingHour / stdH : 0)
       : 0;
-    const otEarning = otHour * (Number(otRate) || 0);
 
     return {
       working_hour: workingHour,
@@ -591,7 +615,7 @@ export default function App() {
       shift_allowance: shiftEarning,
       total_earning: regularEarning + otEarning + shiftEarning,
     };
-  }, [dIn, dOut, std, otRate, otMode, otBlockHours, otDeductMins, paymentType, dailyRate, shiftAllowance, shiftStart]);
+  }, [dIn, dOut, selectedKey, std, otRate, otMode, otBlockHours, otDeductMins, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
 
   // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
   const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);
@@ -956,9 +980,10 @@ export default function App() {
                           <div className="text-center">
                             {(() => {
                               const PANEL_LEAVE = {
-                                sick:     { Icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', label: lang === 'th' ? 'ลาป่วย'   : 'Sick Leave'     },
-                                personal: { Icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
-                                vacation: { Icon: Plane,       color: '#3B4FE4', bg: '#EEF0FD', label: lang === 'th' ? 'ลาพักร้อน' : 'Annual Leave'  },
+                                sick:     { Icon: Stethoscope,   color: '#F43F5E', bg: '#FFF1F3', label: lang === 'th' ? 'ลาป่วย'   : 'Sick Leave'     },
+                                personal: { Icon: UmbrellaOff,   color: '#F472B6', bg: '#FCE7F3', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
+                                vacation: { Icon: Plane,         color: '#3B4FE4', bg: '#EEF0FD', label: lang === 'th' ? 'ลาพักร้อน' : 'Annual Leave'  },
+                                training: { Icon: GraduationCap, color: '#111827', bg: '#F3F4F6', label: lang === 'th' ? 'อบรม'     : 'Training'       },
                               };
                               const info = PANEL_LEAVE[selEntry.leave?.type] || PANEL_LEAVE.sick;
                               return (
@@ -970,7 +995,11 @@ export default function App() {
                                 </>
                               );
                             })()}
-                            <div className="text-xs text-[#9CA3AF] mt-1">{lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day'}</div>
+                            <div className="text-xs text-[#9CA3AF] mt-1">
+                              {selEntry.leave?.type === 'training'
+                                ? (lang === 'th' ? 'บันทึกการอบรมแล้ว' : 'Training recorded for this day')
+                                : (lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day')}
+                            </div>
                           </div>
                         </div>
                         <div className="flex gap-2 w-full">
@@ -1133,9 +1162,10 @@ export default function App() {
                             <div className="min-w-0">
                               <div className="text-[11px] font-semibold text-[#6B7280]">{t.days_short[dw]}</div>
                               {isLeaveEntry ? (
-                                <div className="text-[10px] font-medium text-[#8B5CF6]">
-                                  {e.leave?.type === 'sick' ? (lang === 'th' ? 'ลาป่วย' : 'Sick') 
+                                <div className="text-[10px] font-medium" style={{ color: e.leave?.type === 'training' ? '#111827' : '#8B5CF6' }}>
+                                  {e.leave?.type === 'sick' ? (lang === 'th' ? 'ลาป่วย' : 'Sick')
                                     : e.leave?.type === 'personal' ? (lang === 'th' ? 'ลากิจ' : 'Personal')
+                                    : e.leave?.type === 'training' ? (lang === 'th' ? 'อบรม' : 'Training')
                                     : (lang === 'th' ? 'ลาพักร้อน' : 'Vacation')}
                                 </div>
                               ) : (
@@ -1621,6 +1651,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     sick: { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)', Icon: Stethoscope },
     personal: { color: '#F472B6', bg: 'rgba(244,114,182,0.12)', Icon: UmbrellaOff },
     vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)', Icon: Plane },
+    training: { color: '#111827', bg: 'rgba(17,24,39,0.10)', Icon: GraduationCap },
     };
     const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
 

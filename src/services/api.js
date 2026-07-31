@@ -30,6 +30,16 @@ function logCall(action, data) {
   console.log(`[TimeFlow API] → ${action}`, data || '');
 }
 
+/** บวกวันจาก "YYYY-MM-DD" → "YYYY-MM-DD" */
+function addDaysStr(dateStr, days) {
+  const d = new Date(String(dateStr) + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
 /** แปลง "HH:mm" → จำนวนนาทีตั้งแต่เที่ยงคืน (คืน null ถ้าไม่ถูกต้อง) */
 function parseHHMM(str) {
   const p = String(str || '').split(':');
@@ -393,62 +403,90 @@ async function upsertWorkEntry(data) {
       }
     }
 
+    const paymentType = user.payment_type || 'monthly';
+    const dailyRate = Number(user.daily_rate) || 0;
+    const otRate = Number(user.ot_hourly) || 0;
+    const stdH = Number(user.working_hour) || 8;
+
     let workingHour = 0;
     let otHour = 0;
     let shiftEarning = 0;
+    let otEarningOverride = null; // ถ้าตั้งค่า จะใช้แทน otHour * otRate (กรณี OT 2x/3x)
 
-    if (data.clock_in && data.clock_out) {
+    const isTraining = String(data.leave_type || '') === 'training';
+
+    if (isTraining) {
+      // อบรม (นอกสถานที่/ดูงาน): ได้เงินปกติเต็มวัน — ไม่มี OT, ไม่มีเบี้ยกะ, ไม่เสียวันลา
+      workingHour = stdH;
+    } else if (data.clock_in && data.clock_out) {
       const partsIn = String(data.clock_in).split(':');
       const partsOut = String(data.clock_out).split(':');
       const ih = Number(partsIn[0] || 0), im = Number(partsIn[1] || 0);
       const oh = Number(partsOut[0] || 0), om = Number(partsOut[1] || 0);
 
       let totalMins = (oh * 60 + om) - (ih * 60 + im);
+      const crossedMidnight = totalMins < 0;
       if (totalMins < 0) totalMins += 1440; // ข้ามวัน
 
       if (totalMins > 0) {
         const totalH = totalMins / 60;
-        const stdH = Number(user.working_hour) || 8;
         workingHour = Math.min(totalH, stdH);
 
-        let rawOT = Math.max(0, totalH - stdH);
-        let netOT = rawOT;
-
-        // ── เงื่อนไข: OT ที่ทำจริง ตั้งแต่ 9 ชม. ขึ้นไป → คิด OT = OT − 1 ชม. ──
-        //    เช่น ทำ OT 9 ชม. → คิด 8 ชม., 10 ชม. → คิด 9 ชม.
-        //    เงื่อนไขนี้มาก่อน (แทน) การคิดแบบ block
-        if (rawOT >= 9) {
-          netOT = rawOT - 1;
+        // ── ตรวจวันหยุด: วันนี้เป็น public holiday? / วันถัดไปเป็นวันหยุด (holiday หรือ public)? ──
+        const nextDate = addDaysStr(data.date, 1);
+        const { data: phRows } = await supabase
+          .from('public_holidays').select('date').in('date', [data.date, nextDate]);
+        const phSet = new Set((phRows || []).map((r) => normalizeHolidayDate(r.date)));
+        const isPublicHolidayToday = phSet.has(data.date);
+        let nextDayIsHoliday = phSet.has(nextDate);
+        if (!nextDayIsHoliday) {
+          const { data: uhRows } = await supabase
+            .from('holidays').select('date').eq('email', data.user_email).eq('date', nextDate);
+          nextDayIsHoliday = (uhRows || []).length > 0;
         }
-        // ── Block mode (ใช้เมื่อ OT < 9 ชม.): ไม่เกิน ot_block_hours จ่ายเต็ม, เกินให้หัก ot_deduct_mins ──
-        else if (otMode === 'block' && rawOT > 0) {
-          if (rawOT <= blockH) {
-            netOT = rawOT;                                 // อยู่ในบล็อก → จ่ายเต็มตามชั่วโมงจริง
-          } else {
-            netOT = Math.max(0, rawOT - (deductM / 60));   // เกินบล็อก → หักนาทีที่กำหนด
+
+        const inMin = ih * 60 + im;
+        const shiftStartMin = parseHHMM(shiftStart);
+
+        if (isPublicHolidayToday) {
+          // ── วันหยุดทางการ: OT ล้วน — 0..std = 2 เท่า, ส่วนเกิน = 3 เท่า (ไม่หัก block/≥9) ──
+          const ot2x = Math.min(totalH, stdH);
+          const ot3x = Math.max(0, totalH - stdH);
+          workingHour = 0;                                 // วันหยุด: ไม่มีค่าแรงปกติ
+          otHour = totalH;                                 // ทั้งวันเป็น OT
+          otEarningOverride = (ot2x * 2 + ot3x * 3) * otRate;
+        } else {
+          // ── วันปกติ ──
+          const rawOT = Math.max(0, totalH - stdH);
+
+          // ชั่วโมงหลังเที่ยงคืนที่ตกวันหยุด → 3 เท่า (เฉพาะเมื่อเข้างานก่อน shift_start)
+          const afterMidnightHours = crossedMidnight ? (oh * 60 + om) / 60 : 0;
+          const qualifies3x = crossedMidnight && nextDayIsHoliday
+            && shiftStartMin != null && inMin < shiftStartMin && afterMidnightHours > 0;
+          const ot3xHours = qualifies3x ? Math.min(afterMidnightHours, rawOT) : 0;
+          const normalOTraw = Math.max(0, rawOT - ot3xHours);
+
+          // OT ส่วนปกติ (ไม่ใช่ 3x) ใช้กฎเดิม: OT ที่ทำจริง ≥ 9 → ลบ 1 ; ไม่งั้นใช้ block
+          let netNormalOT = normalOTraw;
+          if (rawOT >= 9) {
+            netNormalOT = Math.max(0, normalOTraw - 1);
+          } else if (otMode === 'block' && normalOTraw > 0) {
+            netNormalOT = normalOTraw <= blockH ? normalOTraw : Math.max(0, normalOTraw - (deductM / 60));
+          }
+
+          otHour = netNormalOT + ot3xHours;
+          otEarningOverride = (netNormalOT + ot3xHours * 3) * otRate;
+
+          // ── เบี้ยกะ: ได้เฉพาะเมื่อเวลาเข้างานตรงกับ shift_start พอดี ──
+          if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
+            shiftEarning = shiftAllowance;
           }
         }
-
-        otHour = netOT;
-      }
-
-      // ── Shift allowance: ได้เบี้ยกะเฉพาะเมื่อเวลาเข้างาน "ตรงกับ" เวลาเริ่มกะพอดี ──
-      //    เข้าก่อนเวลาเริ่มกะ หรือไม่ตรงเวลาเริ่มกะ = งานปกติ ไม่ได้เบี้ยกะ
-      //    (เวลาที่เกินยังคิดเป็น OT ตามปกติจากส่วน working_hour ด้านบน)
-      const inMin = ih * 60 + im;
-      const shiftStartMin = parseHHMM(shiftStart);
-      if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
-        shiftEarning = shiftAllowance;
       }
     }
 
     data.working_hour = workingHour;
     data.ot_hour = otHour;
-
-    const paymentType = user.payment_type || 'monthly';
-    const dailyRate = Number(user.daily_rate) || 0;
-    const otRate = Number(user.ot_hourly) || 0;
-    const stdH = Number(user.working_hour) || 8;
 
     let regularEarning = 0;
     if (paymentType === 'daily') {
@@ -458,7 +496,7 @@ async function upsertWorkEntry(data) {
       regularEarning = 0;
     }
 
-    const otEarning = otHour * otRate;
+    const otEarning = otEarningOverride != null ? otEarningOverride : otHour * otRate;
     const totalEarning = regularEarning + otEarning + shiftEarning;
 
     data.ot_earning = otEarning;
