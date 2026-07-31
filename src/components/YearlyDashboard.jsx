@@ -47,6 +47,7 @@ export default function YearlyDashboard({
     otMode, leaveQuotas, lang,
     paymentType = 'monthly',
     dailyRate = 0,
+    socialSecurity = 0,
     viewY,
     setViewY,
     showToast
@@ -474,9 +475,16 @@ export default function YearlyDashboard({
 
                 {/* Monthly Breakdown Table */}
                 <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                        <div className="text-[15px] font-bold text-[#111827]">{t.monthly_breakdown}</div>
-                        <div className="text-[11px] text-[#9CA3AF]">{t.per_month}</div>
+                    <div className="flex items-start justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                        <div>
+                            <div className="text-[15px] font-bold text-[#111827]">{t.monthly_breakdown}</div>
+                            {socialSecurity > 0 && (
+                                <div className="text-[11px] font-medium text-[#F43F5E] mt-1">
+                                    {t.social_security_monthly_note} {fmtB(socialSecurity)}
+                                </div>
+                            )}
+                        </div>
+                        <div className="text-[11px] text-[#9CA3AF] shrink-0">{t.per_month}</div>
                     </div>
                     <div className="w-full overflow-hidden">
                         <table className="w-full text-[13px] sm:text-sm">

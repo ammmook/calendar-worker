@@ -577,6 +577,8 @@ export default function App() {
       ? Number(ssParts[0]) * 60 + Number(ssParts[1]) : null;
 
     let workingHour = 0, otHour = 0, otEarning = 0, shiftEarning = 0;
+    // แยกรายละเอียด OT ตามอัตรา: 1.5 = ปกติ, 2 = สองแรง (วันหยุด 0..std), 3 = สามแรง
+    let ot15Hours = 0, ot15Earn = 0, ot2Hours = 0, ot2Earn = 0, ot3Hours = 0, ot3Earn = 0;
 
     if (isPublicHolidayToday) {
       // วันหยุดทางการ: OT ล้วน — 0..std = 2x, ส่วนเกิน = 3x
@@ -584,7 +586,9 @@ export default function App() {
       const ot3x = Math.max(0, totalH - stdH);
       workingHour = 0;
       otHour = totalH;
-      otEarning = (ot2x * 2 + ot3x * 3) * rate;
+      ot2Hours = ot2x; ot2Earn = ot2x * 2 * rate;
+      ot3Hours = ot3x; ot3Earn = ot3x * 3 * rate;
+      otEarning = ot2Earn + ot3Earn;
     } else {
       workingHour = Math.min(totalH, stdH);
       const rawOT = Math.max(0, totalH - stdH);
@@ -599,7 +603,9 @@ export default function App() {
         netNormalOT = normalOTraw <= otBlockHours ? normalOTraw : Math.max(0, normalOTraw - (otDeductMins / 60));
       }
       otHour = netNormalOT + ot3xHours;
-      otEarning = (netNormalOT + ot3xHours * 3) * rate;
+      ot15Hours = netNormalOT; ot15Earn = netNormalOT * rate;
+      ot3Hours = ot3xHours; ot3Earn = ot3xHours * 3 * rate;
+      otEarning = ot15Earn + ot3Earn;
       if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
     }
 
@@ -611,6 +617,9 @@ export default function App() {
       working_hour: workingHour,
       ot_hour: otHour,
       ot_earning: otEarning,
+      ot15_hours: ot15Hours, ot15_earn: ot15Earn,
+      ot2_hours: ot2Hours, ot2_earn: ot2Earn,
+      ot3_hours: ot3Hours, ot3_earn: ot3Earn,
       regular_earning: regularEarning,
       shift_allowance: shiftEarning,
       total_earning: regularEarning + otEarning + shiftEarning,
@@ -623,6 +632,10 @@ export default function App() {
   const detE = previewCalc ? previewCalc.total_earning : (selDailyEarning?.total_earning || 0);
   const detOTRateEarn = previewCalc ? previewCalc.ot_earning : (selDailyEarning?.ot_earning || 0);
   const detShift = previewCalc ? previewCalc.shift_allowance : (selDailyEarning?.shift_allowance || 0);
+  // รายละเอียด OT แยกอัตรา (แสดงเฉพาะตอน preview ก่อนบันทึก)
+  const detOT15h = previewCalc?.ot15_hours || 0, detOT15e = previewCalc?.ot15_earn || 0;
+  const detOT2h = previewCalc?.ot2_hours || 0, detOT2e = previewCalc?.ot2_earn || 0;
+  const detOT3h = previewCalc?.ot3_hours || 0, detOT3e = previewCalc?.ot3_earn || 0;
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
   const selLabel = selDateObj
@@ -822,6 +835,7 @@ export default function App() {
               leaveQuotas={leaveQuotas}
               paymentType={paymentType}
               dailyRate={dailyRate}
+              socialSecurity={socialSecurity}
               lang={lang}
               viewY={viewY}
               setViewY={setViewY}
@@ -1059,6 +1073,29 @@ export default function App() {
                               )}
                             </div>
                           </div>
+                          {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
+                          {previewCalc && (detOT15h > 0 || detOT2h > 0 || detOT3h > 0) && (
+                            <div className="flex flex-col gap-1 pl-3 -mt-0.5">
+                              {detOT15h > 0 && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×1.5 · {fmt1(detOT15h)}h</span>
+                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
+                                </div>
+                              )}
+                              {detOT2h > 0 && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×2 · {fmt1(detOT2h)}h</span>
+                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT2e)}</span>
+                                </div>
+                              )}
+                              {detOT3h > 0 && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×3 · {fmt1(detOT3h)}h</span>
+                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT3e)}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <div className="flex justify-between items-center">
                             <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
                             <span className="text-[13px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
@@ -1283,6 +1320,29 @@ export default function App() {
                             )}
                           </div>
                         </div>
+                        {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
+                        {previewCalc && (detOT15h > 0 || detOT2h > 0 || detOT3h > 0) && (
+                          <div className="flex flex-col gap-1 pl-3 -mt-1">
+                            {detOT15h > 0 && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-[#c29302]">OT ×1.5 · {fmt1(detOT15h)}h</span>
+                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
+                              </div>
+                            )}
+                            {detOT2h > 0 && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-[#c29302]">OT ×2 · {fmt1(detOT2h)}h</span>
+                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT2e)}</span>
+                              </div>
+                            )}
+                            {detOT3h > 0 && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-[#c29302]">OT ×3 · {fmt1(detOT3h)}h</span>
+                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT3e)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
                           <span className="text-[14px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
@@ -1678,7 +1738,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     let baseBorder = isSel
     ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
     : isPublicHolIdle
-      ? 'border-[#EF4444] hover:border-[#dc2626]'
+      ? 'border-transparent'
       : isHol
         ? 'border-transparent'
         : isToday
@@ -1740,8 +1800,11 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
 
       {/* Leave Tag Icon / Public Holiday Icon / Holiday Toggle (มุมขวาบน) — อบรมไปแสดงที่ตำแหน่งเวลาแทน */}
       {isLeave && leaveInfo && !isTrainingEntry ? (
-        <div className="absolute top-[5px] right-[5px] w-[18px] h-[18px] flex items-center justify-center z-20">
-          <leaveInfo.Icon size={14} strokeWidth={2.5} style={{ color: leaveInfo.color }} />
+        <div
+          className="absolute top-0 right-0 w-[20px] h-[25px] rounded-tr-lg rounded-bl-[9px] rounded-br-[9px] flex items-start justify-center pt-[5px] z-20"
+          style={{ backgroundColor: leaveInfo.color }}
+        >
+          <leaveInfo.Icon size={10} strokeWidth={2.5} color="#ffffff" />
         </div>
       ) : publicHol ? (
         <div className="absolute top-[4px] right-[4px] flex items-center justify-center z-20" title={publicHolName}>
