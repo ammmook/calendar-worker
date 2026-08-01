@@ -92,7 +92,7 @@ export default function App() {
   const [otSettingId, setOtSettingId] = useState('');
   const [leaveQuotas, setLeaveQuotas] = useState({ sick: 0, personal: 0, vacation: 0 });
 
-  // ── Shift Allowance (เบี้ยกะ) — เก็บใน ot_setting ──
+  // ── Shift Allowance (เบี้ยกะ) — เก็บในตาราง user ──
   const [shiftAllowance, setShiftAllowance] = useState(0);
   const [shiftStart, setShiftStart] = useState('');
   const [shiftEnd, setShiftEnd] = useState('');
@@ -127,31 +127,19 @@ export default function App() {
           const u = res.data;
           if (u.salary_monthly) setSalary(Number(u.salary_monthly));
           if (u.ot_hourly) setOtRate(Number(u.ot_hourly));
-          if (u.working_hour) setStd(Number(u.working_hour));
           if (u.sick_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, sick: Number(u.sick_leave_day) }));
           if (u.personal_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, personal: Number(u.personal_leave_day) }));
           if (u.annual_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, vacation: Number(u.annual_leave_day) }));
-          if (u.ot_setting_id) setOtSettingId(u.ot_setting_id);
-          
+
           if (u.payment_type) setPaymentType(u.payment_type);
           if (u.daily_rate) setDailyRate(Number(u.daily_rate));
-          if (u.work_days_per_week) setWorkDaysPerWeek(Number(u.work_days_per_week));
           if (u.social_security !== undefined && u.social_security !== null) setSocialSecurity(Number(u.social_security) || 0);
 
-          // Load OT settings if linked
-          if (u.ot_setting_id) {
-            const { OtSettingAPI } = await import('./services/api');
-            const otRes = await OtSettingAPI.get(u.ot_setting_id);
-            if (!cancelled && otRes.success && otRes.data) {
-              const ot = otRes.data;
-              if (ot.ot_mode) setOtMode(ot.ot_mode);
-              if (ot.ot_block_hours) setOtBlockHours(Number(ot.ot_block_hours));
-              if (ot.ot_deduct_mins) setOtDeductMins(Number(ot.ot_deduct_mins));
-              if (ot.shift_allowance !== undefined && ot.shift_allowance !== null) setShiftAllowance(Number(ot.shift_allowance) || 0);
-              if (ot.shift_start) setShiftStart(ot.shift_start);
-              if (ot.shift_end) setShiftEnd(ot.shift_end);
-            }
-          }
+          // เบี้ยกะ — เก็บในตาราง user แล้ว
+          if (u.shift_allowance !== undefined && u.shift_allowance !== null) setShiftAllowance(Number(u.shift_allowance) || 0);
+          if (u.shift_start) setShiftStart(u.shift_start);
+          if (u.shift_end) setShiftEnd(u.shift_end);
+
           console.log('[TimeFlow] ✅ User profile loaded');
         } else {
           // User ไม่เจอ → สร้างใหม่ด้วย defaults
@@ -160,13 +148,11 @@ export default function App() {
             email: user.email,
             salary_monthly: 0,
             ot_hourly: 0,
-            working_hour: 8,
             sick_leave_day: 0,
             personal_leave_day: 0,
             annual_leave_day: 0,
             payment_type: 'monthly',
             daily_rate: 0,
-            work_days_per_week: 5
           });
         }
       } catch (err) {
@@ -588,14 +574,19 @@ export default function App() {
     let ot15Hours = 0, ot15Earn = 0, ot2Hours = 0, ot2Earn = 0, ot3Hours = 0, ot3Earn = 0;
 
     if (isPublicHolidayToday) {
-      // วันหยุดทางการ: OT ล้วน — 0..std = 2x, ส่วนเกิน = 3x
-      const ot2x = Math.min(netH, stdH);
-      const ot3x = Math.max(0, netH - stdH);
-      workingHour = 0;
-      otHour = netH;
+      // วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (เริ่มคิดทันที) — 8 ชม.แรก 2x, เลย 8 ชม. 3x
+      // ถ้าข้ามเที่ยงคืนไปตกวันปกติ (วันถัดไปไม่ใช่วันหยุด) → ช่วงหลังเที่ยงคืน = OT ปกติ 1.5x
+      const afterMidnightHours = (crossedMidnight && !nextDayIsHoliday) ? (oh * 60 + om) / 60 : 0;
+      const holidayH = Math.max(0, netH - afterMidnightHours);
+      const ot2x = Math.min(holidayH, stdH);
+      const ot3x = Math.max(0, holidayH - stdH);
+      workingHour = Math.min(netH, stdH);
+      otHour = holidayH + afterMidnightHours;
       ot2Hours = ot2x; ot2Earn = ot2x * 2 * baseHourly;
       ot3Hours = ot3x; ot3Earn = ot3x * 3 * baseHourly;
-      otEarning = ot2Earn + ot3Earn;
+      ot15Hours = afterMidnightHours; ot15Earn = afterMidnightHours * 1.5 * baseHourly;
+      otEarning = ot2Earn + ot3Earn + ot15Earn;
+      if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
     } else {
       workingHour = Math.min(netH, stdH);
       const rawOT = Math.max(0, netH - stdH);
@@ -603,11 +594,12 @@ export default function App() {
       const qualifies3x = crossedMidnight && nextDayIsHoliday && ssMin != null && inMin < ssMin && afterMidnightHours > 0;
       const ot3xHours = qualifies3x ? Math.min(afterMidnightHours, rawOT) : 0;
       const normalOTraw = Math.max(0, rawOT - ot3xHours);
+      // หักตามชั่วโมง OT ที่ทำจริง (rawOT): 1–2 ชม. เต็ม ; > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
       let netNormalOT = normalOTraw;
       if (rawOT >= 9) {
         netNormalOT = Math.max(0, normalOTraw - 1);
-      } else if (otMode === 'block' && normalOTraw > 0) {
-        netNormalOT = normalOTraw <= otBlockHours ? normalOTraw : Math.max(0, normalOTraw - (otDeductMins / 60));
+      } else if (rawOT > 2) {
+        netNormalOT = Math.max(0, normalOTraw - 0.5);
       }
       otHour = netNormalOT + ot3xHours;
       ot15Hours = netNormalOT; ot15Earn = netNormalOT * 1.5 * baseHourly;
@@ -631,7 +623,7 @@ export default function App() {
       shift_allowance: shiftEarning,
       total_earning: regularEarning + otEarning + shiftEarning,
     };
-  }, [dIn, dOut, selectedKey, std, salary, otRate, otMode, otBlockHours, otDeductMins, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
+  }, [dIn, dOut, selectedKey, std, salary, otRate, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
 
   // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
   const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);
@@ -1794,7 +1786,7 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
     >
       {/* Day number */}
       <span className={`text-[11px] font-bold leading-none
-      ${(isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
+      ${(publicHol ? 'text-[#EF4444]' : isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
         {d}
       </span>
 

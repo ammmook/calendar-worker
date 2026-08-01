@@ -10,6 +10,7 @@ export const TH = {
     rate_settings: 'ตั้งค่าอัตรา',
     monthly_salary: 'เงินเดือน',
     ot_rate: 'เรท OT / ชม.',
+    ot_rate_auto_hint: 'คำนวณอัตโนมัติจากเงินเดือน ÷ 30 ÷ 8',
     standard_hours: 'ชั่วโมงปกติ',
     standard_hours_hint: 'กรอกชั่วโมงที่หักเวลาพักแล้วเท่านั้น',
 
@@ -145,6 +146,7 @@ export const EN = {
     rate_settings: 'Rate Settings',
     monthly_salary: 'Monthly Salary',
     ot_rate: 'OT Rate / Hr',
+    ot_rate_auto_hint: 'Auto-calculated from salary ÷ 30 ÷ 8',
     standard_hours: 'Standard Hours',
     standard_hours_hint: 'Enter hours already excluding break time only',
 

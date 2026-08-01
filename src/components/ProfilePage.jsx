@@ -1,14 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-    Briefcase, Wallet, Clock, CircleDollarSign,
+    Wallet, Clock, CircleDollarSign,
     Stethoscope, UmbrellaOff, Plane,
     ChevronLeft, CheckCircle2,
-    Zap, Timer, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
 import { getLang } from '../locales';
-import { UserAPI, OtSettingAPI } from '../services/api';
+import { UserAPI } from '../services/api';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    ProfilePage
@@ -46,16 +45,7 @@ export default function ProfilePage(props) {
 
     // Initialize local state from props to prevent unsaved changes from propagating
     const [salary, setSalary] = useState(props.salary);
-    const [otRate, setOtRate] = useState(props.otRate);
-    const [std, setStd] = useState(props.std);
-    const [otMode, setOtMode] = useState(props.otMode);
-    const [otBlockHours, setOtBlockHours] = useState(props.otBlockHours);
-    const [otDeductMins, setOtDeductMins] = useState(props.otDeductMins);
     const [leaveQuotas, setLeaveQuotas] = useState(props.leaveQuotas);
-    const [paymentType, setPaymentType] = useState(props.paymentType);
-    const [dailyRate, setDailyRate] = useState(props.dailyRate);
-    const [workDaysPerWeek, setWorkDaysPerWeek] = useState(props.workDaysPerWeek);
-    const [otSettingId, setOtSettingId] = useState(props.otSettingId);
     const [shiftAllowance, setShiftAllowance] = useState(props.shiftAllowance);
     const [shiftStart, setShiftStart] = useState(props.shiftStart);
     const [shiftEnd, setShiftEnd] = useState(props.shiftEnd);
@@ -65,83 +55,39 @@ export default function ProfilePage(props) {
         if (!user?.email) return;
         setIsSavingLocal(true);
         try {
-            // Clear irrelevant rate based on paymentType
-            const finalSalary = paymentType === 'monthly' ? salary : 0;
-            const finalDailyRate = paymentType === 'daily' ? dailyRate : 0;
+            // รับเงินแบบรายเดือนอย่างเดียว
+            const finalSalary = salary;
+            // อัตรา OT ต่อชม. = เงินเดือน ÷ 30 ÷ 8 (คำนวณอัตโนมัติ)
+            const finalOtRate = finalSalary > 0 ? finalSalary / 30 / 8 : 0;
 
-            // Sync back to local state so UI reflects the "deletion"
-            if (paymentType === 'monthly') setDailyRate(0);
-            else setSalary(0);
-
-            // 1. บันทึก OT Setting
-            const otData = { ot_mode: otMode };
-            // ถ้าเป็น block mode → เก็บ hrs per block + deduct mins ด้วย
-            if (otMode === OT_MODE.BLOCK) {
-                otData.ot_block_hours = otBlockHours;
-                otData.ot_deduct_mins = otDeductMins;
-            } else {
-                // actual mode → ไม่ต้องเก็บ block settings
-                otData.ot_block_hours = 0;
-                otData.ot_deduct_mins = 0;
-            }
-
-            // ── Shift allowance settings (เบี้ยกะ) ──
-            otData.shift_allowance = shiftAllowance || 0;
-            otData.shift_start = shiftStart || '';
-            otData.shift_end = shiftEnd || '';
-
-            let currentOtSettingId = otSettingId;
-
-            if (currentOtSettingId) {
-                // Edit existing record
-                await OtSettingAPI.update({
-                    ot_setting_id: currentOtSettingId,
-                    ...otData
-                });
-            } else {
-                // Create new record
-                const otRes = await OtSettingAPI.create(otData);
-                if (otRes.success && otRes.data?.ot_setting_id) {
-                    currentOtSettingId = otRes.data.ot_setting_id;
-                    setOtSettingId(currentOtSettingId);
-                }
-            }
-
-            // 2. บันทึก User Profile + link currentOtSettingId
+            // บันทึก User Profile (เบี้ยกะเก็บในตาราง user แล้ว)
             await UserAPI.update({
                 email: user.email,
                 salary_monthly: finalSalary,
-                ot_hourly: otRate,
-                working_hour: std,
+                ot_hourly: finalOtRate,
                 sick_leave_day: leaveQuotas.sick,
                 personal_leave_day: leaveQuotas.personal,
                 annual_leave_day: leaveQuotas.vacation,
-                ...(currentOtSettingId && { ot_setting_id: currentOtSettingId }),
-                
-                payment_type: paymentType,
-                daily_rate: finalDailyRate,
-                work_days_per_week: workDaysPerWeek,
+                payment_type: 'monthly',
+                daily_rate: 0,
                 social_security: socialSecurity || 0,
+                shift_allowance: shiftAllowance || 0,
+                shift_start: shiftStart || '',
+                shift_end: shiftEnd || '',
             });
 
-            // 3. Sync changes back to App.jsx global state ONLY after successful save
+            // Sync changes back to App.jsx global state ONLY after successful save
             props.setSalary(finalSalary);
-            props.setDailyRate(finalDailyRate);
-            props.setOtRate(otRate);
-            props.setStd(std);
-            props.setOtMode(otMode);
-            props.setOtBlockHours(otBlockHours);
-            props.setOtDeductMins(otDeductMins);
-            props.setOtSettingId(currentOtSettingId);
+            props.setDailyRate(0);
+            props.setOtRate(finalOtRate);
             props.setLeaveQuotas(leaveQuotas);
-            props.setPaymentType(paymentType);
-            props.setWorkDaysPerWeek(workDaysPerWeek);
+            props.setPaymentType('monthly');
             props.setShiftAllowance(shiftAllowance);
             props.setShiftStart(shiftStart);
             props.setShiftEnd(shiftEnd);
             props.setSocialSecurity(socialSecurity);
 
-            console.log('[TimeFlow] ✅ Profile & OT settings saved');
+            console.log('[TimeFlow] ✅ Profile saved');
             setSaved(true);
             setTimeout(() => setSaved(false), 2200);
         } catch (err) {
@@ -149,18 +95,10 @@ export default function ProfilePage(props) {
         } finally {
             setIsSavingLocal(false);
         }
-    }, [user?.email, otMode, otBlockHours, otDeductMins, otSettingId, salary, otRate, std, leaveQuotas, paymentType, dailyRate, workDaysPerWeek, shiftAllowance, shiftStart, shiftEnd, socialSecurity, props]);
+    }, [user?.email, salary, leaveQuotas, shiftAllowance, shiftStart, shiftEnd, socialSecurity, props]);
 
-    // ── OT example preview ───────────────────────────────────────────────────
-    const previewOT = (rawOT) => {
-        if (otMode === OT_MODE.HOURLY) return rawOT;
-        if (rawOT <= 0) return 0;
-        if (rawOT <= otBlockHours) return rawOT;
-        return Math.max(0, rawOT - (otDeductMins / 60));
-    };
-
-    const eg1 = previewOT(otBlockHours);      // threshold
-    const eg2 = previewOT(otBlockHours + 2);  // above threshold
+    // อัตรา OT ต่อชม. (base) = เงินเดือน ÷ 30 ÷ 8 — แสดงแบบอ่านอย่างเดียว
+    const computedOtRate = Number(salary) > 0 ? Number(salary) / 30 / 8 : 0;
 
     return (
         <div className="min-h-screen bg-[#F8F9FB] font-sans">
@@ -195,67 +133,33 @@ export default function ProfilePage(props) {
                 {/* ── Work Settings ── */}
                 <div className="flex flex-col gap-4 animate-[fadeUp_0.3s_ease_both]">
 
-                    {/* ── Section 1: Payment Type ── */}
+                    {/* ── Section 1: Salary (รายเดือนอย่างเดียว) ── */}
                     <div className={cardCls}>
-                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.payment_type || 'Payment Type'}</h3>
-                        <div className="grid grid-cols-2 gap-3 mb-6">
-                            <button
-                                type="button"
-                                onClick={() => setPaymentType('monthly')}
-                                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer
-                                    ${paymentType === 'monthly' ? 'border-[#3B4FE4] bg-[#EEF0FD] text-[#3B4FE4]' : 'border-[#E8EAEF] bg-white text-[#6B7280] hover:border-[#D1D5E0]'}`}
-                            >
-                                <Wallet size={20} />
-                                <span className="text-sm font-bold">{t.monthly_salary}</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setPaymentType('daily')}
-                                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all cursor-pointer
-                                    ${paymentType === 'daily' ? 'border-[#3B4FE4] bg-[#EEF0FD] text-[#3B4FE4]' : 'border-[#E8EAEF] bg-white text-[#6B7280] hover:border-[#D1D5E0]'}`}
-                            >
-                                <CircleDollarSign size={20} />
-                                <span className="text-sm font-bold">{t.daily_wage || 'Daily Wage'}</span>
-                            </button>
-                        </div>
+                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.monthly_salary}</h3>
 
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                            {paymentType === 'monthly' ? (
-                                <div>
-                                    <label className={labelCls}>{t.monthly_salary}</label>
-                                    <InputWithIcon Icon={Wallet} suffix={t.mo_unit} color="#10B981">
-                                        <input
-                                            type="number" min="0" value={salary || ''}
-                                            onChange={(e) => setSalary(e.target.value === '' ? 0 : Number(e.target.value))}
-                                            onFocus={(e) => e.target.select()}
-                                            className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                        />
-                                    </InputWithIcon>
-                                </div>
-                            ) : (
-                                <div>
-                                    <label className={labelCls}>{t.daily_rate || 'Daily Rate'}</label>
-                                    <InputWithIcon Icon={CircleDollarSign} suffix={t.day_unit || 'day'} color="#10B981">
-                                        <input
-                                            type="number" min="0" value={dailyRate || ''}
-                                            onChange={(e) => setDailyRate(e.target.value === '' ? 0 : Number(e.target.value))}
-                                            onFocus={(e) => e.target.select()}
-                                            className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                        />
-                                    </InputWithIcon>
-                                </div>
-                            )}
+                            <div>
+                                <label className={labelCls}>{t.monthly_salary}</label>
+                                <InputWithIcon Icon={Wallet} suffix={t.mo_unit} color="#10B981">
+                                    <input
+                                        type="number" min="0" value={salary || ''}
+                                        onChange={(e) => setSalary(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onFocus={(e) => e.target.select()}
+                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                    />
+                                </InputWithIcon>
+                            </div>
 
                             <div>
                                 <label className={labelCls}>{t.ot_rate}</label>
                                 <InputWithIcon Icon={CircleDollarSign} suffix={t.hr_unit} color="#c29302">
                                     <input
-                                        type="number" min="0" value={otRate || ''}
-                                        onChange={(e) => setOtRate(e.target.value === '' ? 0 : Number(e.target.value))}
-                                        onFocus={(e) => e.target.select()}
-                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
+                                        type="text" readOnly disabled
+                                        value={computedOtRate > 0 ? computedOtRate.toFixed(2) : '—'}
+                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#6B7280] min-w-0 cursor-not-allowed"
                                     />
                                 </InputWithIcon>
+                                <p className="mt-1.5 text-[11px] font-medium text-[#9CA3AF] leading-snug">{t.ot_rate_auto_hint}</p>
                             </div>
                         </div>
 
@@ -274,105 +178,7 @@ export default function ProfilePage(props) {
                         </div>
                     </div>
 
-                    {/* ── Section 2: Work Schedule ── */}
-                    <div className={cardCls}>
-                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.work_schedule || 'Work Schedule'}</h3>
-                        <div className="grid grid-cols-2 gap-3 sm:gap-6">
-                            <div>
-                                <label className={labelCls}>{t.standard_hours}</label>
-                                <InputWithIcon Icon={Clock} suffix="h" color="#3B4FE4">
-                                    <input
-                                        type="number" min="1" max="24" value={std || ''}
-                                        onChange={(e) => setStd(e.target.value === '' ? 0 : Number(e.target.value))}
-                                        onFocus={(e) => e.target.select()}
-                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                    />
-                                </InputWithIcon>
-                                <p className="mt-1.5 text-[11px] font-medium text-[#9CA3AF] leading-snug">{t.standard_hours_hint}</p>
-                            </div>
-                            <div>
-                                <label className={labelCls}>{t.work_days_per_week || 'Work Days Per Week'}</label>
-                                <InputWithIcon Icon={Briefcase} suffix={t.day_unit || 'days'} color="#3B4FE4">
-                                    <input
-                                        type="number" min="1" max="7" value={workDaysPerWeek || ''}
-                                        onChange={(e) => setWorkDaysPerWeek(e.target.value === '' ? 0 : Number(e.target.value))}
-                                        onFocus={(e) => e.target.select()}
-                                        className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                    />
-                                </InputWithIcon>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Section 3: OT Calculation Mode ── */}
-                    <div className={cardCls}>
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-[13px] font-bold text-[#111827]">{t.ot_calc_method}</h3>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-
-                            {/* Mode A: Hourly */}
-                            <OTModeCard
-                                active={otMode === OT_MODE.HOURLY}
-                                onClick={() => setOtMode(OT_MODE.HOURLY)}
-                                Icon={Timer}
-                                title={t.ot_mode_actual}
-                                desc={t.ot_mode_actual_desc}
-                                example={t.ot_eg_actual.replace('{hr}', 4).replace('{hr}', 4)}
-                                accentColor="#3B4FE4"
-                            />
-
-                            {/* Mode B: Block */}
-                            <OTModeCard
-                                active={otMode === OT_MODE.BLOCK}
-                                onClick={() => setOtMode(OT_MODE.BLOCK)}
-                                Icon={Zap}
-                                title={t.ot_mode_block}
-                                desc={t.ot_mode_block_desc.replace('{hr}', otBlockHours)}
-                                example={t.ot_eg_block.replace('{hr}', 4).replace('{res}', fmt1(eg2))}
-                                accentColor="#c29302"
-                            />
-                        </div>
-
-                        {/* Block mode config */}
-                        {otMode === OT_MODE.BLOCK && (
-                            <div className="bg-[#fffdef] border border-[#FDE68A] rounded-xl p-3 animate-[fadeUp_0.25s_ease_both]">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <AlertCircle size={13} className="text-[#c29302]" />
-                                    <span className="text-[11px] font-bold text-[#92400E] uppercase tracking-[0.06em]">{t.ot_deduction_settings}</span>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className={`${labelCls} !text-[#92400E]`}>{t.hrs_per_block}</label>
-                                        <InputWithIcon Icon={Clock} suffix="h" color="#c29302">
-                                            <input
-                                                type="number" min="1" max="12" value={otBlockHours || ''}
-                                                onChange={(e) => setOtBlockHours(e.target.value === '' ? 0 : Number(e.target.value))}
-                                                onFocus={(e) => e.target.select()}
-                                                className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                            />
-                                        </InputWithIcon>
-                                    </div>
-                                    <div>
-                                        <label className={`${labelCls} !text-[#92400E]`}>{t.deduct_mins}</label>
-                                        <InputWithIcon Icon={Timer} suffix="m" color="#c29302">
-                                            <input
-                                                type="number" min="0" max="59" value={otDeductMins || ''}
-                                                onChange={(e) => setOtDeductMins(e.target.value === '' ? 0 : Number(e.target.value))}
-                                                onFocus={(e) => e.target.select()}
-                                                className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#111827] min-w-0"
-                                            />
-                                        </InputWithIcon>
-                                    </div>
-                                </div>
-
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── Section 4: Shift Allowance ── */}
+                    {/* ── Section 2: Shift Allowance ── */}
                     <div className={cardCls}>
                         <h3 className="text-[13px] font-bold text-[#111827] mb-1">{t.shift_allowance_title}</h3>
                         <p className="text-[11px] text-[#9CA3AF] mb-4">{t.shift_allowance_desc}</p>
@@ -484,38 +290,6 @@ function InputWithIcon({ Icon, suffix, color, children }) {
         </div>
     );
 }
-
-function OTModeCard({ active, onClick, Icon, title, desc, example, accentColor }) {
-    return (
-        <button
-            onClick={onClick}
-            className={`text-left w-full p-3 rounded-xl border-[1.5px] cursor-pointer transition-all
-        ${active
-                    ? 'border-[#3B4FE4] bg-[#EEF0FD] shadow-[0_0_0_3px_rgba(59,79,228,0.1)]'
-                    : 'border-[#E8EAEF] bg-white hover:border-[#C7CCFA]'}`}
-        >
-            <div className="flex items-center gap-2">
-                <div
-                    className="w-8 h-8 rounded-lg grid place-items-center"
-                    style={{ background: active ? accentColor : '#F8F9FB' }}
-                >
-                    <Icon size={14} className={active ? 'text-white' : 'text-[#9CA3AF]'} />
-                </div>
-                <div className="flex flex-col">
-                    <div className={`text-[12px] font-bold ${active ? 'text-[#3B4FE4]' : 'text-[#374151]'}`}>{title}</div>
-                    <div className="text-[10px] text-[#9CA3AF]">{desc}</div>
-                </div>
-                {active && (
-                    <div className="ml-auto w-4 h-4 rounded-full bg-[#3B4FE4] grid place-items-center">
-                        <CheckCircle2 size={10} className="text-white" />
-                    </div>
-                )}
-            </div>
-        </button>
-    );
-}
-
-function fmt1(n) { return typeof n === 'number' ? n.toFixed(1) : '—'; }
 
 const AnimatedWaitText = () => {
     const [dots, ReactSetDots] = React.useState('');

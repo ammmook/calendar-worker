@@ -2,10 +2,8 @@
    TimeFlow — API Service Layer (Supabase)
    ═══════════════════════════════════════════════════════════════════════════════
    เชื่อมต่อ Frontend กับ Supabase โดยตรง
-   ─ Table "user"            : ข้อมูลผู้ใช้ (อ้างอิง salary ผ่าน salary_id)
-   ─ Table "salary_setting"  : ประเภทเงินเดือน + ยอด (id, salary_type, salary_monthly, salary_daily)
-   ─ Table "work_entry"      : บันทึกการทำงาน
-   ─ Table "ot_setting"      : ตั้งค่า OT
+   ─ Table "user"            : ข้อมูลผู้ใช้ (เงินเดือนเก็บในคอลัมน์ salary + เบี้ยกะ)
+   ─ Table "work_entry"      : บันทึกการทำงาน (เก็บ OT แยกอัตรา 1.5/2/3)
    ─ Table "monthly_summary" : สรุปรายเดือน
    ─ Table "yearly_summary"  : สรุปรายปี
    ─ Table "holidays"        : วันหยุด
@@ -51,55 +49,15 @@ function parseHHMM(str) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  SALARY SETTING (แยกจาก user — user เก็บแค่ salary_id)
-//  salary_type = 'monthly' | 'daily' (ตรงกับ payment_type ฝั่ง frontend)
+//  SALARY (เก็บตรงในตาราง user คอลัมน์ `salary` — รายเดือนอย่างเดียว)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function createSalarySettingRow(sal) {
-  const row = {
-    id: sal.id,
-    salary_type: sal.salary_type || 'monthly',
-    salary_monthly: Number(sal.salary_monthly) || 0,
-    salary_daily: Number(sal.salary_daily) || 0,
-  };
-  const { error } = await supabase.from('salary_setting').insert(row);
-  if (error) throw new Error(error.message);
-}
-
-async function updateSalarySettingRow(salaryId, patch) {
-  const upd = {};
-  if (patch.salary_type !== undefined && patch.salary_type !== null) upd.salary_type = patch.salary_type;
-  if (patch.salary_monthly !== undefined && patch.salary_monthly !== null) upd.salary_monthly = Number(patch.salary_monthly);
-  if (patch.salary_daily !== undefined && patch.salary_daily !== null) upd.salary_daily = Number(patch.salary_daily);
-  if (Object.keys(upd).length === 0) return true;
-
-  const { data, error } = await supabase
-    .from('salary_setting')
-    .update(upd)
-    .eq('id', salaryId)
-    .select('id');
-  if (error) throw new Error(error.message);
-  return Array.isArray(data) && data.length > 0;
-}
-
-/** รวมฟิลด์เงินเดือนเข้า object user สำหรับส่งให้ frontend (payment_type / salary_monthly / daily_rate) */
-async function expandUserWithSalary(user) {
+/** เติมฟิลด์ที่ frontend ใช้ (salary_monthly / payment_type / daily_rate) จากคอลัมน์ user.salary */
+function expandUserWithSalary(user) {
   if (!user) return user;
-  const sid = user.salary_id;
-  if (sid === undefined || sid === null || String(sid).trim() === '') return user;
-
-  const { data: sal, error } = await supabase
-    .from('salary_setting')
-    .select('*')
-    .eq('id', sid)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-
-  if (sal) {
-    user.payment_type = sal.salary_type;
-    user.salary_monthly = sal.salary_monthly;
-    user.daily_rate = sal.salary_daily;
-  }
+  user.salary_monthly = Number(user.salary) || 0;
+  user.payment_type = 'monthly';   // รองรับเฉพาะรายเดือน
+  user.daily_rate = 0;
   return user;
 }
 
@@ -143,33 +101,29 @@ async function createUser(data) {
   if (exErr) return { success: false, error: exErr.message };
   if (existing) return { success: false, error: 'User with this email already exists' };
 
-  // สร้าง salary_setting แล้ว link ผ่าน salary_id (ไม่เก็บเงินเดือนซ้ำใน user)
-  const salaryId = generateId('SAL');
-  await createSalarySettingRow({
-    id: salaryId,
-    salary_type: data.payment_type || 'monthly',
-    salary_monthly: data.salary_monthly !== undefined && data.salary_monthly !== null ? Number(data.salary_monthly) : 0,
-    salary_daily: data.daily_rate !== undefined && data.daily_rate !== null ? Number(data.daily_rate) : 0,
-  });
+  const salaryVal = data.salary_monthly !== undefined && data.salary_monthly !== null
+    ? Number(data.salary_monthly)
+    : (data.salary !== undefined && data.salary !== null ? Number(data.salary) : 0);
 
   const row = {
     email: data.email,
-    salary_id: salaryId,
+    salary: salaryVal,   // เงินเดือน (รายเดือน) เก็บตรงในตาราง user
     ot_hourly: data.ot_hourly !== undefined && data.ot_hourly !== null ? data.ot_hourly : 0,
-    working_hour: data.working_hour !== undefined && data.working_hour !== null ? data.working_hour : 8,
-    ot_setting_id: data.ot_setting_id ? data.ot_setting_id : null,
     sick_leave_day: data.sick_leave_day !== undefined && data.sick_leave_day !== null ? data.sick_leave_day : 30,
     personal_leave_day: data.personal_leave_day !== undefined && data.personal_leave_day !== null ? data.personal_leave_day : 6,
     annual_leave_day: data.annual_leave_day !== undefined && data.annual_leave_day !== null ? data.annual_leave_day : 10,
-    work_days_per_week: data.work_days_per_week !== undefined && data.work_days_per_week !== null ? data.work_days_per_week : 5,
     social_security: data.social_security !== undefined && data.social_security !== null ? data.social_security : 0,
+    // เบี้ยกะ (ย้ายจาก ot_setting เดิมมาเก็บใน user)
+    shift_allowance: data.shift_allowance !== undefined && data.shift_allowance !== null ? data.shift_allowance : 0,
+    shift_start: data.shift_start !== undefined && data.shift_start !== null ? data.shift_start : '',
+    shift_end: data.shift_end !== undefined && data.shift_end !== null ? data.shift_end : '',
   };
 
   const { error } = await supabase.from('user').insert(row);
   if (error) return { success: false, error: error.message };
 
-  const out = Object.assign({}, data, { salary_id: salaryId });
-  await expandUserWithSalary(out);
+  const out = Object.assign({}, data, { salary: salaryVal });
+  expandUserWithSalary(out);
   return { success: true, data: out, message: 'User created' };
 }
 
@@ -180,52 +134,23 @@ async function updateUser(data) {
 
   const { data: current, error: curErr } = await supabase
     .from('user')
-    .select('*')
+    .select('email')
     .eq('email', data.email)
     .maybeSingle();
   if (curErr) return { success: false, error: curErr.message };
   if (!current) return { success: false, error: 'User not found' };
 
-  let salaryId = String(current.salary_id || '').trim();
-
-  // ── patch salary_setting ──
-  const patchSalary = {};
-  if (data.salary_monthly !== undefined && data.salary_monthly !== null) patchSalary.salary_monthly = data.salary_monthly;
-  if (data.daily_rate !== undefined && data.daily_rate !== null) patchSalary.salary_daily = data.daily_rate;
-  if (data.payment_type !== undefined && data.payment_type !== null) patchSalary.salary_type = data.payment_type;
-  const hasSalaryPatch = Object.keys(patchSalary).length > 0;
-
-  if (hasSalaryPatch) {
-    if (!salaryId) {
-      salaryId = generateId('SAL');
-      await createSalarySettingRow({
-        id: salaryId,
-        salary_type: data.payment_type !== undefined && data.payment_type !== null ? data.payment_type : 'monthly',
-        salary_monthly: data.salary_monthly !== undefined && data.salary_monthly !== null ? Number(data.salary_monthly) : 0,
-        salary_daily: data.daily_rate !== undefined && data.daily_rate !== null ? Number(data.daily_rate) : 0,
-      });
-    } else {
-      const ok = await updateSalarySettingRow(salaryId, patchSalary);
-      if (!ok) {
-        await createSalarySettingRow({
-          id: salaryId,
-          salary_type: data.payment_type || 'monthly',
-          salary_monthly: data.salary_monthly !== undefined ? Number(data.salary_monthly) : 0,
-          salary_daily: data.daily_rate !== undefined ? Number(data.daily_rate) : 0,
-        });
-      }
-    }
-  }
-
-  // ── patch user (ไม่เก็บ salary_monthly / payment_type / daily_rate ใน user) ──
-  const SALARY_FIELDS = ['salary_monthly', 'payment_type', 'daily_rate'];
+  // ── patch user (เงินเดือนเก็บในคอลัมน์ salary ; payment_type/daily_rate ไม่มีคอลัมน์แล้ว) ──
+  const SKIP_FIELDS = ['salary_monthly', 'salary', 'payment_type', 'daily_rate'];
   const upd = {};
   Object.keys(data).forEach((h) => {
     if (h === 'email') return;
-    if (SALARY_FIELDS.indexOf(h) !== -1) return;
+    if (SKIP_FIELDS.indexOf(h) !== -1) return;
     if (data[h] !== undefined && data[h] !== null) upd[h] = data[h];
   });
-  if (hasSalaryPatch && salaryId) upd.salary_id = salaryId;
+  // เงินเดือน → คอลัมน์ salary
+  if (data.salary_monthly !== undefined && data.salary_monthly !== null) upd.salary = Number(data.salary_monthly);
+  else if (data.salary !== undefined && data.salary !== null) upd.salary = Number(data.salary);
 
   if (Object.keys(upd).length > 0) {
     const { error } = await supabase.from('user').update(upd).eq('email', data.email);
@@ -321,6 +246,7 @@ function pickWorkEntryColumns(data) {
     'work_entry_id', 'date', 'month_num', 'year_num',
     'clock_in', 'clock_out', 'leave_type', 'working_hour',
     'ot_hour', 'ot_earning', 'user_email',
+    'ot_hour_15', 'ot_earning_15', 'ot_hour_2', 'ot_earning_2', 'ot_hour_3', 'ot_earning_3',
     'regular_earning', 'shift_allowance', 'total_earning',
   ];
   const row = {};
@@ -380,36 +306,17 @@ async function upsertWorkEntry(data) {
   if (user) {
     await expandUserWithSalary(user);
 
-    // ── ดึงการตั้งค่า OT จากตาราง ot_setting (ผูกผ่าน user.ot_setting_id) ──
-    //    ค่า ot_mode / ot_block_hours / ot_deduct_mins ไม่ได้อยู่ในตาราง user
-    let otMode = 'hourly';
-    let blockH = 0;
-    let deductM = 0;
-    let shiftAllowance = 0;
-    let shiftStart = '';
-    if (user.ot_setting_id) {
-      const { data: otSetting, error: otErr } = await supabase
-        .from('ot_setting')
-        .select('*')
-        .eq('ot_setting_id', user.ot_setting_id)
-        .maybeSingle();
-      if (otErr) return { success: false, error: otErr.message };
-      if (otSetting) {
-        otMode = otSetting.ot_mode || 'hourly';
-        blockH = Number(otSetting.ot_block_hours) || 0;
-        deductM = Number(otSetting.ot_deduct_mins) || 0;
-        shiftAllowance = Number(otSetting.shift_allowance) || 0;
-        shiftStart = otSetting.shift_start || '';
-      }
-    }
+    // ── การตั้งค่าเบี้ยกะ (เก็บในตาราง user) ──
+    const shiftAllowance = Number(user.shift_allowance) || 0;
+    const shiftStart = user.shift_start || '';
 
     const paymentType = user.payment_type || 'monthly';
     const dailyRate = Number(user.daily_rate) || 0;
     const otRate = Number(user.ot_hourly) || 0;
-    const stdH = Number(user.working_hour) || 8;
-    // base ต่อชั่วโมง = เงินเดือน ÷ 30 วัน ÷ ชั่วโมงมาตรฐาน (เช่น 22,000 ÷ 30 ÷ 8 = 91.67)
+    const stdH = 8; // ชั่วโมงมาตรฐานคงที่ (ไม่มีคอลัมน์ working_hour แล้ว)
+    // base ต่อชั่วโมง = เงินเดือน ÷ 30 วัน ÷ 8 (เช่น 22,000 ÷ 30 ÷ 8 = 91.67)
     // แล้วคูณ 1.5 (วันธรรมดา) / 2 (นักขัตฤกษ์ ≤ std) / 3 (นักขัตฤกษ์ > std)
-    // ถ้าไม่มีเงินเดือน (เช่น รายวัน) fallback ไปใช้ค่า OT Rate ที่กรอกเอง
+    // ถ้าไม่มีเงินเดือน fallback ไปใช้ค่า OT Rate ที่กรอกเอง
     const salaryMonthly = Number(user.salary_monthly) || 0;
     const baseHourly = salaryMonthly > 0 ? salaryMonthly / 30 / stdH : otRate;
 
@@ -417,6 +324,8 @@ async function upsertWorkEntry(data) {
     let otHour = 0;
     let shiftEarning = 0;
     let otEarningOverride = null; // ถ้าตั้งค่า จะใช้แทน otHour * otRate (กรณี OT 2x/3x)
+    // OT แยกตามอัตรา: 1.5 = ปกติ, 2 = วันหยุด 8 ชม.แรก, 3 = วันหยุดเลย 8 ชม. / ข้ามคืน
+    let ot15Hour = 0, ot15Earn = 0, ot2Hour = 0, ot2Earn = 0, ot3Hour = 0, ot3Earn = 0;
 
     const isTraining = String(data.leave_type || '') === 'training';
 
@@ -457,12 +366,24 @@ async function upsertWorkEntry(data) {
         const shiftStartMin = parseHHMM(shiftStart);
 
         if (isPublicHolidayToday) {
-          // ── วันหยุดทางการ: OT ล้วน — 0..std = 2 เท่า, ส่วนเกิน = 3 เท่า (ไม่หัก block/≥9) ──
-          const ot2x = Math.min(netH, stdH);
-          const ot3x = Math.max(0, netH - stdH);
-          workingHour = 0;                                 // วันหยุด: ไม่มีค่าแรงปกติ
-          otHour = netH;                                   // ทั้งวันเป็น OT (หักพักแล้ว)
-          otEarningOverride = (ot2x * 2 + ot3x * 3) * baseHourly;
+          // ── วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (OT เริ่มคิดทันทีหลังเข้างาน) ──
+          //   OT เซตแรก (ใน 8 ชม.แรก) = 2 เท่า ; OT เซตสอง (เลย 8 ชม.) = 3 เท่า
+          //   ถ้าทำงานข้ามเที่ยงคืนไปตกวันปกติ (วันถัดไปไม่ใช่วันหยุด) → ช่วงหลังเที่ยงคืน = OT ปกติ 1.5 เท่า
+          const afterMidnightHours = (crossedMidnight && !nextDayIsHoliday) ? (oh * 60 + om) / 60 : 0;
+          const holidayH = Math.max(0, netH - afterMidnightHours);   // ช่วงที่ตกวันหยุดจริง (หักพักแล้ว)
+          const ot2x = Math.min(holidayH, stdH);
+          const ot3x = Math.max(0, holidayH - stdH);
+          workingHour = Math.min(netH, stdH);              // ยังได้ค่าแรงปกติ (นับเป็นวันทำงาน)
+          otHour = holidayH + afterMidnightHours;          // ทั้งวันเป็น OT (หักพักแล้ว)
+          ot2Hour = ot2x; ot2Earn = ot2x * 2 * baseHourly;
+          ot3Hour = ot3x; ot3Earn = ot3x * 3 * baseHourly;
+          ot15Hour = afterMidnightHours; ot15Earn = afterMidnightHours * 1.5 * baseHourly;
+          otEarningOverride = ot2Earn + ot3Earn + ot15Earn;
+
+          // ── เบี้ยกะ: เงื่อนไขเดิม (เข้างานตรงกับ shift_start พอดี) ──
+          if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
+            shiftEarning = shiftAllowance;
+          }
         } else {
           // ── วันปกติ ──
           const rawOT = Math.max(0, netH - stdH);
@@ -474,16 +395,19 @@ async function upsertWorkEntry(data) {
           const ot3xHours = qualifies3x ? Math.min(afterMidnightHours, rawOT) : 0;
           const normalOTraw = Math.max(0, rawOT - ot3xHours);
 
-          // OT ส่วนปกติ (ไม่ใช่ 3x) ใช้กฎเดิม: OT ที่ทำจริง ≥ 9 → ลบ 1 ; ไม่งั้นใช้ block
+          // OT ส่วนปกติ (ไม่ใช่ 3x) — หักตามชั่วโมง OT ที่ทำจริง (rawOT):
+          //   1–2 ชม. คิดเต็ม ; > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
           let netNormalOT = normalOTraw;
           if (rawOT >= 9) {
             netNormalOT = Math.max(0, normalOTraw - 1);
-          } else if (otMode === 'block' && normalOTraw > 0) {
-            netNormalOT = normalOTraw <= blockH ? normalOTraw : Math.max(0, normalOTraw - (deductM / 60));
+          } else if (rawOT > 2) {
+            netNormalOT = Math.max(0, normalOTraw - 0.5);
           }
 
           otHour = netNormalOT + ot3xHours;
-          otEarningOverride = (netNormalOT * 1.5 + ot3xHours * 3) * baseHourly;
+          ot15Hour = netNormalOT; ot15Earn = netNormalOT * 1.5 * baseHourly;
+          ot3Hour = ot3xHours; ot3Earn = ot3xHours * 3 * baseHourly;
+          otEarningOverride = ot15Earn + ot3Earn;
 
           // ── เบี้ยกะ: ได้เฉพาะเมื่อเวลาเข้างานตรงกับ shift_start พอดี ──
           if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
@@ -508,6 +432,12 @@ async function upsertWorkEntry(data) {
     const totalEarning = regularEarning + otEarning + shiftEarning;
 
     data.ot_earning = otEarning;
+    data.ot_hour_15 = ot15Hour;
+    data.ot_earning_15 = ot15Earn;
+    data.ot_hour_2 = ot2Hour;
+    data.ot_earning_2 = ot2Earn;
+    data.ot_hour_3 = ot3Hour;
+    data.ot_earning_3 = ot3Earn;
     data.regular_earning = regularEarning;
     data.shift_allowance = shiftEarning;
     data.total_earning = totalEarning;
@@ -561,6 +491,9 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
   let total_working_hour = 0, total_ot_hour = 0;
   let total_regular_earning = 0, total_ot_earning = 0, total_earning = 0;
   let total_shift_allowance = 0;
+  let total_ot_hour_15 = 0, total_ot_earning_15 = 0;
+  let total_ot_hour_2 = 0, total_ot_earning_2 = 0;
+  let total_ot_hour_3 = 0, total_ot_earning_3 = 0;
 
   (filtered || []).forEach((e) => {
     const wh = Number(e.working_hour) || 0;
@@ -575,6 +508,12 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_ot_earning += Number(e.ot_earning) || 0;
     total_shift_allowance += sa;
     total_earning += Number(e.total_earning) || 0;
+    total_ot_hour_15 += Number(e.ot_hour_15) || 0;
+    total_ot_earning_15 += Number(e.ot_earning_15) || 0;
+    total_ot_hour_2 += Number(e.ot_hour_2) || 0;
+    total_ot_earning_2 += Number(e.ot_earning_2) || 0;
+    total_ot_hour_3 += Number(e.ot_hour_3) || 0;
+    total_ot_earning_3 += Number(e.ot_earning_3) || 0;
   });
 
   // Fetch user info for payment_type check
@@ -612,6 +551,12 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_ot_earning,
     total_shift_allowance,
     total_earning,
+    total_ot_hour_15,
+    total_ot_earning_15,
+    total_ot_hour_2,
+    total_ot_earning_2,
+    total_ot_hour_3,
+    total_ot_earning_3,
   };
 
   const { data: existing } = await supabase
@@ -648,6 +593,9 @@ async function recalcYearlySummary(userEmail, yearNum) {
   let total_working_hour = 0, total_ot_hour = 0;
   let total_regular_earning = 0, total_ot_earning = 0, total_earning = 0;
   let total_shift_allowance = 0;
+  let total_ot_hour_15 = 0, total_ot_earning_15 = 0;
+  let total_ot_hour_2 = 0, total_ot_earning_2 = 0;
+  let total_ot_hour_3 = 0, total_ot_earning_3 = 0;
 
   (filtered || []).forEach((m) => {
     total_days_worked += Number(m.days_worked) || 0;
@@ -659,6 +607,12 @@ async function recalcYearlySummary(userEmail, yearNum) {
     total_ot_earning += Number(m.total_ot_earning) || 0;
     total_shift_allowance += Number(m.total_shift_allowance) || 0;
     total_earning += Number(m.total_earning) || 0;
+    total_ot_hour_15 += Number(m.total_ot_hour_15) || 0;
+    total_ot_earning_15 += Number(m.total_ot_earning_15) || 0;
+    total_ot_hour_2 += Number(m.total_ot_hour_2) || 0;
+    total_ot_earning_2 += Number(m.total_ot_earning_2) || 0;
+    total_ot_hour_3 += Number(m.total_ot_hour_3) || 0;
+    total_ot_earning_3 += Number(m.total_ot_earning_3) || 0;
   });
 
   const summaryData = {
@@ -673,6 +627,12 @@ async function recalcYearlySummary(userEmail, yearNum) {
     total_ot_earning,
     total_shift_allowance,
     total_earning,
+    total_ot_hour_15,
+    total_ot_earning_15,
+    total_ot_hour_2,
+    total_ot_earning_2,
+    total_ot_hour_3,
+    total_ot_earning_3,
   };
 
   const { data: existing } = await supabase
@@ -714,6 +674,12 @@ async function getEarningsSummary(email, year) {
       working_hour: Number(e.working_hour) || 0,
       ot_hour: Number(e.ot_hour) || 0,
       ot_earning: Number(e.ot_earning) || 0,
+      ot_hour_15: Number(e.ot_hour_15) || 0,
+      ot_earning_15: Number(e.ot_earning_15) || 0,
+      ot_hour_2: Number(e.ot_hour_2) || 0,
+      ot_earning_2: Number(e.ot_earning_2) || 0,
+      ot_hour_3: Number(e.ot_hour_3) || 0,
+      ot_earning_3: Number(e.ot_earning_3) || 0,
       regular_earning: Number(e.regular_earning) || 0,
       shift_allowance: Number(e.shift_allowance) || 0,
       total_earning: Number(e.total_earning) || 0,
@@ -744,6 +710,12 @@ async function getEarningsSummary(email, year) {
         total_regular_earning: Number(found.total_regular_earning) || 0,
         total_shift_allowance: Number(found.total_shift_allowance) || 0,
         total_earning: Number(found.total_earning) || 0,
+        total_ot_hour_15: Number(found.total_ot_hour_15) || 0,
+        total_ot_earning_15: Number(found.total_ot_earning_15) || 0,
+        total_ot_hour_2: Number(found.total_ot_hour_2) || 0,
+        total_ot_earning_2: Number(found.total_ot_earning_2) || 0,
+        total_ot_hour_3: Number(found.total_ot_hour_3) || 0,
+        total_ot_earning_3: Number(found.total_ot_earning_3) || 0,
       });
     } else {
       monthly.push({
@@ -752,6 +724,9 @@ async function getEarningsSummary(email, year) {
         total_working_hour: 0, total_ot_hour: 0,
         total_ot_earning: 0, total_regular_earning: 0,
         total_shift_allowance: 0, total_earning: 0,
+        total_ot_hour_15: 0, total_ot_earning_15: 0,
+        total_ot_hour_2: 0, total_ot_earning_2: 0,
+        total_ot_hour_3: 0, total_ot_earning_3: 0,
       });
     }
   }
@@ -776,67 +751,24 @@ async function getEarningsSummary(email, year) {
     total_regular_earning: Number(yearlyFound.total_regular_earning) || 0,
     total_shift_allowance: Number(yearlyFound.total_shift_allowance) || 0,
     total_earning: Number(yearlyFound.total_earning) || 0,
+    total_ot_hour_15: Number(yearlyFound.total_ot_hour_15) || 0,
+    total_ot_earning_15: Number(yearlyFound.total_ot_earning_15) || 0,
+    total_ot_hour_2: Number(yearlyFound.total_ot_hour_2) || 0,
+    total_ot_earning_2: Number(yearlyFound.total_ot_earning_2) || 0,
+    total_ot_hour_3: Number(yearlyFound.total_ot_hour_3) || 0,
+    total_ot_earning_3: Number(yearlyFound.total_ot_earning_3) || 0,
   } : {
     year_num: year,
     total_days_worked: 0, total_ot_days: 0, total_shift_days: 0,
     total_working_hour: 0, total_ot_hour: 0,
     total_ot_earning: 0, total_regular_earning: 0,
     total_shift_allowance: 0, total_earning: 0,
+    total_ot_hour_15: 0, total_ot_earning_15: 0,
+    total_ot_hour_2: 0, total_ot_earning_2: 0,
+    total_ot_hour_3: 0, total_ot_earning_3: 0,
   };
 
   return { success: true, data: { monthly, yearly: yearlyTotals, daily } };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  OT SETTING API
-// ═══════════════════════════════════════════════════════════════════════════════
-
-async function getOtSetting(otSettingId) {
-  if (!otSettingId) return { success: false, error: 'ot_setting_id is required' };
-  const { data, error } = await supabase
-    .from('ot_setting')
-    .select('*')
-    .eq('ot_setting_id', otSettingId)
-    .maybeSingle();
-  if (error) return { success: false, error: error.message };
-  if (!data) return { success: false, error: 'OT Setting not found' };
-  return { success: true, data };
-}
-
-async function createOtSetting(data) {
-  if (!data) return { success: false, error: 'data is required' };
-  if (!data.ot_setting_id) data.ot_setting_id = generateId('OTS');
-
-  const row = {
-    ot_setting_id: data.ot_setting_id,
-    ot_mode: data.ot_mode !== undefined && data.ot_mode !== null ? data.ot_mode : 'hourly',
-    ot_block_hours: data.ot_block_hours !== undefined && data.ot_block_hours !== null ? data.ot_block_hours : 2,
-    ot_deduct_mins: data.ot_deduct_mins !== undefined && data.ot_deduct_mins !== null ? data.ot_deduct_mins : 30,
-    shift_allowance: data.shift_allowance !== undefined && data.shift_allowance !== null ? data.shift_allowance : 0,
-    shift_start: data.shift_start !== undefined && data.shift_start !== null ? data.shift_start : '',
-    shift_end: data.shift_end !== undefined && data.shift_end !== null ? data.shift_end : '',
-  };
-  const { error } = await supabase.from('ot_setting').insert(row);
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: { ot_setting_id: data.ot_setting_id }, message: 'OT Setting created' };
-}
-
-async function updateOtSetting(data) {
-  if (!data || !data.ot_setting_id) {
-    return { success: false, error: 'ot_setting_id is required' };
-  }
-  const upd = {};
-  ['ot_mode', 'ot_block_hours', 'ot_deduct_mins', 'shift_allowance', 'shift_start', 'shift_end'].forEach((h) => {
-    if (data[h] !== undefined && data[h] !== null) upd[h] = data[h];
-  });
-  const { data: updated, error } = await supabase
-    .from('ot_setting')
-    .update(upd)
-    .eq('ot_setting_id', data.ot_setting_id)
-    .select('ot_setting_id');
-  if (error) return { success: false, error: error.message };
-  if (!updated || updated.length === 0) return { success: false, error: 'OT Setting not found' };
-  return { success: true, message: 'OT Setting updated' };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -953,12 +885,6 @@ export const WorkEntryAPI = {
   update: wrap('updateWorkEntry', updateWorkEntry),
   upsert: wrap('upsertWorkEntry', upsertWorkEntry),
   delete: wrap('deleteWorkEntry', (workEntryId) => deleteWorkEntry(workEntryId)),
-};
-
-export const OtSettingAPI = {
-  get: wrap('getOtSetting', getOtSetting),
-  create: wrap('createOtSetting', createOtSetting),
-  update: wrap('updateOtSetting', updateOtSetting),
 };
 
 export const HolidayAPI = {
