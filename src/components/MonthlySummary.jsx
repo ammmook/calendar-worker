@@ -22,7 +22,7 @@ export default function MonthlySummary({
   lang, t, viewY, viewM, setViewM, setViewY, today,
   onSelectDay, showToast,
 }) {
-  const [tab, setTab] = useState('list'); // 'list' | 'graph' | 'summary'
+  const [tab, setTab] = useState('summary'); // 'summary' | 'graph' | 'list'
 
   const prevMonth = () => {
     if (viewM === 0) { setViewM(11); setViewY(viewY - 1); }
@@ -74,9 +74,9 @@ export default function MonthlySummary({
   const todayK = todayKeyFn();
 
   const tabs = [
-    { id: 'list', Icon: List, label: t.tab_worklog },
-    { id: 'graph', Icon: PieChart, label: t.tab_graph },
     { id: 'summary', Icon: LayoutGrid, label: t.tab_summary },
+    { id: 'graph', Icon: PieChart, label: t.tab_graph },
+    { id: 'list', Icon: List, label: t.tab_worklog },
   ];
 
   return (

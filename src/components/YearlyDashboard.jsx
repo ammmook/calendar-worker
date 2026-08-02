@@ -60,7 +60,7 @@ export default function YearlyDashboard({
     const today = useMemo(() => new Date(), []);
     const [year, setYear] = useState(today.getFullYear());
     const [tooltip, setTooltip] = useState(null);   // { monthIdx, x, y }
-    const [tab, setTab] = useState('list'); // 'list' | 'graph' | 'summary'
+    const [tab, setTab] = useState('summary'); // 'summary' | 'graph' | 'list'
     const chartRef = useRef(null);
 
     const [localEarningsSummary, setLocalEarningsSummary] = useState(earningsSummary || { monthly: [], yearly: {} });
@@ -184,9 +184,9 @@ export default function YearlyDashboard({
     const ssDeducted = Math.max(0, grossEarn - netEarn);
 
     const tabs = [
-        { id: 'list', Icon: List, label: t.tab_worklog },
-        { id: 'graph', Icon: PieChart, label: t.tab_graph },
         { id: 'summary', Icon: LayoutGrid, label: t.tab_summary },
+        { id: 'graph', Icon: PieChart, label: t.tab_graph },
+        { id: 'list', Icon: List, label: t.tab_worklog },
     ];
 
     // ── Chart geometry ─────────────────────────────────────────────────────────
