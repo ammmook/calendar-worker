@@ -3,10 +3,11 @@ import {
     TrendingUp, Banknote, CircleDollarSign, Timer,
     UmbrellaOff, Stethoscope, Baby, Plane, BookOpen,
     CalendarDays, ChevronLeft, ChevronRight, Info,
-    ArrowUpRight, Award, Moon,
+    ArrowUpRight, Award, Moon, List, PieChart, LayoutGrid,
 } from 'lucide-react';
 import { getLang } from '../locales';
 import { WorkEntryAPI } from '../services/api';
+import { DonutChart, LegendRow } from './charts';
 
 import { OT_MODE } from './ProfilePage';
 
@@ -36,6 +37,9 @@ const C = {
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
+// OT tier colors (สำหรับโดนัทกราฟ) — เฉดอำพัน
+const OT_TIER_COLORS = ['#fcd34d', '#c29302', '#92700a'];
+
 const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt1 = (n) => n.toFixed(1);
 
@@ -56,6 +60,7 @@ export default function YearlyDashboard({
     const today = useMemo(() => new Date(), []);
     const [year, setYear] = useState(today.getFullYear());
     const [tooltip, setTooltip] = useState(null);   // { monthIdx, x, y }
+    const [tab, setTab] = useState('list'); // 'list' | 'graph' | 'summary'
     const chartRef = useRef(null);
 
     const [localEarningsSummary, setLocalEarningsSummary] = useState(earningsSummary || { monthly: [], yearly: {} });
@@ -100,7 +105,7 @@ export default function YearlyDashboard({
         Object.keys(entries).forEach((dateStr) => {
             const [y] = dateStr.split('-');
             if (Number(y) !== year) return;
-            
+
             const entry = entries[dateStr];
             if (entry?.leave?.type) {
                 counts[entry.leave.type] = (counts[entry.leave.type] || 0) + 1;
@@ -113,7 +118,7 @@ export default function YearlyDashboard({
     const monthlyStats = useMemo(() => {
         return t.short_months.map((_, mIdx) => {
             const beMonth = (localEarningsSummary.monthly || []).find(m => m.month_num === mIdx + 1);
-            
+
             const regEarn = beMonth?.total_regular_earning || 0;
 
             const otEarn = beMonth?.total_ot_earning || 0;
@@ -166,12 +171,23 @@ export default function YearlyDashboard({
 
     // ── OT tier summary (รายปี) ──
     const otTiers = [
-        { key: '1', label: t.ot_x1, hint: t.ot_x1_hint, hours: yearTotals.totalOT1Hrs, earn: yearTotals.totalOT1Earn },
-        { key: '15', label: t.ot_x15, hint: t.ot_x15_hint, hours: yearTotals.totalOT15Hrs, earn: yearTotals.totalOT15Earn },
-        { key: '3', label: t.ot_x3, hint: t.ot_x3_hint, hours: yearTotals.totalOT3Hrs, earn: yearTotals.totalOT3Earn },
+        { key: '1', label: t.ot_x1, hint: t.ot_x1_hint, hours: yearTotals.totalOT1Hrs, earn: yearTotals.totalOT1Earn, color: OT_TIER_COLORS[0] },
+        { key: '15', label: t.ot_x15, hint: t.ot_x15_hint, hours: yearTotals.totalOT15Hrs, earn: yearTotals.totalOT15Earn, color: OT_TIER_COLORS[1] },
+        { key: '3', label: t.ot_x3, hint: t.ot_x3_hint, hours: yearTotals.totalOT3Hrs, earn: yearTotals.totalOT3Earn, color: OT_TIER_COLORS[2] },
     ];
 
     const totalLeave = LEAVE_TYPES.reduce((s, lt) => s + (leaveData[lt.key] || 0), 0);
+
+    // ── Income breakdown (รายปี) — gross = reg+ot+shift ; net = total_earning (หัก SS แล้วจาก backend) ──
+    const grossEarn = yearTotals.totalRegEarn + yearTotals.totalOTEarn + yearTotals.totalShiftEarn;
+    const netEarn = yearTotals.totalEarn;
+    const ssDeducted = Math.max(0, grossEarn - netEarn);
+
+    const tabs = [
+        { id: 'list', Icon: List, label: t.tab_worklog },
+        { id: 'graph', Icon: PieChart, label: t.tab_graph },
+        { id: 'summary', Icon: LayoutGrid, label: t.tab_summary },
+    ];
 
     // ── Chart geometry ─────────────────────────────────────────────────────────
     const CHART_H = 220;
@@ -195,19 +211,201 @@ export default function YearlyDashboard({
         setTooltip({ mIdx });
     };
 
+    // ── Bar chart (แนวโน้มรายได้) — reuse ในแท็บ Graph ──
+    const barChart = (
+        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                <div>
+                    <div className="text-[15px] font-bold text-[#111827]">{t.monthly_earnings_title} {year}</div>
+                    <div className="text-[11px] text-[#9CA3AF] mt-0.5">{t.hover_bars}</div>
+                </div>
+                {/* Legend */}
+                <div className="hidden sm:flex items-center gap-4">
+                    <LegendDot color="#3B4FE4" label={t.regular} />
+                    <LegendDot color="#fbde3a" label={t.overtime} />
+                    <LegendDot color="#FDBA74" label={t.shift_short} />
+                </div>
+            </div>
+
+            {/* SVG Chart */}
+            <div
+                ref={chartRef}
+                className="relative px-2 pt-4 pb-2"
+                onMouseLeave={() => setTooltip(null)}
+            >
+                <svg
+                    width="100%"
+                    height={CHART_H}
+                    viewBox={`0 0 800 ${CHART_H}`}
+                    preserveAspectRatio="none"
+                    className="overflow-visible"
+                >
+                    {/* Y-axis grid lines + labels */}
+                    {Array.from({ length: yTicks + 1 }).map((_, i) => {
+                        const val = (maxVal / yTicks) * (yTicks - i);
+                        const y = yScale(val);
+                        return (
+                            <g key={i}>
+                                <line
+                                    x1={CHART_PAD.left} y1={y} x2={800 - CHART_PAD.right} y2={y}
+                                    stroke="#E8EAEF" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 3'}
+                                />
+                                <text
+                                    x={CHART_PAD.left - 6} y={y + 4}
+                                    textAnchor="end" fill="#9CA3AF"
+                                    style={{ fontSize: 9, fontFamily: 'Google Sans, sans-serif' }}
+                                >
+                                    {val >= 1000 ? `${Math.round(val / 1000)}k` : Math.round(val)}
+                                </text>
+                            </g>
+                        );
+                    })}
+
+                    {/* Bars */}
+                    {monthlyStats.map((m, idx) => {
+                        const totalW = 800;
+                        const { x, bW } = barGroup(idx, totalW);
+                        const regH = m.regEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.regEarn / maxVal) : 0;
+                        const otH = m.otEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.otEarn / maxVal) : 0;
+                        const shiftH = m.shiftEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.shiftEarn / maxVal) : 0;
+                        const totalH = regH + otH + shiftH;
+                        const baseY = CHART_H - CHART_PAD.bottom;
+                        const isActive = tooltip?.mIdx === idx;
+
+                        return (
+                            <g key={idx}>
+                                {/* Hover zone */}
+                                <rect
+                                    x={x - 4} y={CHART_PAD.top}
+                                    width={bW + 8} height={CHART_H - CHART_PAD.top - CHART_PAD.bottom}
+                                    fill="transparent"
+                                    className="cursor-pointer"
+                                    onMouseEnter={() => handleBarHover(idx)}
+                                    onClick={() => handleBarHover(idx)}
+                                    onTouchStart={() => handleBarHover(idx)}
+                                />
+
+                                {/* Hover highlight */}
+                                {isActive && (
+                                    <rect
+                                        x={x - 4} y={CHART_PAD.top}
+                                        width={bW + 8} height={CHART_H - CHART_PAD.top - CHART_PAD.bottom}
+                                        fill="#EEF0FD"
+                                    />
+                                )}
+
+                                {/* Regular bar */}
+                                {regH > 0 && (
+                                    <rect
+                                        x={x} y={baseY - regH}
+                                        width={bW} height={regH}
+                                        fill={isActive ? '#3B4FE4' : '#C7CCFA'}
+                                        style={{ transition: 'fill 0.15s' }}
+                                    />
+                                )}
+
+                                {/* OT bar (stacked on top) */}
+                                {otH > 0 && (
+                                    <rect
+                                        x={x} y={baseY - regH - otH}
+                                        width={bW} height={otH}
+                                        fill={isActive ? '#fbde3a' : '#FDE68A'}
+                                        style={{ transition: 'fill 0.15s' }}
+                                    />
+                                )}
+
+                                {/* Shift bar (light orange, stacked on top of OT) */}
+                                {shiftH > 0 && (
+                                    <rect
+                                        x={x} y={baseY - regH - otH - shiftH}
+                                        width={bW} height={shiftH}
+                                        fill={isActive ? '#FB923C' : '#FED7AA'}
+                                        style={{ transition: 'fill 0.15s' }}
+                                    />
+                                )}
+
+                                {/* Empty bar placeholder */}
+                                {totalH === 0 && (
+                                    <rect
+                                        x={x} y={baseY - 3}
+                                        width={bW} height={3}
+                                        fill="#E8EAEF"
+                                    />
+                                )}
+
+                                {/* Month label */}
+                                <text
+                                    x={x + bW / 2} y={CHART_H - CHART_PAD.bottom + 14}
+                                    textAnchor="middle" fill={isActive ? '#3B4FE4' : '#9CA3AF'}
+                                    style={{ fontSize: 9, fontWeight: isActive ? 700 : 400, fontFamily: 'Google Sans, sans-serif', transition: 'fill 0.15s' }}
+                                >
+                                    {m.month}
+                                </text>
+                            </g>
+                        );
+                    })}
+                </svg>
+
+                {/* Tooltip */}
+                {tooltip !== null && (() => {
+                    const mIdx = tooltip.mIdx;
+                    const m = monthlyStats[mIdx];
+                    const totalW = chartRef.current?.offsetWidth || 800;
+                    const { x, bW } = barGroup(mIdx, totalW);
+                    const TW = 200;
+
+                    let tx = x + (bW / 2) - (TW / 2);
+                    let ty = 20;
+
+                    if (tx < 8) tx = 8;
+                    if (tx + TW > totalW - 8) tx = totalW - TW - 8;
+
+                    return (
+                        <div
+                            className="absolute pointer-events-none z-20 bg-white border border-[#E8EAEF] rounded-xl shadow-[0_8px_28px_rgba(17,24,39,0.12)] p-3.5"
+                            style={{ left: tx, top: ty, width: TW }}
+                        >
+                            <div className="flex items-center justify-between mb-2.5">
+                                <span className="text-[13px] font-bold text-[#111827]">{m.fullMonth}</span>
+                                <span className="text-[10px] font-semibold text-[#9CA3AF]">{m.daysWorked} {t.table_days}</span>
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <TooltipRow label={t.total} value={fmtB(m.totalEarn)} color="#111827" bold />
+                                <div className="border-t border-[#E8EAEF] my-0.5" />
+                                <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="#3B4FE4" />
+                                <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="#c29302" />
+                                <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="#E8730C" />
+                                <div className="border-t border-[#E8EAEF] my-0.5" />
+                                <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="#9CA3AF" />
+                            </div>
+                        </div>
+                    );
+                })()}
+            </div>
+        </div>
+    );
+
     // ─────────────────────────────────────────────────────────────────────────
     return (
         <div className="flex flex-col gap-6 animate-[fadeUp_0.4s_ease_both]">
 
-            {/* ── Page header ── */}
-            <div className="flex items-end justify-between flex-wrap gap-4">
-                <div>
-                    <h1 className="text-[26px] font-bold text-[#111827] tracking-tight leading-tight">
-                        {t.annual_overview}
-                    </h1>
-                    <p className="text-sm text-[#9CA3AF] mt-0.5">
-                        {t.yearly_desc}
-                    </p>
+            {/* ── Page header: tabs (แทน title) + year picker ── */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+                {/* Sub-tabs */}
+                <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[12px] p-1">
+                    {tabs.map(({ id, Icon, label }) => (
+                        <button
+                            key={id}
+                            onClick={() => setTab(id)}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition-all
+                                ${tab === id
+                                    ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                                    : 'text-[#6B7280] hover:text-[#374151]'}`}
+                        >
+                            <Icon size={14} />
+                            <span>{label}</span>
+                        </button>
+                    ))}
                 </div>
 
                 {/* Year picker */}
@@ -249,285 +447,9 @@ export default function YearlyDashboard({
                 </div>
             </div>
 
-            {/* ── Annual KPI cards ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 animate-[fadeUp_0.4s_0.06s_ease_both]">
-
-                {/* OT Earnings */}
-                <AnnualCard
-                    Icon={TrendingUp}
-                    label={t.ot_earnings}
-                    value={fmtB(yearTotals.totalOTEarn)}
-                    sub={`${fmt1(yearTotals.totalOTHrs)}h ${t.total_ot_hours}`}
-                    iconCls="bg-[#fffdef] text-[#c29302]"
-                    valCls="text-[#c29302]"
-                    stripe="bg-[#fbde3a]"
-                />
-
-                {/* Shift Pay */}
-                <AnnualCard
-                    Icon={Moon}
-                    label={t.shift_earnings}
-                    value={fmtB(yearTotals.totalShiftEarn)}
-                    sub={`${yearTotals.totalShiftDays} ${t.shift_days_label}`}
-                    iconCls="bg-[#FFF3E6] text-[#E8730C]"
-                    valCls="text-[#E8730C]"
-                    stripe="bg-[#FDBA74]"
-                />
-
-                {/* Regular */}
-                <AnnualCard
-                    Icon={Banknote}
-                    label={t.regular_earnings}
-                    value={fmtB(yearTotals.totalRegEarn)}
-                    sub={`${yearTotals.totalDays} ${t.worked_days}`}
-                    iconCls="bg-[#ECFDF5] text-[#10B981]"
-                    valCls="text-[#10B981]"
-                    stripe="bg-[#10B981]"
-                />
-
-                {/* OT Hours */}
-                <AnnualCard
-                    Icon={Timer}
-                    label={t.total_ot_hours}
-                    value={`${fmt1(yearTotals.totalOTHrs)}h`}
-                    sub={t.across_months}
-                    iconCls="bg-[#EEF0FD] text-[#3B4FE4]"
-                    valCls="text-[#3B4FE4]"
-                    stripe="bg-[#3B4FE4]"
-                />
-
-                {/* Total annual — full-width bottom banner on mobile, in-row on desktop (matches other card heights) */}
-                <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
-                    <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 rounded-[8px] bg-white/25 grid place-items-center">
-                            <CircleDollarSign size={15} className="text-white" />
-                        </div>
-                        <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.1em]">{t.total_year} {year}</span>
-                    </div>
-                    <div className="text-[1.4rem] sm:text-[1.85rem] font-bold text-white leading-none tracking-tight">
-                        {fmtB(yearTotals.totalEarn)}
-                    </div>
-                    <div className="text-[11px] text-white/70 mt-1.5">{yearTotals.totalDays} {t.worked_days}</div>
-                    {yearTotals.bestMonth && (
-                        <div className="absolute top-4 right-4 bg-white/20 text-white/90 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em] flex items-center gap-1">
-                            <Award size={8} /> <span className="hidden sm:inline">{t.best_month}</span> {yearTotals.bestMonth.month}
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* ── OT by rate (รายปี) ── */}
-            <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.4s_0.10s_ease_both]">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                    <div className="text-[15px] font-bold text-[#111827]">{t.ot_by_rate}</div>
-                    <div className="text-[11px] text-[#9CA3AF]">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
-                    {otTiers.map((tier) => {
-                        const pct = yearTotals.totalOTHrs > 0 ? Math.min((tier.hours / yearTotals.totalOTHrs) * 100, 100) : 0;
-                        return (
-                            <div key={tier.key} className="rounded-xl border border-[#E8EAEF] bg-[#fffdef]/40 p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-7 h-7 rounded-[8px] grid place-items-center shrink-0 bg-[#fffdef]">
-                                            <Timer size={14} className="text-[#c29302]" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <div className="text-[13px] font-bold text-[#374151] leading-tight">{tier.label}</div>
-                                            <div className="text-[10px] text-[#9CA3AF] leading-tight truncate">{tier.hint}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-[1.35rem] font-bold text-[#c29302] leading-none tracking-tight">{fmt1(tier.hours)}<span className="text-[13px] font-normal text-[#9CA3AF]">h</span></div>
-                                <div className="text-[12px] font-semibold text-[#c29302] mt-1">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
-                                <div className="h-[5px] bg-[#F3F4F8] rounded-full overflow-hidden mt-2.5">
-                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: '#fbde3a' }} />
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* ── Bar Chart ── */}
-            <div
-                className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.4s_0.12s_ease_both]"
-            >
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                    <div>
-                        <div className="text-[15px] font-bold text-[#111827]">{t.monthly_earnings_title} {year}</div>
-                        <div className="text-[11px] text-[#9CA3AF] mt-0.5">{t.hover_bars}</div>
-                    </div>
-                    {/* Legend */}
-                    <div className="hidden sm:flex items-center gap-4">
-                        <LegendDot color="#3B4FE4" label={t.regular} />
-                        <LegendDot color="#fbde3a" label={t.overtime} />
-                        <LegendDot color="#FDBA74" label={t.shift_short} />
-                    </div>
-                </div>
-
-                {/* SVG Chart */}
-                <div
-                    ref={chartRef}
-                    className="relative px-2 pt-4 pb-2"
-                    onMouseLeave={() => setTooltip(null)}
-                >
-                    <svg
-                        width="100%"
-                        height={CHART_H}
-                        viewBox={`0 0 800 ${CHART_H}`}
-                        preserveAspectRatio="none"
-                        className="overflow-visible"
-                    >
-                        {/* Y-axis grid lines + labels */}
-                        {Array.from({ length: yTicks + 1 }).map((_, i) => {
-                            const val = (maxVal / yTicks) * (yTicks - i);
-                            const y = yScale(val);
-                            return (
-                                <g key={i}>
-                                    <line
-                                        x1={CHART_PAD.left} y1={y} x2={800 - CHART_PAD.right} y2={y}
-                                        stroke="#E8EAEF" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 3'}
-                                    />
-                                    <text
-                                        x={CHART_PAD.left - 6} y={y + 4}
-                                        textAnchor="end" fill="#9CA3AF"
-                                        style={{ fontSize: 9, fontFamily: 'Google Sans, sans-serif' }}
-                                    >
-                                        {val >= 1000 ? `${Math.round(val / 1000)}k` : Math.round(val)}
-                                    </text>
-                                </g>
-                            );
-                        })}
-
-                        {/* Bars */}
-                        {monthlyStats.map((m, idx) => {
-                            const totalW = 800;
-                            const { x, bW } = barGroup(idx, totalW);
-                            const regH = m.regEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.regEarn / maxVal) : 0;
-                            const otH = m.otEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.otEarn / maxVal) : 0;
-                            const shiftH = m.shiftEarn > 0 ? (CHART_H - CHART_PAD.top - CHART_PAD.bottom) * (m.shiftEarn / maxVal) : 0;
-                            const totalH = regH + otH + shiftH;
-                            const baseY = CHART_H - CHART_PAD.bottom;
-                            const isActive = tooltip?.mIdx === idx;
-
-                            return (
-                                <g key={idx}>
-                                    {/* Hover zone */}
-                                    <rect
-                                        x={x - 4} y={CHART_PAD.top}
-                                        width={bW + 8} height={CHART_H - CHART_PAD.top - CHART_PAD.bottom}
-                                        fill="transparent"
-                                        className="cursor-pointer"
-                                        onMouseEnter={() => handleBarHover(idx)}
-                                        onClick={() => handleBarHover(idx)}
-                                        onTouchStart={() => handleBarHover(idx)}
-                                    />
-
-                                    {/* Hover highlight */}
-                                    {isActive && (
-                                        <rect
-                                            x={x - 4} y={CHART_PAD.top}
-                                            width={bW + 8} height={CHART_H - CHART_PAD.top - CHART_PAD.bottom}
-                                            fill="#EEF0FD"
-                                        />
-                                    )}
-
-                                    {/* Regular bar */}
-                                    {regH > 0 && (
-                                        <rect
-                                            x={x} y={baseY - regH}
-                                            width={bW} height={regH}
-                                            fill={isActive ? '#3B4FE4' : '#C7CCFA'}
-                                            style={{ transition: 'fill 0.15s' }}
-                                        />
-                                    )}
-
-                                    {/* OT bar (stacked on top) */}
-                                    {otH > 0 && (
-                                        <rect
-                                            x={x} y={baseY - regH - otH}
-                                            width={bW} height={otH}
-                                            fill={isActive ? '#fbde3a' : '#FDE68A'}
-                                            style={{ transition: 'fill 0.15s' }}
-                                        />
-                                    )}
-
-                                    {/* Shift bar (light orange, stacked on top of OT) */}
-                                    {shiftH > 0 && (
-                                        <rect
-                                            x={x} y={baseY - regH - otH - shiftH}
-                                            width={bW} height={shiftH}
-                                            fill={isActive ? '#FB923C' : '#FED7AA'}
-                                            style={{ transition: 'fill 0.15s' }}
-                                        />
-                                    )}
-
-                                    {/* Empty bar placeholder */}
-                                    {totalH === 0 && (
-                                        <rect
-                                            x={x} y={baseY - 3}
-                                            width={bW} height={3}
-                                            fill="#E8EAEF"
-                                        />
-                                    )}
-
-                                    {/* Month label */}
-                                    <text
-                                        x={x + bW / 2} y={CHART_H - CHART_PAD.bottom + 14}
-                                        textAnchor="middle" fill={isActive ? '#3B4FE4' : '#9CA3AF'}
-                                        style={{ fontSize: 9, fontWeight: isActive ? 700 : 400, fontFamily: 'Google Sans, sans-serif', transition: 'fill 0.15s' }}
-                                    >
-                                        {m.month}
-                                    </text>
-                                </g>
-                            );
-                        })}
-                    </svg>
-
-                    {/* Tooltip */}
-                    {tooltip !== null && (() => {
-                        const mIdx = tooltip.mIdx;
-                        const m = monthlyStats[mIdx];
-                        const totalW = chartRef.current?.offsetWidth || 800;
-                        const { x, bW } = barGroup(mIdx, totalW);
-                        const TW = 200;
-
-                        let tx = x + (bW / 2) - (TW / 2);
-                        let ty = 20;
-
-                        if (tx < 8) tx = 8;
-                        if (tx + TW > totalW - 8) tx = totalW - TW - 8;
-
-                        return (
-                            <div
-                                className="absolute pointer-events-none z-20 bg-white border border-[#E8EAEF] rounded-xl shadow-[0_8px_28px_rgba(17,24,39,0.12)] p-3.5"
-                                style={{ left: tx, top: ty, width: TW }}
-                            >
-                                <div className="flex items-center justify-between mb-2.5">
-                                    <span className="text-[13px] font-bold text-[#111827]">{m.fullMonth}</span>
-                                    <span className="text-[10px] font-semibold text-[#9CA3AF]">{m.daysWorked} {t.table_days}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <TooltipRow label={t.total} value={fmtB(m.totalEarn)} color="#111827" bold />
-                                    <div className="border-t border-[#E8EAEF] my-0.5" />
-                                    <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="#3B4FE4" />
-                                    <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="#c29302" />
-                                    <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="#E8730C" />
-                                    <div className="border-t border-[#E8EAEF] my-0.5" />
-                                    <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="#9CA3AF" />
-                                </div>
-                            </div>
-                        );
-                    })()}
-                </div>
-            </div>
-
-            {/* ── Bottom row: monthly table + leave ── */}
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5 animate-[fadeUp_0.4s_0.18s_ease_both]">
-
-                {/* Monthly Breakdown Table */}
-                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+            {/* ══════════════ TAB: LIST (รายละเอียดรายเดือน) ══════════════ */}
+            {tab === 'list' && (
+                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.35s_ease_both]">
                     <div className="flex items-start justify-between px-5 py-4 border-b border-[#E8EAEF]">
                         <div>
                             <div className="text-[15px] font-bold text-[#111827]">{t.monthly_breakdown}</div>
@@ -539,7 +461,7 @@ export default function YearlyDashboard({
                         </div>
                         <div className="text-[11px] text-[#9CA3AF] shrink-0">{t.per_month}</div>
                     </div>
-                    <div className="w-full overflow-hidden">
+                    <div className="w-full overflow-x-auto">
                         <table className="w-full text-[13px] sm:text-sm">
                             <thead>
                                 <tr className="border-b border-[#E8EAEF]">
@@ -600,65 +522,252 @@ export default function YearlyDashboard({
                         </table>
                     </div>
                 </div>
+            )}
 
-                {/* Leave Summary */}
-                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                        <div className="text-[15px] font-bold text-[#111827]">{t.leave_summary}</div>
-                        <div className="text-[11px] text-[#9CA3AF]">{totalLeave} {t.leave_used}</div>
-                    </div>
+            {/* ══════════════ TAB: GRAPH ══════════════ */}
+            {tab === 'graph' && (
+                <div className="flex flex-col gap-5 animate-[fadeUp_0.35s_ease_both]">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-                    <div className="p-4 flex flex-col gap-3 flex-1">
-                        {LEAVE_TYPES.map((lt) => {
-                            const used = leaveData[lt.key] || 0;
-                            const pct = Math.min((used / lt.max) * 100, 100);
-                            const LeaveIcon = lt.icon;
-                            return (
-                                <div key={lt.key} className="group">
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0" style={{ background: lt.bg }}>
-                                                <LeaveIcon size={12} style={{ color: lt.color }} />
-                                            </div>
-                                            <span className="text-[12px] font-semibold text-[#374151]">
-                                                {lt.key === 'sick' ? t.sick_leave : lt.key === 'personal' ? t.personal_leave : t.vacation_leave}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            {/* Display text instead of input */}
-                                            <span className="text-[12px] font-bold" style={{ color: lt.color }}>
-                                                {used}
-                                            </span>
-                                            <span className="text-[11px] text-[#9CA3AF]">/ {lt.max}</span>
-                                        </div>
+                        {/* Income breakdown donut */}
+                        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                            <div className="px-5 py-4 border-b border-[#E8EAEF] text-[15px] font-bold text-[#111827]">
+                                {t.income_breakdown}
+                            </div>
+                            <div className="p-5 flex flex-col items-center gap-4">
+                                <DonutChart
+                                    size={210}
+                                    thickness={30}
+                                    centerLabel={t.gross_income}
+                                    centerValue={fmtB(grossEarn)}
+                                    segments={[
+                                        { label: t.regular_earnings, value: yearTotals.totalRegEarn, color: '#3B4FE4' },
+                                        { label: t.ot_earnings, value: yearTotals.totalOTEarn, color: '#c29302' },
+                                        { label: t.shift_earnings, value: yearTotals.totalShiftEarn, color: '#E8730C' },
+                                    ]}
+                                />
+                                <div className="w-full flex flex-col gap-2">
+                                    <LegendRow color="#3B4FE4" label={t.regular_earnings} value={fmtB(yearTotals.totalRegEarn)} total={grossEarn} raw={yearTotals.totalRegEarn} />
+                                    <LegendRow color="#c29302" label={t.ot_earnings} value={fmtB(yearTotals.totalOTEarn)} total={grossEarn} raw={yearTotals.totalOTEarn} />
+                                    <LegendRow color="#E8730C" label={t.shift_earnings} value={fmtB(yearTotals.totalShiftEarn)} total={grossEarn} raw={yearTotals.totalShiftEarn} />
+                                </div>
+                                <div className="w-full mt-1 pt-4 border-t border-[#E8EAEF] flex flex-col gap-2">
+                                    <div className="flex items-center justify-between text-[13px]">
+                                        <span className="text-[#6B7280]">{t.gross_income}</span>
+                                        <span className="font-semibold text-[#111827]">{fmtB(grossEarn)}</span>
                                     </div>
-                                    {/* Progress bar */}
-                                    <div className="h-[5px] bg-[#F3F4F8] rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all duration-500"
-                                            style={{ width: `${pct}%`, background: lt.color, opacity: 0.75 }}
-                                        />
+                                    <div className="flex items-center justify-between text-[13px]">
+                                        <span className="text-[#6B7280]">{t.less_social_security}</span>
+                                        <span className="font-semibold text-[#EF4444]">−{fmtB(ssDeducted)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-dashed border-[#E8EAEF]">
+                                        <span className="text-[13px] font-bold text-[#111827]">{t.net_remaining}</span>
+                                        <span className="text-[18px] font-bold text-[#10B981]">{fmtB(netEarn)}</span>
                                     </div>
                                 </div>
-                            );
-                        })}
-
-                        {/* Leave total summary */}
-                        <div className="mt-2 pt-3 border-t border-[#E8EAEF] flex items-center justify-between">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.total_leave_taken}</span>
-                            <span className="text-[15px] font-bold text-[#111827]">{totalLeave} <span className="text-[11px] font-normal text-[#9CA3AF]">{t.days_unit}</span></span>
+                            </div>
                         </div>
 
-                        {/* Info note */}
-                        <div className="flex items-start gap-2 bg-[#F8F9FB] rounded-[8px] p-2.5 mt-1">
-                            <Info size={12} className="text-[#9CA3AF] mt-0.5 shrink-0" />
-                            <p className="text-[10px] text-[#9CA3AF] leading-relaxed">
-                                {t.leave_info} {year}.
-                            </p>
+                        {/* OT breakdown donut */}
+                        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                                <span className="text-[15px] font-bold text-[#111827]">{t.ot_breakdown}</span>
+                                <span className="text-[11px] text-[#9CA3AF]">{fmt1(yearTotals.totalOTHrs)}h</span>
+                            </div>
+                            <div className="p-5 flex flex-col items-center gap-4">
+                                <DonutChart
+                                    size={210}
+                                    thickness={30}
+                                    centerLabel={t.total_ot_earnings}
+                                    centerValue={fmtB(yearTotals.totalOTEarn)}
+                                    segments={otTiers.map((tier) => ({ label: tier.label, value: tier.earn, color: tier.color }))}
+                                />
+                                <div className="w-full flex flex-col gap-2">
+                                    {otTiers.map((tier) => (
+                                        <LegendRow
+                                            key={tier.key}
+                                            color={tier.color}
+                                            label={tier.label}
+                                            sub={`${fmt1(tier.hours)}h · ${tier.hint}`}
+                                            value={fmtB(tier.earn)}
+                                            total={yearTotals.totalOTEarn}
+                                            raw={tier.earn}
+                                        />
+                                    ))}
+                                </div>
+                                <div className="w-full mt-1 pt-4 border-t border-[#E8EAEF] flex items-center justify-between">
+                                    <span className="text-[13px] font-bold text-[#111827]">{t.total_ot_earnings}</span>
+                                    <span className="text-[18px] font-bold text-[#c29302]">{fmtB(yearTotals.totalOTEarn)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* กราฟแนวโน้มรายได้ — อยู่ล่างสุด */}
+                    {barChart}
+                </div>
+            )}
+
+            {/* ══════════════ TAB: SUMMARY (Grid) ══════════════ */}
+            {tab === 'summary' && (
+                <div className="flex flex-col gap-5 animate-[fadeUp_0.35s_ease_both]">
+
+                    {/* Annual KPI cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+
+                        {/* OT Earnings */}
+                        <AnnualCard
+                            Icon={TrendingUp}
+                            label={t.ot_earnings}
+                            value={fmtB(yearTotals.totalOTEarn)}
+                            sub={`${fmt1(yearTotals.totalOTHrs)}h ${t.total_ot_hours}`}
+                            iconCls="bg-[#fffdef] text-[#c29302]"
+                            valCls="text-[#c29302]"
+                            stripe="bg-[#fbde3a]"
+                        />
+
+                        {/* Shift Pay */}
+                        <AnnualCard
+                            Icon={Moon}
+                            label={t.shift_earnings}
+                            value={fmtB(yearTotals.totalShiftEarn)}
+                            sub={`${yearTotals.totalShiftDays} ${t.shift_days_label}`}
+                            iconCls="bg-[#FFF3E6] text-[#E8730C]"
+                            valCls="text-[#E8730C]"
+                            stripe="bg-[#FDBA74]"
+                        />
+
+                        {/* Regular */}
+                        <AnnualCard
+                            Icon={Banknote}
+                            label={t.regular_earnings}
+                            value={fmtB(yearTotals.totalRegEarn)}
+                            sub={`${yearTotals.totalDays} ${t.worked_days}`}
+                            iconCls="bg-[#ECFDF5] text-[#10B981]"
+                            valCls="text-[#10B981]"
+                            stripe="bg-[#10B981]"
+                        />
+
+                        {/* OT Hours */}
+                        <AnnualCard
+                            Icon={Timer}
+                            label={t.total_ot_hours}
+                            value={`${fmt1(yearTotals.totalOTHrs)}h`}
+                            sub={t.across_months}
+                            iconCls="bg-[#EEF0FD] text-[#3B4FE4]"
+                            valCls="text-[#3B4FE4]"
+                            stripe="bg-[#3B4FE4]"
+                        />
+
+                        {/* Total annual */}
+                        <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
+                            <div className="flex items-center gap-2 mb-3">
+                                <div className="w-8 h-8 rounded-[8px] bg-white/25 grid place-items-center">
+                                    <CircleDollarSign size={15} className="text-white" />
+                                </div>
+                                <span className="text-[10px] font-bold text-white/80 uppercase tracking-[0.1em]">{t.total_year} {year}</span>
+                            </div>
+                            <div className="text-[1.4rem] sm:text-[1.85rem] font-bold text-white leading-none tracking-tight">
+                                {fmtB(yearTotals.totalEarn)}
+                            </div>
+                            <div className="text-[11px] text-white/70 mt-1.5">{yearTotals.totalDays} {t.worked_days}</div>
+                            {yearTotals.bestMonth && (
+                                <div className="absolute top-4 right-4 bg-white/20 text-white/90 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em] flex items-center gap-1">
+                                    <Award size={8} /> <span className="hidden sm:inline">{t.best_month}</span> {yearTotals.bestMonth.month}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* OT by rate — แสดงเป็นแถวชิดๆ (ไม่ใช่แถบชาร์จพลัง) */}
+                    <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                            <div className="text-[15px] font-bold text-[#111827]">{t.ot_by_rate}</div>
+                            <div className="text-[11px] text-[#9CA3AF]">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
+                        </div>
+                        <div className="p-2.5 flex flex-col gap-0.5">
+                            {otTiers.map((tier) => (
+                                <div key={tier.key} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-[#fffdef] transition-colors">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0 bg-[#fffdef]">
+                                            <Timer size={12} className="text-[#c29302]" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-[12px] font-bold text-[#374151] leading-tight">{tier.label}</div>
+                                            <div className="text-[10px] text-[#9CA3AF] leading-tight truncate">{tier.hint}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right shrink-0 leading-tight">
+                                        <div className="text-[12px] font-bold text-[#c29302]">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
+                                        <div className="text-[10px] text-[#9CA3AF]">{fmt1(tier.hours)} h</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="px-5 py-3.5 border-t border-[#E8EAEF] flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.total_ot_hours}</span>
+                            <span className="text-[15px] font-bold text-[#c29302]">{fmt1(yearTotals.totalOTHrs)}<span className="text-[11px] font-normal text-[#9CA3AF]">h</span></span>
+                        </div>
+                    </div>
+
+                    {/* Leave Summary */}
+                    <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                            <div className="text-[15px] font-bold text-[#111827]">{t.leave_summary}</div>
+                            <div className="text-[11px] text-[#9CA3AF]">{totalLeave} {t.leave_used}</div>
+                        </div>
+
+                        <div className="p-4 flex flex-col gap-3 flex-1">
+                            {LEAVE_TYPES.map((lt) => {
+                                const used = leaveData[lt.key] || 0;
+                                const pct = Math.min((used / lt.max) * 100, 100);
+                                const LeaveIcon = lt.icon;
+                                return (
+                                    <div key={lt.key} className="group">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0" style={{ background: lt.bg }}>
+                                                    <LeaveIcon size={12} style={{ color: lt.color }} />
+                                                </div>
+                                                <span className="text-[12px] font-semibold text-[#374151]">
+                                                    {lt.key === 'sick' ? t.sick_leave : lt.key === 'personal' ? t.personal_leave : t.vacation_leave}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[12px] font-bold" style={{ color: lt.color }}>
+                                                    {used}
+                                                </span>
+                                                <span className="text-[11px] text-[#9CA3AF]">/ {lt.max}</span>
+                                            </div>
+                                        </div>
+                                        {/* Progress bar */}
+                                        <div className="h-[5px] bg-[#F3F4F8] rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-500"
+                                                style={{ width: `${pct}%`, background: lt.color, opacity: 0.75 }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Leave total summary */}
+                            <div className="mt-2 pt-3 border-t border-[#E8EAEF] flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.total_leave_taken}</span>
+                                <span className="text-[15px] font-bold text-[#111827]">{totalLeave} <span className="text-[11px] font-normal text-[#9CA3AF]">{t.days_unit}</span></span>
+                            </div>
+
+                            {/* Info note */}
+                            <div className="flex items-start gap-2 bg-[#F8F9FB] rounded-[8px] p-2.5 mt-1">
+                                <Info size={12} className="text-[#9CA3AF] mt-0.5 shrink-0" />
+                                <p className="text-[10px] text-[#9CA3AF] leading-relaxed">
+                                    {t.leave_info} {year}.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
 
         </div>
     );
