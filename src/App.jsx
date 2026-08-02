@@ -545,7 +545,6 @@ export default function App() {
     const ih = Number(pIn[0] || 0), im = Number(pIn[1] || 0);
     const oh = Number(pOut[0] || 0), om = Number(pOut[1] || 0);
     let totalMins = (oh * 60 + om) - (ih * 60 + im);
-    const crossedMidnight = totalMins < 0;
     if (totalMins < 0) totalMins += 1440; // ข้ามเที่ยงคืน
     if (totalMins <= 0) return { working_hour: 0, ot_hour: 0, ot_earning: 0, regular_earning: 0, shift_allowance: 0, total_earning: 0 };
 
@@ -558,11 +557,8 @@ export default function App() {
     // base ต่อชั่วโมง = เงินเดือน ÷ 30 ÷ std แล้วคูณ 1.5 / 2 / 3 (fallback เป็น OT Rate ที่กรอกเองถ้าไม่มีเงินเดือน)
     const baseHourly = Number(salary) > 0 ? Number(salary) / 30 / stdH : rate;
 
-    // วันหยุด: วันนี้เป็น public holiday? / วันถัดไปเป็นวันหยุด (holiday หรือ public)?
-    const nd = new Date(selectedKey + 'T00:00:00'); nd.setDate(nd.getDate() + 1);
-    const nextDate = `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}-${String(nd.getDate()).padStart(2, '0')}`;
+    // วันนี้เป็นวันหยุดทางการ (public holiday) หรือไม่
     const isPublicHolidayToday = !!publicHolidays?.[selectedKey];
-    const nextDayIsHoliday = !!publicHolidays?.[nextDate] || (holidays && holidays.has(nextDate));
 
     const inMin = ih * 60 + im;
     const ssParts = String(shiftStart || '').split(':');
@@ -590,23 +586,17 @@ export default function App() {
       otEarning = ot1Earn + ot3Earn;
       if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
     } else {
+      // วันปกติ: OT ทั้งหมด = 1.5 เท่า (ทำกะข้ามคืนไปตกวันหยุดก็คิดปกติ ไม่มีสามแรง)
       workingHour = Math.min(netH, stdH);
       const rawOT = Math.max(0, netH - stdH);
-      const afterMidnightHours = crossedMidnight ? (oh * 60 + om) / 60 : 0;
-      const qualifies3x = crossedMidnight && nextDayIsHoliday && ssMin != null && inMin < ssMin && afterMidnightHours > 0;
-      const ot3xHours = qualifies3x ? Math.min(afterMidnightHours, rawOT) : 0;
-      const normalOTraw = Math.max(0, rawOT - ot3xHours);
       // หักตามชั่วโมง OT ที่ทำจริง (rawOT): 1–2 ชม. เต็ม ; > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
-      let netNormalOT = normalOTraw;
-      if (rawOT >= 9) {
-        netNormalOT = Math.max(0, normalOTraw - 1);
-      } else if (rawOT > 2) {
-        netNormalOT = Math.max(0, normalOTraw - 0.5);
-      }
-      otHour = netNormalOT + ot3xHours;
+      let netNormalOT = rawOT;
+      if (rawOT >= 9) netNormalOT = Math.max(0, rawOT - 1);
+      else if (rawOT > 2) netNormalOT = Math.max(0, rawOT - 0.5);
+      otHour = netNormalOT;
       ot15Hours = netNormalOT; ot15Earn = netNormalOT * 1.5 * baseHourly;
-      ot3Hours = ot3xHours; ot3Earn = ot3xHours * 3 * baseHourly;
-      otEarning = ot15Earn + ot3Earn;
+      ot3Hours = 0; ot3Earn = 0;
+      otEarning = ot15Earn;
       if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
     }
 
@@ -625,7 +615,7 @@ export default function App() {
       shift_allowance: shiftEarning,
       total_earning: regularEarning + otEarning + shiftEarning,
     };
-  }, [dIn, dOut, selectedKey, std, salary, otRate, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
+  }, [dIn, dOut, selectedKey, std, salary, otRate, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays]);
 
   // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
   const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);

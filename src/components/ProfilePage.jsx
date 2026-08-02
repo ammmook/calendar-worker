@@ -135,7 +135,8 @@ export default function ProfilePage(props) {
 
                     {/* ── Section 1: Salary (รายเดือนอย่างเดียว) ── */}
                     <div className={cardCls}>
-                        <h3 className="text-[13px] font-bold text-[#111827] mb-4">{t.monthly_salary}</h3>
+                        <h3 className="text-[13px] font-bold text-[#111827] mb-1">{t.monthly_salary}</h3>
+                        <p className="text-[11px] font-medium text-[#9CA3AF] leading-snug mb-4">{t.ot_rate_auto_hint}</p>
 
                         <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             <div>
@@ -159,7 +160,6 @@ export default function ProfilePage(props) {
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-[#6B7280] min-w-0 cursor-not-allowed"
                                     />
                                 </InputWithIcon>
-                                <p className="mt-1.5 text-[11px] font-medium text-[#9CA3AF] leading-snug">{t.ot_rate_auto_hint}</p>
                             </div>
                         </div>
 
