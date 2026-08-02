@@ -131,6 +131,13 @@ export default function YearlyDashboard({
                 regEarn,
                 otEarn,
                 shiftEarn,
+                // OT แยกอัตรา (ot1 = วันหยุด 8 ชม.แรก, ot15 = วันปกติ, ot3 = วันหยุดเลย 8 ชม.)
+                ot1Hours: beMonth?.total_ot_hour_1 || 0,
+                ot1Earn: beMonth?.total_ot_earning_1 || 0,
+                ot15Hours: beMonth?.total_ot_hour_15 || 0,
+                ot15Earn: beMonth?.total_ot_earning_15 || 0,
+                ot3Hours: beMonth?.total_ot_hour_3 || 0,
+                ot3Earn: beMonth?.total_ot_earning_3 || 0,
                 // ใช้ยอด total_earning ที่ backend คำนวณจากข้อมูลทั้งหมดใน DB (รวมเบี้ยกะแล้ว)
                 totalEarn: beMonth?.total_earning != null
                     ? beMonth.total_earning
@@ -148,8 +155,21 @@ export default function YearlyDashboard({
         totalDays: monthlyStats.reduce((s, m) => s + m.daysWorked, 0),
         totalShiftEarn: monthlyStats.reduce((s, m) => s + m.shiftEarn, 0),
         totalShiftDays: monthlyStats.reduce((s, m) => s + m.shiftDays, 0),
+        totalOT1Hrs: monthlyStats.reduce((s, m) => s + m.ot1Hours, 0),
+        totalOT1Earn: monthlyStats.reduce((s, m) => s + m.ot1Earn, 0),
+        totalOT15Hrs: monthlyStats.reduce((s, m) => s + m.ot15Hours, 0),
+        totalOT15Earn: monthlyStats.reduce((s, m) => s + m.ot15Earn, 0),
+        totalOT3Hrs: monthlyStats.reduce((s, m) => s + m.ot3Hours, 0),
+        totalOT3Earn: monthlyStats.reduce((s, m) => s + m.ot3Earn, 0),
         bestMonth: monthlyStats.reduce((best, m) => m.totalEarn > best.totalEarn ? m : best, monthlyStats[0] || { totalEarn: 0 }),
     }), [monthlyStats]);
+
+    // ── OT tier summary (รายปี) ──
+    const otTiers = [
+        { key: '1', label: t.ot_x1, hint: t.ot_x1_hint, hours: yearTotals.totalOT1Hrs, earn: yearTotals.totalOT1Earn },
+        { key: '15', label: t.ot_x15, hint: t.ot_x15_hint, hours: yearTotals.totalOT15Hrs, earn: yearTotals.totalOT15Earn },
+        { key: '3', label: t.ot_x3, hint: t.ot_x3_hint, hours: yearTotals.totalOT3Hrs, earn: yearTotals.totalOT3Earn },
+    ];
 
     const totalLeave = LEAVE_TYPES.reduce((s, lt) => s + (leaveData[lt.key] || 0), 0);
 
@@ -293,6 +313,39 @@ export default function YearlyDashboard({
                             <Award size={8} /> <span className="hidden sm:inline">{t.best_month}</span> {yearTotals.bestMonth.month}
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* ── OT by rate (รายปี) ── */}
+            <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.4s_0.10s_ease_both]">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                    <div className="text-[15px] font-bold text-[#111827]">{t.ot_by_rate}</div>
+                    <div className="text-[11px] text-[#9CA3AF]">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
+                    {otTiers.map((tier) => {
+                        const pct = yearTotals.totalOTHrs > 0 ? Math.min((tier.hours / yearTotals.totalOTHrs) * 100, 100) : 0;
+                        return (
+                            <div key={tier.key} className="rounded-xl border border-[#E8EAEF] bg-[#fffdef]/40 p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-7 h-7 rounded-[8px] grid place-items-center shrink-0 bg-[#fffdef]">
+                                            <Timer size={14} className="text-[#c29302]" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="text-[13px] font-bold text-[#374151] leading-tight">{tier.label}</div>
+                                            <div className="text-[10px] text-[#9CA3AF] leading-tight truncate">{tier.hint}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="text-[1.35rem] font-bold text-[#c29302] leading-none tracking-tight">{fmt1(tier.hours)}<span className="text-[13px] font-normal text-[#9CA3AF]">h</span></div>
+                                <div className="text-[12px] font-semibold text-[#c29302] mt-1">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
+                                <div className="h-[5px] bg-[#F3F4F8] rounded-full overflow-hidden mt-2.5">
+                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: '#fbde3a' }} />
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 

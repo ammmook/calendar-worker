@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight,
   LayoutDashboard, Settings2,
@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import YearlyDashboard from './components/YearlyDashboard';
+import WorkCalendar from './components/WorkCalendar';
+import MonthlySummary from './components/MonthlySummary';
 import { LeaveSelector } from './components/LeaveSelector';
 import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
@@ -103,7 +105,8 @@ export default function App() {
   const [dIn, setDIn] = useState('');
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
-  const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' | 'yearly'
+  const [view, setView] = useState('calendar'); // 'calendar' | 'dashboard'
+  const [dashTab, setDashTab] = useState('monthly'); // แท็บย่อยใน dashboard: 'monthly' | 'yearly'
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showProfileIncomplete, setShowProfileIncomplete] = useState(false);
   const [isSavingEntry, setIsSavingEntry] = useState(false);
@@ -286,12 +289,6 @@ export default function App() {
   const totalEarn = Math.max(0, regEarn + otEarn + shiftEarn - (socialSecurity || 0));
   // อัตรา OT วันธรรมดาที่แสดงบนการ์ด = base (เงินเดือน ÷ 30 ÷ std) × 1.5 ; รายวัน fallback ค่า OT Rate ที่กรอกเอง
   const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
-
-  // ── Calendar cells ──
-  const daysInM = new Date(viewY, viewM + 1, 0).getDate();
-  const firstDow = new Date(viewY, viewM, 1).getDay();
-  const emptyCells = Array.from({ length: firstDow });
-  const dayCells = Array.from({ length: daysInM }, (_, i) => i + 1);
 
   // Toggle holiday for a date key
   const toggleHoliday = async (e, k) => {
@@ -636,14 +633,6 @@ export default function App() {
   const isTodaySelected = selectedKey === todayKey();
   const isSelectedHoliday = selectedKey ? holidays.has(selectedKey) : false;
 
-  // ── Recent logs for current view month ──
-  const recentLogs = useMemo(() =>
-    Object.keys(entries)
-      .filter((k) => k.startsWith(`${viewY}-${String(viewM + 1).padStart(2, '0')}`))
-      .sort((a, b) => b.localeCompare(a)),
-    [entries, viewY, viewM]
-  );
-
   // ── Shared utility classes ──
   const labelCls = 'text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] block mb-1';
   const inputCls = 'w-full min-w-0 block bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-1 sm:px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white box-border';
@@ -737,28 +726,24 @@ export default function App() {
           </button>
         </div>
 
-        {/* Tab toggle (always visible) */}
+        {/* Tab toggle (always visible) — Work Calendar | Dashboard */}
         <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[10px] p-1">
-          <button
-            onClick={() => setActiveTab('monthly')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all
-              ${activeTab === 'monthly'
-                ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                : 'text-[#6B7280] hover:text-[#374151]'}`}
-          >
-            <LayoutDashboard size={13} />
-            <span className="hidden sm:inline">{t.monthly}</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('yearly')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all
-              ${activeTab === 'yearly'
-                ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                : 'text-[#6B7280] hover:text-[#374151]'}`}
-          >
-            <BarChart2 size={13} />
-            <span className="hidden sm:inline">{t.annual}</span>
-          </button>
+          {[
+            { id: 'calendar', Icon: CalendarDays, label: t.work_calendar },
+            { id: 'dashboard', Icon: LayoutDashboard, label: t.dashboard },
+          ].map(({ id, Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => setView(id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all
+                ${view === id
+                  ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                  : 'text-[#6B7280] hover:text-[#374151]'}`}
+            >
+              <Icon size={13} />
+              <span className="hidden sm:inline">{label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Language Toggle & User Menu */}
@@ -788,612 +773,157 @@ export default function App() {
         {/* ── SIDEBAR ─────────────────────────────── */}
         <aside className="hidden xl:flex flex-col w-[220px] shrink-0 bg-white border-r border-[#E8EAEF] sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto p-4 gap-1">
 
-          {/* Single nav: Dashboard */}
+          {/* Nav: Work Calendar / Dashboard */}
           <div className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.1em] px-3 pt-3 pb-2">{t.menu}</div>
-
-          {/* Nav: Dashboard */}
           <div
-            onClick={() => setActiveTab('monthly')}
+            onClick={() => setView('calendar')}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
-              ${activeTab === 'monthly' ? 'bg-[#EEF0FD] text-[#3B4FE4]' : 'text-[#6B7280] hover:bg-[#F8F9FB] hover:text-[#374151]'}`}
+              ${view === 'calendar' ? 'bg-[#EEF0FD] text-[#3B4FE4]' : 'text-[#6B7280] hover:bg-[#F8F9FB] hover:text-[#374151]'}`}
+          >
+            <CalendarDays size={15} />
+            {t.work_calendar}
+          </div>
+          <div
+            onClick={() => setView('dashboard')}
+            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
+              ${view === 'dashboard' ? 'bg-[#EEF0FD] text-[#3B4FE4]' : 'text-[#6B7280] hover:bg-[#F8F9FB] hover:text-[#374151]'}`}
           >
             <LayoutDashboard size={15} />
             {t.dashboard}
           </div>
 
-          {/* Nav: Annual Overview */}
-          <div
-            onClick={() => setActiveTab('yearly')}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
-              ${activeTab === 'yearly' ? 'bg-[#EEF0FD] text-[#3B4FE4]' : 'text-[#6B7280] hover:bg-[#F8F9FB] hover:text-[#374151]'}`}
-          >
-            <BarChart2 size={15} />
-            {t.annual_overview}
-          </div>
+          {/* Sub-tabs (แสดงเมื่ออยู่หน้า Dashboard) */}
+          {view === 'dashboard' && (
+            <div className="mt-1 ml-3 pl-3 border-l border-[#E8EAEF] flex flex-col gap-1">
+              <div
+                onClick={() => setDashTab('monthly')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
+                  ${dashTab === 'monthly' ? 'text-[#3B4FE4]' : 'text-[#6B7280] hover:text-[#374151]'}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'monthly' ? 'bg-[#3B4FE4]' : 'bg-[#D1D5E0]'}`} />
+                {t.monthly}
+              </div>
+              <div
+                onClick={() => setDashTab('yearly')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
+                  ${dashTab === 'yearly' ? 'text-[#3B4FE4]' : 'text-[#6B7280] hover:text-[#374151]'}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'yearly' ? 'bg-[#3B4FE4]' : 'bg-[#D1D5E0]'}`} />
+                {t.annual}
+              </div>
+            </div>
+          )}
         </aside>
 
         {/* ── MAIN ─────────────────────────────────── */}
         <main className="flex-1 min-w-0 flex flex-col gap-6 p-6 overflow-y-auto">
 
-          {/* ══ YEARLY VIEW ══ */}
-          {activeTab === 'yearly' && (
-            <YearlyDashboard
-              userEmail={user.email}
-              entries={entries}
-              earningsSummary={earningsSummary}
-              holidays={holidays}
-              salary={salary}
-              otRate={otRate}
-              leaveQuotas={leaveQuotas}
-              paymentType={paymentType}
-              dailyRate={dailyRate}
-              socialSecurity={socialSecurity}
-              lang={lang}
-              viewY={viewY}
-              setViewY={setViewY}
-              showToast={showToast}
+          {/* ══ CALENDAR VIEW (ปฏิทินการทำงาน) ══ */}
+          {view === 'calendar' && !dataLoaded && (
+            <SkeletonDashboard daysShort={t.days_short} />
+          )}
+          {view === 'calendar' && dataLoaded && (
+            <WorkCalendar
+              viewY={viewY} viewM={viewM} lang={lang} t={t} today={today}
+              prevMonth={prevMonth} nextMonth={nextMonth} goToday={goToday}
+              setViewM={setViewM} setViewY={setViewY} showToast={showToast}
+              entries={entries} setEntries={setEntries}
+              earningsSummary={earningsSummary} holidays={holidays}
+              publicHolidays={publicHolidays} paymentType={paymentType}
+              selectedKey={selectedKey} setSelectedKey={setSelectedKey}
+              handleDayClick={handleDayClick} toggleHoliday={toggleHoliday}
+              dIn={dIn} dOut={dOut} setDIn={setDIn} setDOut={setDOut}
+              saveSelectedEntry={saveSelectedEntry} deleteSelectedEntry={deleteSelectedEntry}
+              isSavingEntry={isSavingEntry} isDeletingEntry={isDeletingEntry}
+              showLeaveSelector={showLeaveSelector} showDeleteConfirm={showDeleteConfirm}
+              selEntry={selEntry} selLabel={selLabel}
+              isTodaySelected={isTodaySelected} isSelectedHoliday={isSelectedHoliday}
+              previewCalc={previewCalc}
+              detHReg={detHReg} netDetOT={netDetOT} detE={detE}
+              detOTRateEarn={detOTRateEarn} detShift={detShift}
+              detOT15h={detOT15h} detOT15e={detOT15e}
+              detOT1h={detOT1h} detOT1e={detOT1e}
+              detOT3h={detOT3h} detOT3e={detOT3e}
+              labelCls={labelCls} inputCls={inputCls}
             />
           )}
 
-          {/* ══ MONTHLY VIEW ══ */}
-          {activeTab === 'monthly' && !dataLoaded && (
-            <SkeletonDashboard daysShort={t.days_short} />
-          )}
+          {/* ══ DASHBOARD VIEW — แท็บย่อย รายเดือน / รายปี ══ */}
+          {view === 'dashboard' && (
+            <div className="flex flex-col gap-6 w-full">
 
-          {activeTab === 'monthly' && dataLoaded && (
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_284px] gap-6 w-full">
-
-            {/* Dashboard header */}
-            <div className="flex items-end justify-between flex-wrap gap-4 animate-[fadeUp_0.4s_ease_both] order-1 xl:col-span-2">
-              <div>
-                <h1 className="text-[26px] font-bold text-[#111827] tracking-tight leading-tight">{t.dashboard}</h1>
-                <p className="text-sm text-[#9CA3AF] mt-0.5">
-                  {t.months[viewM]} {lang === 'th' ? viewY + 543 : viewY} · {daysWorked} {t.worked_days} · {fmt1(totalOT)}h {t.with_overtime}
-                </p>
+              {/* Sub-tab toggle (mobile-first: เต็มความกว้างบนมือถือ) */}
+              <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[12px] p-1 w-full sm:w-auto sm:self-start">
+                {[
+                  { id: 'monthly', Icon: LayoutDashboard, label: t.monthly },
+                  { id: 'yearly', Icon: BarChart2, label: t.annual },
+                ].map(({ id, Icon, label }) => (
+                  <button
+                    key={id}
+                    onClick={() => setDashTab(id)}
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-[9px] text-[13px] font-semibold cursor-pointer transition-all
+                      ${dashTab === id
+                        ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                        : 'text-[#6B7280] hover:text-[#374151]'}`}
+                  >
+                    <Icon size={14} />
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              {/* Mobile filters */}
-              <div className="flex sm:hidden items-center gap-2 flex-wrap">
-                <div className="relative">
-                  <select value={viewM} onChange={(e) => setViewM(Number(e.target.value))}
-                    className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-[#3B4FE4]">
-                    {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
-                  </select>
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
-                </div>
-                <div className="relative">
-                  <select value={viewY} onChange={(e) => {
-                      setViewY(Number(e.target.value));
-                      showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...');
+              {/* รายเดือน */}
+              {dashTab === 'monthly' && !dataLoaded && (
+                <SkeletonDashboard daysShort={t.days_short} />
+              )}
+              {dashTab === 'monthly' && dataLoaded && (
+                <MonthlySummary
+                  earningsSummary={earningsSummary}
+                  entries={entries}
+                  holidays={holidays}
+                  publicHolidays={publicHolidays}
+                  salary={salary}
+                  otRate={otRate}
+                  std={std}
+                  socialSecurity={socialSecurity}
+                  paymentType={paymentType}
+                  lang={lang}
+                  t={t}
+                  viewY={viewY}
+                  viewM={viewM}
+                  setViewM={setViewM}
+                  setViewY={setViewY}
+                  today={today}
+                  showToast={showToast}
+                  onSelectDay={(k) => {
+                    setView('calendar');
+                    setSelectedKey(k);
+                    if (!holidays.has(k)) { setLeaveSelectorKey(k); setShowLeaveSelector(true); }
                   }}
-                    className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-[#3B4FE4]">
-                    {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
-                      <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
-                </div>
-              </div>
+                />
+              )}
+
+              {/* รายปี */}
+              {dashTab === 'yearly' && (
+                <YearlyDashboard
+                  userEmail={user.email}
+                  entries={entries}
+                  earningsSummary={earningsSummary}
+                  holidays={holidays}
+                  salary={salary}
+                  otRate={otRate}
+                  leaveQuotas={leaveQuotas}
+                  paymentType={paymentType}
+                  dailyRate={dailyRate}
+                  socialSecurity={socialSecurity}
+                  lang={lang}
+                  viewY={viewY}
+                  setViewY={setViewY}
+                  showToast={showToast}
+                />
+              )}
             </div>
-
-            {/* ── SUMMARY CARDS ── */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 animate-[fadeUp_0.4s_0.08s_ease_both] order-3 xl:order-2 xl:col-span-2">
-
-              <SummaryCard variant="amber" Icon={Timer} label={t.total_ot_hours} value={`${fmt1(totalOT)}h`} sub={`${otDays} ${t.with_overtime}`} />
-              <SummaryCard variant="orange" Icon={Moon} label={t.shift_earnings} value={fmtB(shiftEarn)} sub={`${shiftDays} ${t.shift_days_label}`} />
-              <SummaryCard variant="indigo" Icon={TrendingUp} label={t.ot_earnings} value={fmtB(otEarn)} sub={`${t.at_rate} ${fmt1(otDisplayRate)}${t.hr_unit}`} />
-              <SummaryCard variant="green" Icon={Banknote} label={t.regular_earnings} value={fmtB(regEarn)} sub={t.est_daily_base} />
-
-              {/* Hero card — full-width bottom banner on mobile, in-row on desktop (matches other card heights) */}
-              <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl border-transparent cursor-default
-              bg-gradient-to-br from-[#A5AEFC] to-[#8995F4]
-              shadow-[0_8px_24px_rgba(137,149,244,0.3)] p-4 sm:p-6
-              transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
-              hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
-                <span className="absolute top-4 right-4 sm:top-5 sm:right-5 bg-white/25 text-white/90 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
-                  {t.this_month}
-                </span>
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] bg-white/25 grid place-items-center mb-3 sm:mb-4">
-                  <CircleDollarSign size={17} className="text-white" />
-                </div>
-                <div className="text-[10px] sm:text-[11px] font-bold text-white/80 uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 sm:mb-1.5">{t.total_earnings}</div>
-                <div className="text-[1.4rem] sm:text-[2rem] font-bold text-white leading-none tracking-tight">{fmtB(totalEarn)}</div>
-                <div className="text-[10px] sm:text-[12px] text-white/70 mt-1 sm:mt-1.5">{daysWorked} {t.worked_days}</div>
-              </div>
-            </div>
-
-            {/* ── CALENDAR ── */}
-            <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.4s_0.16s_ease_both] order-2 xl:order-3">
-
-                {/* Calendar header */}
-                <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                  <span className="text-[17px] font-bold text-[#111827]">{t.months[viewM]} {lang === 'th' ? viewY + 543 : viewY}</span>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={prevMonth}
-                      className="w-[30px] h-[30px] rounded-lg bg-[#F8F9FB] border border-[#E8EAEF] text-[#6B7280] grid place-items-center cursor-pointer transition-all hover:bg-[#EEF0FD] hover:border-[#3B4FE4] hover:text-[#3B4FE4]">
-                      <ChevronLeft size={15} />
-                    </button>
-                    <button onClick={nextMonth}
-                      className="w-[30px] h-[30px] rounded-lg bg-[#F8F9FB] border border-[#E8EAEF] text-[#6B7280] grid place-items-center cursor-pointer transition-all hover:bg-[#EEF0FD] hover:border-[#3B4FE4] hover:text-[#3B4FE4]">
-                      <ChevronRight size={15} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Calendar body */}
-                <div className="p-4">
-                  {/* Weekday row */}
-                  <div className="grid grid-cols-7 mb-1.5">
-                    {t.days_short.map((d) => (
-                      <div key={d} className="text-center text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.06em] py-1.5">
-                        {d}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Day cells grid */}
-                  <div className="grid grid-cols-7 gap-[3px]">
-
-                    {/* Empty leading cells */}
-                    {emptyCells.map((_, i) => <div key={`e-${i}`} />)}
-
-                    {/* Actual day cells */}
-                    {dayCells.map((d) => (
-                      <DayCell
-                        key={d}
-                        d={d}
-                        k={dateKey(viewY, viewM + 1, d)}
-                        entries={entries}
-                        todayKey={todayKey()}
-                        selectedKey={selectedKey}
-                        holidays={holidays}
-                        viewY={viewY}
-                        viewM={viewM}
-                        dailyEarning={earningsSummary.daily[dateKey(viewY, viewM + 1, d)]}
-                        handleDayClick={handleDayClick}
-                        toggleHoliday={toggleHoliday}
-                        paymentType={paymentType}
-                        publicHolidays={publicHolidays}
-                        lang={lang}
-                        t={t}
-                      />
-                    ))}
-                  </div>
-                </div>
-            </div>
-
-            {/* ── Right panel ── */}
-            <div className="relative order-4 xl:order-4 min-w-0 xl:h-full">
-              <div className="flex flex-col gap-4 min-w-0 overflow-hidden animate-[fadeUp_0.4s_0.20s_ease_both] w-full xl:absolute xl:inset-0">
-
-                {/* Day detail card */}
-                {selectedKey && (
-                  <div className="hidden xl:flex flex-col bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden shrink-0">
-                  <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF]">
-                    <span className="text-sm font-bold text-[#111827]">{selLabel}</span>
-                    {isTodaySelected && (
-                      <span className="text-[10px] font-bold bg-[#6fa3cb] text-white px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
-                        {t.today}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="p-4 w-full overflow-hidden">
-                    {selEntry.leave !== null && selEntry.leave !== undefined ? (
-                      /* Leave info display */
-                      <div className="flex flex-col gap-3 w-full">
-                        <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
-                          <div className="text-center">
-                            {(() => {
-                              const PANEL_LEAVE = {
-                                sick:     { Icon: Stethoscope,   color: '#F43F5E', bg: '#FFF1F3', label: lang === 'th' ? 'ลาป่วย'   : 'Sick Leave'     },
-                                personal: { Icon: UmbrellaOff,   color: '#F472B6', bg: '#FCE7F3', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
-                                vacation: { Icon: Plane,         color: '#3B4FE4', bg: '#EEF0FD', label: lang === 'th' ? 'ลาพักร้อน' : 'Annual Leave'  },
-                                training: { Icon: GraduationCap, color: '#111827', bg: '#F3F4F6', label: lang === 'th' ? 'อบรม'     : 'Training'       },
-                              };
-                              const info = PANEL_LEAVE[selEntry.leave?.type] || PANEL_LEAVE.sick;
-                              return (
-                                <>
-                                  <div className="w-14 h-14 rounded-2xl grid place-items-center mx-auto mb-2" style={{ backgroundColor: info.bg }}>
-                                    <info.Icon size={28} style={{ color: info.color }} />
-                                  </div>
-                                  <div className="text-sm font-bold text-[#111827]">{info.label}</div>
-                                </>
-                              );
-                            })()}
-                            <div className="text-xs text-[#9CA3AF] mt-1">
-                              {selEntry.leave?.type === 'training'
-                                ? (lang === 'th' ? 'บันทึกการอบรมแล้ว' : 'Training recorded for this day')
-                                : (lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day')}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 w-full">
-                          {(entries[selectedKey]?._id || entries[selectedKey]?.leave) && (
-                            <button
-                              onClick={deleteSelectedEntry}
-                              disabled={isDeletingEntry}
-                              title={t.delete_entry || 'Delete'}
-                              className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                                ${isDeletingEntry
-                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                                  : 'bg-[#FFF1F3] text-[#F43F5E] cursor-pointer hover:bg-[#FEE2E2]'}`}
-                            >
-                              {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setEntries((p) => ({
-                                ...p,
-                                [selectedKey]: { ...p[selectedKey], leave: null }
-                              }));
-                              showToast(lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Changed to working day');
-                            }}
-                            className="flex-1 py-2.5 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
-                          >
-                            {lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Change to Working Day'}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-3 w-full min-w-0">
-                        {/* Time inputs — grid-cols-2 so each cell is exactly 50% and never overflows */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
-                          <div className="min-w-0">
-                            <label className={labelCls}>{t.clock_in}</label>
-                            <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dIn} onChange={(e) => setDIn(e.target.value)} disabled={isSelectedHoliday} />
-                          </div>
-                          <div className="min-w-0">
-                            <label className={labelCls}>{t.clock_out}</label>
-                            <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dOut} onChange={(e) => setDOut(e.target.value)} disabled={isSelectedHoliday} />
-                          </div>
-                        </div>
-
-                        {/* Calc summary */}
-                        <div className="bg-[#F8F9FB] rounded-[10px] p-3 flex flex-col gap-2">
-                          <div className="flex justify-between items-center mb-2.5">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                            <span className="text-[13px] font-bold text-[#3B4FE4]">{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                            <div className="text-right">
-                              <div className="text-[13px] font-bold text-[#c29302]">{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
-                              {netDetOT > 0 && detOTRateEarn > 0 && (
-                                <div className="text-[10px] font-bold text-[#c29302] leading-none">+{fmtB(detOTRateEarn)}</div>
-                              )}
-                            </div>
-                          </div>
-                          {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
-                          {previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0) && (
-                            <div className="flex flex-col gap-1 pl-3 -mt-0.5">
-                              {detOT15h > 0 && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×1.5 · {fmt1(detOT15h)}h</span>
-                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
-                                </div>
-                              )}
-                              {detOT1h > 0 && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×1 · {fmt1(detOT1h)}h</span>
-                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT1e)}</span>
-                                </div>
-                              )}
-                              {detOT3h > 0 && (
-                                <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×3 · {fmt1(detOT3h)}h</span>
-                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT3e)}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          <div className="flex justify-between items-center">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                            <span className="text-[13px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
-                          </div>
-                          <hr className="border-[#E8EAEF]" />
-                          {detShift > 0 && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.shift_earnings}</span>
-                              <span className="text-[13px] font-bold text-[#E8730C]">+{fmtB(detShift)}</span>
-                            </div>
-                          )}
-                          {(paymentType !== 'monthly' || detE > 0) && (
-                            <div className="flex justify-between items-center">
-                              <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                              <span className="text-[13px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Save / Update / Delete */}
-                        <div className="flex gap-2 w-full mt-1">
-                          {(entries[selectedKey]?._id || entries[selectedKey]?.in) && (
-                            <button
-                              onClick={deleteSelectedEntry}
-                              disabled={isSelectedHoliday || isDeletingEntry}
-                              title={t.delete_entry}
-                              className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                                ${isSelectedHoliday || isDeletingEntry
-                                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                                  : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
-                            >
-                              {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
-                            </button>
-                          )}
-                          <button
-                            onClick={saveSelectedEntry}
-                            disabled={!dIn || isSelectedHoliday || isSavingEntry}
-                            className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2 relative overflow-hidden
-                              ${isSelectedHoliday 
-                                ? 'bg-[#D1D5E0] cursor-not-allowed' 
-                                : isSavingEntry
-                                  ? 'bg-[#7B8CED] cursor-wait text-transparent'
-                                  : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
-                          >
-                            <div className={`flex items-center gap-2 transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
-                              <CheckCircle2 size={14} />
-                              <span>{entries[selectedKey]?.in ? t.update_entry : t.save_entry}</span>
-                            </div>
-                            {isSavingEntry && (
-                              <div className="absolute inset-0 flex items-center justify-center text-white">
-                                <AnimatedWaitText />
-                              </div>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                )}
-
-                {/* Work log */}
-                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex-1 flex flex-col min-h-0">
-                  <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF] shrink-0">
-                    <span className="text-sm font-bold text-[#111827]">{t.work_log}</span>
-                    <span className="text-[11px] text-[#9CA3AF] font-medium">{recentLogs.length} {t.entries}</span>
-                  </div>
-                  <div className="p-2.5 max-h-[240px] xl:max-h-none flex-1 overflow-y-auto flex flex-col gap-1 min-h-0">
-                    {recentLogs.length === 0 ? (
-                      <p className="text-[12px] text-[#9CA3AF] text-center py-4">{t.no_entries}</p>
-                    ) : (
-                      recentLogs.map((k) => {
-                        const e = entries[k];
-                        const d = k.split('-')[2];
-                        const dw = new Date(k + 'T00:00:00').getDay();
-                        const dailyEarning = earningsSummary.daily[k];
-                        const hTotal = dailyEarning?.working_hour || 0;
-                        const netOt = dailyEarning?.ot_hour || 0;
-                        const eEarn = dailyEarning?.total_earning || 0;
-                        const shiftPay = dailyEarning?.shift_allowance || 0;
-                        const hasOT = netOt > 0;
-                        const hasShift = shiftPay > 0;
-                        const isLeaveEntry = e.leave !== null && e.leave !== undefined;
-                        const isSel = k === selectedKey;
-                        return (
-                          <div
-                            key={k}
-                            onClick={() => handleDayClick(k)}
-                            className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
-                            ${isSel ? 'bg-[#EEF0FD] border-[#C7CCFA]'
-                              : hasOT
-                                ? 'border-l-[3px] border-l-[#fbde3a] border-r-transparent border-t-transparent border-b-transparent hover:bg-[#fffdef]'
-                                : hasShift
-                                  ? 'border-l-[3px] border-l-[#FDBA74] border-r-transparent border-t-transparent border-b-transparent hover:bg-[#FFF3E6]'
-                                  : 'border-transparent hover:bg-[#F8F9FB] hover:border-[#E8EAEF]'}`}
-                          >
-                            <div className={`w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0
-                            ${hasOT ? 'bg-[#fffdef] text-[#c29302]' : hasShift ? 'bg-[#FFF3E6] text-[#E8730C]' : 'bg-[#F8F9FB] text-[#374151]'}`}>
-                              {d}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-[11px] font-semibold text-[#6B7280]">{t.days_short[dw]}</div>
-                              {isLeaveEntry ? (
-                                <div className="text-[10px] font-medium" style={{ color: e.leave?.type === 'training' ? '#111827' : '#8B5CF6' }}>
-                                  {e.leave?.type === 'sick' ? (lang === 'th' ? 'ลาป่วย' : 'Sick')
-                                    : e.leave?.type === 'personal' ? (lang === 'th' ? 'ลากิจ' : 'Personal')
-                                    : e.leave?.type === 'training' ? (lang === 'th' ? 'อบรม' : 'Training')
-                                    : (lang === 'th' ? 'ลาพักร้อน' : 'Vacation')}
-                                </div>
-                              ) : (
-                                <div className="text-[11px] text-[#9CA3AF]">{e.in} → {e.out}</div>
-                              )}
-                            </div>
-                            {!isLeaveEntry && (
-                              <div className="text-right flex flex-col items-end gap-0.5">
-                                {(paymentType !== 'monthly' || eEarn > 0) && (
-                                  <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
-                                )}
-                                <div className="flex flex-col items-end gap-0.5">
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(hTotal)}h</span>
-                                    {hasOT && (
-                                      <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">
-                                        +{fmt1(netOt)}h OT
-                                      </span>
-                                    )}
-                                    {hasShift && (
-                                      <span className="flex items-center gap-0.5 text-[9px] font-bold bg-[#FFF3E6] text-[#E8730C] px-1 py-px rounded">
-                                        <Moon size={8} strokeWidth={2.5} /> {t.shift_short}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {hasOT && dailyEarning?.ot_earning > 0 && (
-                                    <span className="text-[9px] font-bold text-[#c29302] leading-none">
-                                      +{fmtB(dailyEarning.ot_earning)}
-                                    </span>
-                                  )}
-                                  {hasShift && (
-                                    <span className="text-[9px] font-bold text-[#E8730C] leading-none">
-                                      +{fmtB(shiftPay)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Legend */}
-            <div className="flex gap-5 flex-wrap px-1 animate-[fadeUp_0.4s_0.24s_ease_both] order-5 xl:col-span-2">
-              {[
-                { color: 'bg-[#EEF0FD] border border-[#C7CCFA]', label: t.regular_day_legend },
-                { color: 'bg-[#fffdef] border border-[#ffe270]', label: t.ot_day_legend },
-                { color: 'bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]', label: t.holiday_legend },
-                { color: 'bg-[#FEECEC] border border-[#EF4444]', label: t.public_holiday_legend },
-                { color: 'bg-[#f0f5fa] border-2 border-[#6fa3cb]', label: t.today },
-                { color: 'bg-[#f2f8fa] border-2 border-[#6ab9dc]', label: t.selected_legend },
-              ].map(({ color, label }) => (
-                <div key={label} className="flex items-center gap-1.5 text-[12px] text-[#6B7280] font-medium">
-                  <div className={`w-2.5 h-2.5 rounded-[3px] shrink-0 ${color}`} />
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            {/* Mobile Modal for Date Details — handles both new and existing entries */}
-            {selectedKey && !showLeaveSelector && !showDeleteConfirm && (
-              <div 
-                className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
-                onClick={() => setSelectedKey(null)}
-              >
-                <div 
-                  className="bg-white rounded-[20px] w-full max-w-[340px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden max-h-[90vh] scale-100 animate-[zoomIn_0.2s_ease_both]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-bold text-[#111827]">{selLabel}</span>
-                      {isTodaySelected && (
-                        <span className="text-[10px] font-bold bg-[#6fa3cb] text-white px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
-                          {t.today}
-                        </span>
-                      )}
-                    </div>
-                    <button onClick={() => setSelectedKey(null)} className="w-[30px] h-[30px] grid place-items-center rounded-lg text-[#6B7280] hover:bg-[#F3F4F8] hover:text-[#111827] cursor-pointer transition-colors bg-transparent border-none">
-                      <X size={18} />
-                    </button>
-                  </div>
-                  
-                  <div className="p-5 overflow-y-auto">
-                    <div className="flex flex-col gap-4 w-full min-w-0">
-                      {/* Time inputs */}
-                      <div className="grid grid-cols-2 gap-3 w-full min-w-0">
-                        <div className="min-w-0">
-                          <label className={labelCls}>{t.clock_in}</label>
-                          <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dIn} onChange={(e) => setDIn(e.target.value)} disabled={isSelectedHoliday} />
-                        </div>
-                        <div className="min-w-0">
-                          <label className={labelCls}>{t.clock_out}</label>
-                          <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dOut} onChange={(e) => setDOut(e.target.value)} disabled={isSelectedHoliday} />
-                        </div>
-                      </div>
-
-                      {/* Calc summary */}
-                      <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                          <span className="text-[14px] font-bold text-[#3B4FE4]">{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                          <div className="text-right">
-                            <div className="text-[14px] font-bold text-[#c29302]">{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
-                            {netDetOT > 0 && detOTRateEarn > 0 && (
-                              <div className="text-[11px] font-bold text-[#c29302] leading-none">+{fmtB(detOTRateEarn)}</div>
-                            )}
-                          </div>
-                        </div>
-                        {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
-                        {previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0) && (
-                          <div className="flex flex-col gap-1 pl-3 -mt-1">
-                            {detOT15h > 0 && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-[11px] font-medium text-[#c29302]">OT ×1.5 · {fmt1(detOT15h)}h</span>
-                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
-                              </div>
-                            )}
-                            {detOT1h > 0 && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-[11px] font-medium text-[#c29302]">OT ×1 · {fmt1(detOT1h)}h</span>
-                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT1e)}</span>
-                              </div>
-                            )}
-                            {detOT3h > 0 && (
-                              <div className="flex justify-between items-center">
-                                <span className="text-[11px] font-medium text-[#c29302]">OT ×3 · {fmt1(detOT3h)}h</span>
-                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT3e)}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                          <span className="text-[14px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
-                        </div>
-                        <div className="h-px bg-[#E8EAEF] w-full" />
-                        {detShift > 0 && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.shift_earnings}</span>
-                            <span className="text-[14px] font-bold text-[#E8730C]">+{fmtB(detShift)}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                          <span className="text-[16px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
-                        </div>
-                      </div>
-
-                      {/* Save / Update / Delete */}
-                      <div className="flex gap-2.5 w-full mt-2">
-                        {entries[selectedKey]?.in && (
-                          <button
-                            onClick={deleteSelectedEntry}
-                            disabled={isSelectedHoliday || isDeletingEntry}
-                            title={t.delete_entry}
-                            className={`px-5 py-3.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                              ${isSelectedHoliday || isDeletingEntry
-                                ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                                : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
-                          >
-                            {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={18} />}
-                          </button>
-                        )}
-                        <button
-                          onClick={saveSelectedEntry}
-                          disabled={!dIn || isSelectedHoliday || isSavingEntry}
-                          className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 relative overflow-hidden
-                            ${isSelectedHoliday
-                              ? 'bg-[#D1D5E0] cursor-not-allowed'
-                              : isSavingEntry
-                                ? 'bg-[#7B8CED] cursor-wait text-transparent'
-                                : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
-                        >
-                          <div className={`flex items-center gap-2.5 transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
-                            <CheckCircle2 size={16} />
-                            <span>{entries[selectedKey]?.in ? t.update_entry : t.save_entry}</span>
-                          </div>
-                          {isSavingEntry && (
-                            <div className="absolute inset-0 flex items-center justify-center text-white">
-                              <AnimatedWaitText />
-                            </div>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>)} {/* end monthly view */}
+          )}
 
         </main>
       </div>
@@ -1520,52 +1050,6 @@ export default function App() {
   );
 }
 
-// ─── SummaryCard ──────────────────────────────────────────────────────────────
-const variantStyles = {
-  amber: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#fbde3a]',
-    icon: 'bg-[#fffdef] text-[#c29302]',
-    val: 'text-[#c29302]',
-  },
-  indigo: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#3B4FE4]',
-    icon: 'bg-[#EEF0FD] text-[#3B4FE4]',
-    val: 'text-[#3B4FE4]',
-  },
-  green: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#10B981]',
-    icon: 'bg-[#ECFDF5] text-[#10B981]',
-    val: 'text-[#10B981]',
-  },
-  orange: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#FDBA74]',
-    icon: 'bg-[#FFF3E6] text-[#E8730C]',
-    val: 'text-[#E8730C]',
-  },
-};
-
-function SummaryCard({ variant, Icon, label, value, sub }) {
-  const s = variantStyles[variant];
-  return (
-    <div className={`relative overflow-hidden rounded-2xl border p-4 sm:p-6 cursor-default
-      transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
-      shadow-[0_1px_3px_rgba(17,24,39,0.06)] hover:-translate-y-[3px] ${s.wrap}`}>
-      <span className={`absolute top-0 left-4 sm:left-6 right-4 sm:right-6 h-[3px] rounded-b-[4px] opacity-60 ${s.stripe}`} />
-      <div className={`w-8 h-8 sm:w-[38px] sm:h-[38px] rounded-[10px] grid place-items-center mb-3 sm:mb-4 ${s.icon}`}>
-        <Icon size={14} strokeWidth={2} className="sm:hidden" />
-        <Icon size={17} strokeWidth={2} className="hidden sm:block" />
-      </div>
-      <div className="text-[10px] sm:text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 sm:mb-1.5 truncate">{label}</div>
-      <div className={`text-[1.4rem] sm:text-[2rem] font-bold leading-none tracking-tight truncate ${s.val}`}>{value}</div>
-      {sub && <div className="text-[10px] sm:text-[12px] mt-1 sm:mt-1.5 text-[#9CA3AF] truncate">{sub}</div>}
-    </div>
-  );
-}
-
 // ── UserMenu ──────────────────────────────────────────────────────────────────
 function UserMenu({ user, t, onProfile, onSignOut }) {
   const [open, setOpen] = React.useState(false);
@@ -1672,204 +1156,5 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
         {sub && <div className="text-[10px] text-[#9CA3AF]">{sub}</div>}
       </div>
     </button>
-    );
-    }
-
-    // ── DayCell Sub-component ───────────────────────────────────────────────────
-    function DayCell({
-    d, k, entries, todayKey, selectedKey, holidays, viewY, viewM,
-    dailyEarning, handleDayClick, toggleHoliday, paymentType, publicHolidays, lang, t
-    }) {
-    const entry = entries[k];
-    const publicHol = publicHolidays?.[k] || null;
-    const publicHolName = publicHol ? (lang === 'th' ? publicHol.name_th : publicHol.name_en) : '';
-    const isToday = k === todayKey;
-    const isSel = k === selectedKey;
-    const isHol = holidays.has(k);
-    const dow = new Date(viewY, viewM, d).getDay();
-    const isWE = dow === 0 || dow === 6;
-
-    const hTotal = dailyEarning?.working_hour || 0;
-    const netOT = dailyEarning?.ot_hour || 0;
-    const eEarn = dailyEarning?.total_earning || 0;
-    const hasOT = netOT > 0;
-    const hasShift = (dailyEarning?.shift_allowance || 0) > 0;
-    const hasEntry = !!entry;
-
-    // Leave tag
-    const isLeave = entry?.leave !== null && entry?.leave !== undefined;
-    const leaveType = entry?.leave?.type;
-    const LEAVE_ICONS = {
-    sick: { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)', Icon: Stethoscope },
-    personal: { color: '#F472B6', bg: 'rgba(244,114,182,0.12)', Icon: UmbrellaOff },
-    vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)', Icon: Plane },
-    training: { color: '#111827', bg: 'rgba(17,24,39,0.10)', Icon: GraduationCap },
-    };
-    const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
-    const isTrainingEntry = leaveType === 'training';
-    const trainingLabel = lang === 'th' ? 'อบรม/ดูงานนอกสถานที่' : 'Training / Off-site';
-
-    const CornerIcon = isHol ? Palmtree : Sun;
-
-    // Cell background / border
-    // วันหยุดทางการที่ยังไม่มีการทำงาน → กรอบแดง + พื้นแดงจางๆ (หาย/เปลี่ยนเมื่อวันนั้นมีการทำงาน)
-    const isPublicHolIdle = !!publicHol && !hasEntry;
-
-    let baseBg = isHol
-    ? 'bg-[rgba(153,142,217,0.15)]'
-    : isPublicHolIdle
-      ? 'bg-[rgba(239,68,68,0.07)]'
-      : hasOT
-        ? 'bg-[#fffdef]'
-        : hasShift
-          ? 'bg-[#FFF3E6]'
-          : isToday
-            ? 'bg-[#f0f5fa]'
-            : 'bg-transparent hover:bg-[#F8F9FB]';
-
-    let baseBorder = isSel
-    ? 'border-[#6ab9dc] outline outline-[1.5px] outline-[#6ab9dc] z-10'
-    : isPublicHolIdle
-      ? 'border-transparent'
-      : isHol
-        ? 'border-transparent'
-        : isToday
-          ? 'border-[#6fa3cb] hover:border-[#5c96bb]'
-          : hasOT
-            ? 'border-transparent hover:border-[#fbde3a]'
-            : 'border-transparent hover:border-[#E8EAEF]';
-
-    const cellBg = `${baseBg} ${baseBorder}`;
-
-    // ── Mobile Long Press logic ──
-    const longPressTimer = useRef(null);
-    const isLongPress = useRef(false);
-
-    const handleTouchStart = (e) => {
-    isLongPress.current = false;
-    longPressTimer.current = setTimeout(() => {
-      isLongPress.current = true;
-      toggleHoliday(e, k);
-      if (navigator.vibrate) navigator.vibrate(40); // Haptic feedback
-    }, 600); // 600ms for long press
-    };
-
-    const handleTouchEnd = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-    };
-
-    const handleTouchMove = () => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-    }
-    };
-
-    return (
-    <div
-      onClick={() => {
-        if (!isLongPress.current) handleDayClick(k);
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchMove={handleTouchMove}
-      onContextMenu={(e) => e.preventDefault()} // Disable native context menu
-      className={`relative min-h-[72px] sm:min-h-[80px] p-[7px_6px_5px] rounded-lg flex flex-col gap-[2px] border cursor-pointer transition-all duration-[220ms] group ${cellBg}`}
-    >
-      {/* Day number */}
-      <span className={`text-[11px] font-bold leading-none
-      ${(publicHol ? 'text-[#EF4444]' : isToday ? 'text-[#6fa3cb]' : isWE ? 'text-[#9CA3AF]' : 'text-[#6B7280]')}`}>
-        {d}
-      </span>
-
-      {/* ชื่อวันหยุดทางการ (สลับไทย-อังกฤษตามภาษา) */}
-      {publicHol && publicHolName && (
-        <span className="text-[7px] sm:text-[8px] font-bold text-[#EF4444] leading-tight truncate pr-3.5" title={publicHolName}>
-          {publicHolName}
-        </span>
-      )}
-
-      {/* Leave Tag Icon / Public Holiday Icon / Holiday Toggle (มุมขวาบน) — อบรมไปแสดงที่ตำแหน่งเวลาแทน */}
-      {isLeave && leaveInfo && !isTrainingEntry ? (
-        <div
-          className="absolute top-0 right-0 w-[20px] h-[25px] rounded-tr-lg rounded-bl-[9px] rounded-br-[9px] flex items-start justify-center pt-[5px] z-20"
-          style={{ backgroundColor: leaveInfo.color }}
-        >
-          <leaveInfo.Icon size={10} strokeWidth={2.5} color="#ffffff" />
-        </div>
-      ) : publicHol ? (
-        <div className="absolute top-[4px] right-[4px] flex items-center justify-center z-20" title={publicHolName}>
-          <CalendarDays size={13} strokeWidth={2.25} className="text-[#EF4444]" />
-        </div>
-      ) : (
-        <>
-          {/* Mobile-only Holiday Icon (Static) */}
-          {isHol && (
-            <div className="sm:hidden absolute top-[5px] right-[5px] w-[18px] h-[18px] rounded-[4px] grid place-items-center text-[#998ed9] bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]">
-              <CornerIcon size={10} strokeWidth={2.5} />
-            </div>
-          )}
-          {/* Desktop-only Holiday Toggle Button */}
-          <button
-            title={isHol ? 'Mark as workday' : 'Mark as holiday'}
-            onClick={(e) => toggleHoliday(e, k)}
-            className={[
-              'absolute top-[5px] right-[5px]',
-              'w-[18px] h-[18px] rounded-[4px]',
-              'hidden sm:grid place-items-center cursor-pointer',
-              'transition-all duration-150',
-              (isHol ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'),
-              (isHol
-                ? 'text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
-                : 'text-[#c29302] bg-[#fffdef] hover:bg-[#ffe270] border border-[#ffe270]'),
-            ].join(' ')}
-          >
-            <CornerIcon size={10} strokeWidth={2.5} />
-          </button>
-        </>
-      )}
-
-      {/* Entry data */}
-      {hasEntry && (
-        isTrainingEntry ? (
-          <div className="mt-auto flex items-center gap-1 text-[#111827]" title={trainingLabel}>
-            <GraduationCap size={11} strokeWidth={2.5} className="shrink-0" />
-            <span className="text-[8px] sm:text-[9px] font-bold leading-tight truncate">{trainingLabel}</span>
-          </div>
-        ) : (
-        <div className="mt-auto flex flex-col gap-[2px]">
-          <span className="text-[8px] sm:text-[9px] font-medium text-[#9CA3AF] leading-tight truncate">
-            {entry.in}–{entry.out}
-          </span>
-          {hasShift && (
-            <span title={t.shift_allowance_title} className="flex items-center gap-0.5 text-[8px] sm:text-[9px] font-bold text-[#E8730C] leading-none">
-              <Moon size={9} strokeWidth={2.5} />
-              +{fmtB(dailyEarning.shift_allowance)}
-            </span>
-          )}
-          <div className="flex justify-between items-end">
-            {hasOT ? (
-              <div className="flex flex-col">
-                <span className="text-[10px] font-bold text-[#c29302] leading-none">OT {fmt1(netOT)}h</span>
-                {dailyEarning?.ot_earning > 0 && (
-                  <span className="text-[8px] font-bold text-[#c29302] leading-none mt-0.5">+{fmtB(dailyEarning.ot_earning)}</span>
-                )}
-              </div>
-            ) : (
-              paymentType !== 'monthly' ? (
-                <span className="text-[10px] font-bold text-[#6B7280] leading-none">{fmt1(hTotal)}h</span>
-              ) : null
-            )}
-            {eEarn > 0 && paymentType !== 'monthly' && (
-              <span className="text-[9px] font-bold text-[#10B981] leading-none hidden sm:block">
-                {fmtB(eEarn)}
-              </span>
-            )}
-          </div>
-        </div>
-        )
-      )}
-    </div>
     );
     }
