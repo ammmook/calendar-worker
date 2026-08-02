@@ -349,16 +349,17 @@ async function upsertWorkEntry(data) {
 
         if (isPublicHolidayToday) {
           // ── วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (OT เริ่มคิดทันทีหลังเข้างาน) ──
-          //   OT เซตแรก (ใน 8 ชม.แรก) = 1 เท่า ; OT เซตสอง (เลย 8 ชม.) = 3 เท่า
-          //   หักตามชั่วโมงที่ทำจริง (netH): > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
+          //   8 ชม.แรก = 1 เท่า (ไม่หัก) ; ส่วนที่ทำโอเลย 8 ชม. = 3 เท่า
+          //   หักเฉพาะส่วนโอที่เลย 8 ชม. (rawOT): > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
+          //   เช่น 9:00–21:00 → netH 11 → ทำงาน 8 + ทำโอ 3 (3>2 หัก 30น. → 2.5)
           //   ถ้าทำข้ามเที่ยงคืนไปตกวันปกติ → ยังคิดเรตวันหยุดต่อจนเลิกงาน (ไม่ตัดที่เที่ยงคืน)
-          let holidayOT = netH;
-          if (holidayOT >= 9) holidayOT = Math.max(0, holidayOT - 1);
-          else if (holidayOT > 2) holidayOT = Math.max(0, holidayOT - 0.5);
-          const ot1x = Math.min(holidayOT, stdH);          // 8 ชม.แรก = 1 เท่า
-          const ot3x = Math.max(0, holidayOT - stdH);      // เลย 8 ชม. = 3 เท่า
+          const ot1x = Math.min(netH, stdH);               // 8 ชม.แรก = 1 เท่า (ไม่หัก)
+          const rawOT = Math.max(0, netH - stdH);          // ส่วนที่ทำโอเลย 8 ชม.
+          let ot3x = rawOT;
+          if (rawOT >= 9) ot3x = Math.max(0, rawOT - 1);
+          else if (rawOT > 2) ot3x = Math.max(0, rawOT - 0.5);
           workingHour = Math.min(netH, stdH);              // ยังได้ค่าแรงปกติ (นับเป็นวันทำงาน)
-          otHour = holidayOT;
+          otHour = ot1x + ot3x;
           // คอลัมน์ _1 = ช่วงวันหยุด 8 ชม.แรก (เรต 1 เท่า) ; _3 = เลย 8 ชม. (เรต 3 เท่า)
           ot1Hour = ot1x; ot1Earn = ot1x * 1 * baseHourly;
           ot3Hour = ot3x; ot3Earn = ot3x * 3 * baseHourly;

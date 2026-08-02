@@ -571,15 +571,16 @@ export default function App() {
 
     if (isPublicHolidayToday) {
       // วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (เริ่มคิดทันที) — 8 ชม.แรก 1x, เลย 8 ชม. 3x
-      // หักตามชั่วโมงที่ทำจริง: > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
+      // หักเฉพาะส่วนโอที่เลย 8 ชม. (rawOT): > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
+      // เช่น 9:00–21:00 → netH 11 → ทำงาน 8 + ทำโอ 3 (3>2 หัก 30น. → 2.5)
       // ข้ามเที่ยงคืนไปตกวันปกติ → ยังคิดเรตวันหยุดต่อจนเลิกงาน (ไม่ตัดที่เที่ยงคืน)
-      let holidayOT = netH;
-      if (holidayOT >= 9) holidayOT = Math.max(0, holidayOT - 1);
-      else if (holidayOT > 2) holidayOT = Math.max(0, holidayOT - 0.5);
-      const ot1x = Math.min(holidayOT, stdH);
-      const ot3x = Math.max(0, holidayOT - stdH);
+      const ot1x = Math.min(netH, stdH);              // 8 ชม.แรก 1x (ไม่หัก)
+      const rawOT = Math.max(0, netH - stdH);         // ส่วนที่ทำโอเลย 8 ชม.
+      let ot3x = rawOT;
+      if (rawOT >= 9) ot3x = Math.max(0, rawOT - 1);
+      else if (rawOT > 2) ot3x = Math.max(0, rawOT - 0.5);
       workingHour = Math.min(netH, stdH);
-      otHour = holidayOT;
+      otHour = ot1x + ot3x;
       ot1Hours = ot1x; ot1Earn = ot1x * 1 * baseHourly;   // _1 = วันหยุด 8 ชม.แรก (เรต 1x)
       ot3Hours = ot3x; ot3Earn = ot3x * 3 * baseHourly;
       ot15Hours = 0; ot15Earn = 0;
