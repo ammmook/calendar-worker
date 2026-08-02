@@ -570,22 +570,24 @@ export default function App() {
       ? Number(ssParts[0]) * 60 + Number(ssParts[1]) : null;
 
     let workingHour = 0, otHour = 0, otEarning = 0, shiftEarning = 0;
-    // แยกรายละเอียด OT ตามอัตรา: 1.5 = ปกติ, 2 = สองแรง (วันหยุด 0..std), 3 = สามแรง
-    let ot15Hours = 0, ot15Earn = 0, ot2Hours = 0, ot2Earn = 0, ot3Hours = 0, ot3Earn = 0;
+    // แยกรายละเอียด OT ตามอัตรา: 1.5 = วันปกติ, 1 = วันหยุด 8 ชม.แรก, 3 = สามแรง (วันหยุดเลย 8 ชม. / ข้ามคืน)
+    let ot15Hours = 0, ot15Earn = 0, ot1Hours = 0, ot1Earn = 0, ot3Hours = 0, ot3Earn = 0;
 
     if (isPublicHolidayToday) {
-      // วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (เริ่มคิดทันที) — 8 ชม.แรก 2x, เลย 8 ชม. 3x
-      // ถ้าข้ามเที่ยงคืนไปตกวันปกติ (วันถัดไปไม่ใช่วันหยุด) → ช่วงหลังเที่ยงคืน = OT ปกติ 1.5x
-      const afterMidnightHours = (crossedMidnight && !nextDayIsHoliday) ? (oh * 60 + om) / 60 : 0;
-      const holidayH = Math.max(0, netH - afterMidnightHours);
-      const ot2x = Math.min(holidayH, stdH);
-      const ot3x = Math.max(0, holidayH - stdH);
+      // วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (เริ่มคิดทันที) — 8 ชม.แรก 1x, เลย 8 ชม. 3x
+      // หักตามชั่วโมงที่ทำจริง: > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
+      // ข้ามเที่ยงคืนไปตกวันปกติ → ยังคิดเรตวันหยุดต่อจนเลิกงาน (ไม่ตัดที่เที่ยงคืน)
+      let holidayOT = netH;
+      if (holidayOT >= 9) holidayOT = Math.max(0, holidayOT - 1);
+      else if (holidayOT > 2) holidayOT = Math.max(0, holidayOT - 0.5);
+      const ot1x = Math.min(holidayOT, stdH);
+      const ot3x = Math.max(0, holidayOT - stdH);
       workingHour = Math.min(netH, stdH);
-      otHour = holidayH + afterMidnightHours;
-      ot2Hours = ot2x; ot2Earn = ot2x * 2 * baseHourly;
+      otHour = holidayOT;
+      ot1Hours = ot1x; ot1Earn = ot1x * 1 * baseHourly;   // _1 = วันหยุด 8 ชม.แรก (เรต 1x)
       ot3Hours = ot3x; ot3Earn = ot3x * 3 * baseHourly;
-      ot15Hours = afterMidnightHours; ot15Earn = afterMidnightHours * 1.5 * baseHourly;
-      otEarning = ot2Earn + ot3Earn + ot15Earn;
+      ot15Hours = 0; ot15Earn = 0;
+      otEarning = ot1Earn + ot3Earn;
       if (Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin) shiftEarning = Number(shiftAllowance);
     } else {
       workingHour = Math.min(netH, stdH);
@@ -617,7 +619,7 @@ export default function App() {
       ot_hour: otHour,
       ot_earning: otEarning,
       ot15_hours: ot15Hours, ot15_earn: ot15Earn,
-      ot2_hours: ot2Hours, ot2_earn: ot2Earn,
+      ot1_hours: ot1Hours, ot1_earn: ot1Earn,
       ot3_hours: ot3Hours, ot3_earn: ot3Earn,
       regular_earning: regularEarning,
       shift_allowance: shiftEarning,
@@ -633,7 +635,7 @@ export default function App() {
   const detShift = previewCalc ? previewCalc.shift_allowance : (selDailyEarning?.shift_allowance || 0);
   // รายละเอียด OT แยกอัตรา (แสดงเฉพาะตอน preview ก่อนบันทึก)
   const detOT15h = previewCalc?.ot15_hours || 0, detOT15e = previewCalc?.ot15_earn || 0;
-  const detOT2h = previewCalc?.ot2_hours || 0, detOT2e = previewCalc?.ot2_earn || 0;
+  const detOT1h = previewCalc?.ot1_hours || 0, detOT1e = previewCalc?.ot1_earn || 0;
   const detOT3h = previewCalc?.ot3_hours || 0, detOT3e = previewCalc?.ot3_earn || 0;
 
   const selDateObj = selectedKey ? new Date(selectedKey + 'T00:00:00') : null;
@@ -1073,7 +1075,7 @@ export default function App() {
                             </div>
                           </div>
                           {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
-                          {previewCalc && (detOT15h > 0 || detOT2h > 0 || detOT3h > 0) && (
+                          {previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0) && (
                             <div className="flex flex-col gap-1 pl-3 -mt-0.5">
                               {detOT15h > 0 && (
                                 <div className="flex justify-between items-center">
@@ -1081,10 +1083,10 @@ export default function App() {
                                   <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
                                 </div>
                               )}
-                              {detOT2h > 0 && (
+                              {detOT1h > 0 && (
                                 <div className="flex justify-between items-center">
-                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×2 · {fmt1(detOT2h)}h</span>
-                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT2e)}</span>
+                                  <span className="text-[10px] font-medium text-[#c29302]">OT ×1 · {fmt1(detOT1h)}h</span>
+                                  <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT1e)}</span>
                                 </div>
                               )}
                               {detOT3h > 0 && (
@@ -1320,7 +1322,7 @@ export default function App() {
                           </div>
                         </div>
                         {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
-                        {previewCalc && (detOT15h > 0 || detOT2h > 0 || detOT3h > 0) && (
+                        {previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0) && (
                           <div className="flex flex-col gap-1 pl-3 -mt-1">
                             {detOT15h > 0 && (
                               <div className="flex justify-between items-center">
@@ -1328,10 +1330,10 @@ export default function App() {
                                 <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
                               </div>
                             )}
-                            {detOT2h > 0 && (
+                            {detOT1h > 0 && (
                               <div className="flex justify-between items-center">
-                                <span className="text-[11px] font-medium text-[#c29302]">OT ×2 · {fmt1(detOT2h)}h</span>
-                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT2e)}</span>
+                                <span className="text-[11px] font-medium text-[#c29302]">OT ×1 · {fmt1(detOT1h)}h</span>
+                                <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT1e)}</span>
                               </div>
                             )}
                             {detOT3h > 0 && (

@@ -246,7 +246,7 @@ function pickWorkEntryColumns(data) {
     'work_entry_id', 'date', 'month_num', 'year_num',
     'clock_in', 'clock_out', 'leave_type', 'working_hour',
     'ot_hour', 'ot_earning', 'user_email',
-    'ot_hour_15', 'ot_earning_15', 'ot_hour_2', 'ot_earning_2', 'ot_hour_3', 'ot_earning_3',
+    'ot_hour_15', 'ot_earning_15', 'ot_hour_1', 'ot_earning_1', 'ot_hour_3', 'ot_earning_3',
     'regular_earning', 'shift_allowance', 'total_earning',
   ];
   const row = {};
@@ -324,8 +324,8 @@ async function upsertWorkEntry(data) {
     let otHour = 0;
     let shiftEarning = 0;
     let otEarningOverride = null; // ถ้าตั้งค่า จะใช้แทน otHour * otRate (กรณี OT 2x/3x)
-    // OT แยกตามอัตรา: 1.5 = ปกติ, 2 = วันหยุด 8 ชม.แรก, 3 = วันหยุดเลย 8 ชม. / ข้ามคืน
-    let ot15Hour = 0, ot15Earn = 0, ot2Hour = 0, ot2Earn = 0, ot3Hour = 0, ot3Earn = 0;
+    // OT แยกตามอัตรา: 1.5 = วันปกติ, 1 = วันหยุด 8 ชม.แรก, 3 = วันหยุดเลย 8 ชม. / ข้ามคืน
+    let ot15Hour = 0, ot15Earn = 0, ot1Hour = 0, ot1Earn = 0, ot3Hour = 0, ot3Earn = 0;
 
     const isTraining = String(data.leave_type || '') === 'training';
 
@@ -367,18 +367,21 @@ async function upsertWorkEntry(data) {
 
         if (isPublicHolidayToday) {
           // ── วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (OT เริ่มคิดทันทีหลังเข้างาน) ──
-          //   OT เซตแรก (ใน 8 ชม.แรก) = 2 เท่า ; OT เซตสอง (เลย 8 ชม.) = 3 เท่า
-          //   ถ้าทำงานข้ามเที่ยงคืนไปตกวันปกติ (วันถัดไปไม่ใช่วันหยุด) → ช่วงหลังเที่ยงคืน = OT ปกติ 1.5 เท่า
-          const afterMidnightHours = (crossedMidnight && !nextDayIsHoliday) ? (oh * 60 + om) / 60 : 0;
-          const holidayH = Math.max(0, netH - afterMidnightHours);   // ช่วงที่ตกวันหยุดจริง (หักพักแล้ว)
-          const ot2x = Math.min(holidayH, stdH);
-          const ot3x = Math.max(0, holidayH - stdH);
+          //   OT เซตแรก (ใน 8 ชม.แรก) = 1 เท่า ; OT เซตสอง (เลย 8 ชม.) = 3 เท่า
+          //   หักตามชั่วโมงที่ทำจริง (netH): > 2 ชม. หัก 30 นาที ; ≥ 9 ชม. หัก 1 ชม.
+          //   ถ้าทำข้ามเที่ยงคืนไปตกวันปกติ → ยังคิดเรตวันหยุดต่อจนเลิกงาน (ไม่ตัดที่เที่ยงคืน)
+          let holidayOT = netH;
+          if (holidayOT >= 9) holidayOT = Math.max(0, holidayOT - 1);
+          else if (holidayOT > 2) holidayOT = Math.max(0, holidayOT - 0.5);
+          const ot1x = Math.min(holidayOT, stdH);          // 8 ชม.แรก = 1 เท่า
+          const ot3x = Math.max(0, holidayOT - stdH);      // เลย 8 ชม. = 3 เท่า
           workingHour = Math.min(netH, stdH);              // ยังได้ค่าแรงปกติ (นับเป็นวันทำงาน)
-          otHour = holidayH + afterMidnightHours;          // ทั้งวันเป็น OT (หักพักแล้ว)
-          ot2Hour = ot2x; ot2Earn = ot2x * 2 * baseHourly;
+          otHour = holidayOT;
+          // คอลัมน์ _1 = ช่วงวันหยุด 8 ชม.แรก (เรต 1 เท่า) ; _3 = เลย 8 ชม. (เรต 3 เท่า)
+          ot1Hour = ot1x; ot1Earn = ot1x * 1 * baseHourly;
           ot3Hour = ot3x; ot3Earn = ot3x * 3 * baseHourly;
-          ot15Hour = afterMidnightHours; ot15Earn = afterMidnightHours * 1.5 * baseHourly;
-          otEarningOverride = ot2Earn + ot3Earn + ot15Earn;
+          ot15Hour = 0; ot15Earn = 0;
+          otEarningOverride = ot1Earn + ot3Earn;
 
           // ── เบี้ยกะ: เงื่อนไขเดิม (เข้างานตรงกับ shift_start พอดี) ──
           if (shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin) {
@@ -434,8 +437,8 @@ async function upsertWorkEntry(data) {
     data.ot_earning = otEarning;
     data.ot_hour_15 = ot15Hour;
     data.ot_earning_15 = ot15Earn;
-    data.ot_hour_2 = ot2Hour;
-    data.ot_earning_2 = ot2Earn;
+    data.ot_hour_1 = ot1Hour;
+    data.ot_earning_1 = ot1Earn;
     data.ot_hour_3 = ot3Hour;
     data.ot_earning_3 = ot3Earn;
     data.regular_earning = regularEarning;
@@ -492,7 +495,7 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
   let total_regular_earning = 0, total_ot_earning = 0, total_earning = 0;
   let total_shift_allowance = 0;
   let total_ot_hour_15 = 0, total_ot_earning_15 = 0;
-  let total_ot_hour_2 = 0, total_ot_earning_2 = 0;
+  let total_ot_hour_1 = 0, total_ot_earning_1 = 0;
   let total_ot_hour_3 = 0, total_ot_earning_3 = 0;
 
   (filtered || []).forEach((e) => {
@@ -510,8 +513,8 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_earning += Number(e.total_earning) || 0;
     total_ot_hour_15 += Number(e.ot_hour_15) || 0;
     total_ot_earning_15 += Number(e.ot_earning_15) || 0;
-    total_ot_hour_2 += Number(e.ot_hour_2) || 0;
-    total_ot_earning_2 += Number(e.ot_earning_2) || 0;
+    total_ot_hour_1 += Number(e.ot_hour_1) || 0;
+    total_ot_earning_1 += Number(e.ot_earning_1) || 0;
     total_ot_hour_3 += Number(e.ot_hour_3) || 0;
     total_ot_earning_3 += Number(e.ot_earning_3) || 0;
   });
@@ -553,8 +556,8 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_earning,
     total_ot_hour_15,
     total_ot_earning_15,
-    total_ot_hour_2,
-    total_ot_earning_2,
+    total_ot_hour_1,
+    total_ot_earning_1,
     total_ot_hour_3,
     total_ot_earning_3,
   };
@@ -594,7 +597,7 @@ async function recalcYearlySummary(userEmail, yearNum) {
   let total_regular_earning = 0, total_ot_earning = 0, total_earning = 0;
   let total_shift_allowance = 0;
   let total_ot_hour_15 = 0, total_ot_earning_15 = 0;
-  let total_ot_hour_2 = 0, total_ot_earning_2 = 0;
+  let total_ot_hour_1 = 0, total_ot_earning_1 = 0;
   let total_ot_hour_3 = 0, total_ot_earning_3 = 0;
 
   (filtered || []).forEach((m) => {
@@ -609,8 +612,8 @@ async function recalcYearlySummary(userEmail, yearNum) {
     total_earning += Number(m.total_earning) || 0;
     total_ot_hour_15 += Number(m.total_ot_hour_15) || 0;
     total_ot_earning_15 += Number(m.total_ot_earning_15) || 0;
-    total_ot_hour_2 += Number(m.total_ot_hour_2) || 0;
-    total_ot_earning_2 += Number(m.total_ot_earning_2) || 0;
+    total_ot_hour_1 += Number(m.total_ot_hour_1) || 0;
+    total_ot_earning_1 += Number(m.total_ot_earning_1) || 0;
     total_ot_hour_3 += Number(m.total_ot_hour_3) || 0;
     total_ot_earning_3 += Number(m.total_ot_earning_3) || 0;
   });
@@ -629,8 +632,8 @@ async function recalcYearlySummary(userEmail, yearNum) {
     total_earning,
     total_ot_hour_15,
     total_ot_earning_15,
-    total_ot_hour_2,
-    total_ot_earning_2,
+    total_ot_hour_1,
+    total_ot_earning_1,
     total_ot_hour_3,
     total_ot_earning_3,
   };
@@ -676,8 +679,8 @@ async function getEarningsSummary(email, year) {
       ot_earning: Number(e.ot_earning) || 0,
       ot_hour_15: Number(e.ot_hour_15) || 0,
       ot_earning_15: Number(e.ot_earning_15) || 0,
-      ot_hour_2: Number(e.ot_hour_2) || 0,
-      ot_earning_2: Number(e.ot_earning_2) || 0,
+      ot_hour_1: Number(e.ot_hour_1) || 0,
+      ot_earning_1: Number(e.ot_earning_1) || 0,
       ot_hour_3: Number(e.ot_hour_3) || 0,
       ot_earning_3: Number(e.ot_earning_3) || 0,
       regular_earning: Number(e.regular_earning) || 0,
@@ -712,8 +715,8 @@ async function getEarningsSummary(email, year) {
         total_earning: Number(found.total_earning) || 0,
         total_ot_hour_15: Number(found.total_ot_hour_15) || 0,
         total_ot_earning_15: Number(found.total_ot_earning_15) || 0,
-        total_ot_hour_2: Number(found.total_ot_hour_2) || 0,
-        total_ot_earning_2: Number(found.total_ot_earning_2) || 0,
+        total_ot_hour_1: Number(found.total_ot_hour_1) || 0,
+        total_ot_earning_1: Number(found.total_ot_earning_1) || 0,
         total_ot_hour_3: Number(found.total_ot_hour_3) || 0,
         total_ot_earning_3: Number(found.total_ot_earning_3) || 0,
       });
@@ -725,7 +728,7 @@ async function getEarningsSummary(email, year) {
         total_ot_earning: 0, total_regular_earning: 0,
         total_shift_allowance: 0, total_earning: 0,
         total_ot_hour_15: 0, total_ot_earning_15: 0,
-        total_ot_hour_2: 0, total_ot_earning_2: 0,
+        total_ot_hour_1: 0, total_ot_earning_1: 0,
         total_ot_hour_3: 0, total_ot_earning_3: 0,
       });
     }
@@ -753,8 +756,8 @@ async function getEarningsSummary(email, year) {
     total_earning: Number(yearlyFound.total_earning) || 0,
     total_ot_hour_15: Number(yearlyFound.total_ot_hour_15) || 0,
     total_ot_earning_15: Number(yearlyFound.total_ot_earning_15) || 0,
-    total_ot_hour_2: Number(yearlyFound.total_ot_hour_2) || 0,
-    total_ot_earning_2: Number(yearlyFound.total_ot_earning_2) || 0,
+    total_ot_hour_1: Number(yearlyFound.total_ot_hour_1) || 0,
+    total_ot_earning_1: Number(yearlyFound.total_ot_earning_1) || 0,
     total_ot_hour_3: Number(yearlyFound.total_ot_hour_3) || 0,
     total_ot_earning_3: Number(yearlyFound.total_ot_earning_3) || 0,
   } : {
@@ -764,7 +767,7 @@ async function getEarningsSummary(email, year) {
     total_ot_earning: 0, total_regular_earning: 0,
     total_shift_allowance: 0, total_earning: 0,
     total_ot_hour_15: 0, total_ot_earning_15: 0,
-    total_ot_hour_2: 0, total_ot_earning_2: 0,
+    total_ot_hour_1: 0, total_ot_earning_1: 0,
     total_ot_hour_3: 0, total_ot_earning_3: 0,
   };
 
