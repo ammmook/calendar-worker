@@ -20,7 +20,7 @@ import { useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
 import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
-import { SkeletonDashboard, SkeletonAuthLoading } from './components/SkeletonLoader';
+import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const dateKey = (y, m, d) =>
@@ -820,7 +820,7 @@ export default function App() {
 
           {/* ══ CALENDAR VIEW (ปฏิทินการทำงาน) ══ */}
           {view === 'calendar' && !dataLoaded && (
-            <SkeletonDashboard daysShort={t.days_short} />
+            <SkeletonCalendarView daysShort={t.days_short} />
           )}
           {view === 'calendar' && dataLoaded && (
             <WorkCalendar
@@ -874,7 +874,7 @@ export default function App() {
 
               {/* รายเดือน */}
               {dashTab === 'monthly' && !dataLoaded && (
-                <SkeletonDashboard daysShort={t.days_short} />
+                <SkeletonMonthly />
               )}
               {dashTab === 'monthly' && dataLoaded && (
                 <MonthlySummary
@@ -904,7 +904,10 @@ export default function App() {
               )}
 
               {/* รายปี */}
-              {dashTab === 'yearly' && (
+              {dashTab === 'yearly' && !dataLoaded && (
+                <SkeletonYearly />
+              )}
+              {dashTab === 'yearly' && dataLoaded && (
                 <YearlyDashboard
                   userEmail={user.email}
                   entries={entries}
