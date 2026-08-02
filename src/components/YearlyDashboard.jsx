@@ -36,7 +36,7 @@ const C = {
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
+const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt1 = (n) => n.toFixed(1);
 
 // Weekend rest days removed due to custom monthly logic not matching daily work log

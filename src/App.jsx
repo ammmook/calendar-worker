@@ -29,7 +29,7 @@ const todayKey = () => {
 };
 
 const fmt1 = (n) => n.toFixed(1);
-const fmtB = (n) => '฿' + Math.round(n).toLocaleString('en-US');
+const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Weekend rest days removed due to custom monthly logic not matching daily work log
 
