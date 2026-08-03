@@ -47,6 +47,14 @@ const deductOtHours = (h) => {
   return Math.max(0, h);
 };
 
+/** สั่น (haptic) — no-op ถ้าเบราว์เซอร์ไม่รองรับ (เช่น iOS Safari) */
+const vibrate = (pattern) => {
+  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pattern); } catch {}
+};
+// รูปแบบการสั่น: บันทึก/แก้ไข/ลบ สำเร็จ = จังหวะคู่ ; toggle วันหยุด = จังหวะสั้นเดียว (ให้ต่างกัน)
+const VIBE_SUCCESS = [35, 25, 35];
+const VIBE_HOLIDAY = 18;
+
 // Weekend rest days removed due to custom monthly logic not matching daily work log
 
 const AnimatedWaitText = () => {
@@ -321,6 +329,7 @@ export default function App() {
       }
       return next;
     });
+    vibrate(VIBE_HOLIDAY);
 
     // Save to Google Apps Script backend
     if (user?.email) {
@@ -358,6 +367,7 @@ export default function App() {
         // Reload to sync _id and get calculated earnings before closing
         await loadEntries(true, true);
 
+        vibrate(VIBE_SUCCESS);
         showToast(lang === 'th' ? 'บันทึกและคำนวณเงินแล้ว' : 'Saved and calculated');
         
         // Close modal/pane immediately
@@ -394,6 +404,7 @@ export default function App() {
         // Reload entries จาก Sheet (force reload)
         await loadEntries(true, true);
       setSelectedKey(null);
+      vibrate(VIBE_SUCCESS);
       showToast(t.entry_deleted || 'Entry deleted');
     } catch (err) {
       console.error('[TimeFlow] Delete error:', err);
@@ -504,6 +515,7 @@ export default function App() {
           setIsSavingLeave(false);
         }
       }
+      vibrate(VIBE_SUCCESS);
       showToast(leaveData.leave?.type === 'training'
         ? (lang === 'th' ? 'เพิ่มการอบรมแล้ว' : 'Training recorded')
         : (lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded'));
