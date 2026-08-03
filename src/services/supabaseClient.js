@@ -17,7 +17,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 export const supabase = createClient(SUPABASE_URL || '', SUPABASE_ANON_KEY || '', {
   auth: {
-    persistSession: false,
-    autoRefreshToken: false,
+    persistSession: true,        // เก็บ session ไว้ (Supabase จัดการเอง)
+    autoRefreshToken: true,      // ต่ออายุ token อัตโนมัติ
+    detectSessionInUrl: true,    // อ่าน ?code= หลัง redirect กลับจาก Google แล้วแลกเป็น session
+    flowType: 'pkce',            // OAuth แบบ PKCE (ปลอดภัยสำหรับ client-side)
   },
 });

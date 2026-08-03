@@ -1,20 +1,23 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '../services/supabaseClient';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    AuthContext
-   ─ Wraps Google Identity Services (GIS) One Tap / OAuth 2.0
+   ─ ใช้ Supabase Auth (Google provider) — Supabase จัดการ session/OAuth redirect เอง
    ───────────────────────────────────────────────────────────────────────────── */
 
 const AuthContext = createContext(null);
 
-// ── Decode a Google JWT id_token (base64url) ──────────────────────────────────
-function decodeJwt(token) {
-    try {
-        const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        return JSON.parse(atob(base64));
-    } catch {
-        return null;
-    }
+// แปลง Supabase user → รูปแบบที่แอปใช้ { id, name, email, picture }
+function mapSupabaseUser(sUser) {
+    if (!sUser) return null;
+    const meta = sUser.user_metadata || {};
+    return {
+        id: sUser.id,
+        email: sUser.email || meta.email || '',
+        name: meta.full_name || meta.name || sUser.email || '',
+        picture: meta.avatar_url || meta.picture || '',
+    };
 }
 
 export function AuthProvider({ children }) {
@@ -22,49 +25,51 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);   // true while checking session
     const [error, setError] = useState(null);
 
-    // ── Restore session from localStorage ────────────────────────────────────
+    // ── โหลด session ปัจจุบัน + ติดตามการเปลี่ยนแปลง (login/logout/refresh) ──
     useEffect(() => {
-        try {
-            const stored = localStorage.getItem('tf_user');
-            if (stored) setUser(JSON.parse(stored));
-        } catch { /* ignore */ }
-        setLoading(false);
+        let mounted = true;
+
+        supabase.auth.getSession().then(({ data }) => {
+            if (!mounted) return;
+            setUser(mapSupabaseUser(data.session?.user));
+            setLoading(false);
+        });
+
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(mapSupabaseUser(session?.user));
+            setLoading(false);
+        });
+
+        return () => {
+            mounted = false;
+            sub?.subscription?.unsubscribe();
+        };
     }, []);
 
-    // ── Persist user to localStorage whenever it changes ─────────────────────
-    useEffect(() => {
-        if (user) localStorage.setItem('tf_user', JSON.stringify(user));
-        else localStorage.removeItem('tf_user');
-    }, [user]);
-
-    // ── Successful Google Login Handler ───────────────────────────────────────
-    const handleGoogleSuccess = useCallback((payload) => {
-        setUser({
-            id: payload.sub,
-            name: payload.name,
-            email: payload.email,
-            picture: payload.picture,
-        });
+    // ── เข้าสู่ระบบด้วย Google (ผ่าน Supabase OAuth) ──
+    const signInWithGoogle = useCallback(async () => {
         setError(null);
-    }, []);
-
-    // ── Sign in as Guest ───────────────────────────────────────────────────────
-    const signInAsGuest = useCallback((name = 'ผู้ใช้งานทั่วไป') => {
-        setUser({
-            id: `guest-${Date.now()}`,
-            name,
-            email: 'guest@local.dev',
-            picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=3B4FE4&color=fff&size=128&font-size=0.4`
+        const { error: oauthError } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin,
+            },
         });
+        if (oauthError) {
+            setError(oauthError.message || 'Sign-in failed');
+            throw oauthError;
+        }
+        // ถ้าไม่ error เบราว์เซอร์จะ redirect ไป Google ทันที
     }, []);
 
-    // ── Sign out ───────────────────────────────────────────────────────────────
-    const signOut = useCallback(() => {
+    // ── ออกจากระบบ ──
+    const signOut = useCallback(async () => {
+        await supabase.auth.signOut();
         setUser(null);
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, error, setError, handleGoogleSuccess, signInAsGuest, signOut }}>
+        <AuthContext.Provider value={{ user, loading, error, setError, signInWithGoogle, signOut }}>
             {children}
         </AuthContext.Provider>
     );

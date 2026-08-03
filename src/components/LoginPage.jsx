@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { CalendarDays, Clock, TrendingUp } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { useGoogleLogin } from '@react-oauth/google';
 
 
 function WorkerIllustration() {
@@ -168,34 +167,17 @@ function WorkerIllustration() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LoginPage() {
-    const { handleGoogleSuccess, loading: authLoading, error, setError } = useAuth();
+    const { signInWithGoogle, loading: authLoading, error } = useAuth();
     const [isSigningIn, setIsSigningIn] = useState(false);
 
-    const loginWithGoogle = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            try {
-                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                });
-                const data = await res.json();
-                handleGoogleSuccess(data);
-            } catch {
-                setError('Error fetching profile from Google');
-            } finally {
-                setIsSigningIn(false);
-            }
-        },
-        onError: () => {
-            setError('Sign-in cancelled or encountered an error');
-            setIsSigningIn(false);
-        },
-        onNonOAuthError: () => setIsSigningIn(false),
-    });
-
-    const handleGoogleClick = () => {
+    const handleGoogleClick = async () => {
         setIsSigningIn(true);
-        setError(null);
-        loginWithGoogle();
+        try {
+            // สำเร็จ → เบราว์เซอร์ redirect ไป Google ; error → เคลียร์สถานะปุ่ม
+            await signInWithGoogle();
+        } catch {
+            setIsSigningIn(false);
+        }
     };
 
     const isInteractionDisabled = authLoading || isSigningIn;
