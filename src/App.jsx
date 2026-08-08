@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   ChevronLeft, ChevronRight,
   LayoutDashboard, Settings2,
@@ -588,8 +588,28 @@ export default function App() {
     const ssParts = String(shiftStart || '').split(':');
     const ssMin = (ssParts.length >= 2 && !isNaN(Number(ssParts[0])) && !isNaN(Number(ssParts[1])))
       ? Number(ssParts[0]) * 60 + Number(ssParts[1]) : null;
-    // มีกะ = วันนี้ได้เบี้ยกะ (เข้างานตรงเวลาเริ่มกะพอดี)
-    const hasShift = Number(shiftAllowance) > 0 && ssMin != null && inMin === ssMin;
+      
+    const seParts = String(shiftEnd || '').split(':');
+    const seMin = (seParts.length >= 2 && !isNaN(Number(seParts[0])) && !isNaN(Number(seParts[1])))
+      ? Number(seParts[0]) * 60 + Number(seParts[1]) : null;
+
+    let isWithinShift = false;
+    if (ssMin != null) {
+      if (seMin != null) {
+        if (ssMin <= seMin) {
+          isWithinShift = inMin >= ssMin && inMin <= seMin;
+        } else {
+          // กะข้ามคืน เช่น 22:00 ถึง 06:00
+          isWithinShift = inMin >= ssMin || inMin <= seMin;
+        }
+      } else {
+        // ถ้าไม่มีเวลาสิ้นสุดกะ ให้เช็คแค่เวลาเข้างาน >= เวลาเริ่มกะ
+        isWithinShift = inMin >= ssMin;
+      }
+    }
+
+    // มีกะ = วันนี้ได้เบี้ยกะ (เข้างานอยู่ในช่วงเวลาเข้ากะ)
+    const hasShift = Number(shiftAllowance) > 0 && isWithinShift;
 
     // ถ้าทำข้ามคืน → ตรวจว่าวันถัดไปเป็นนักขัตฤกษ์/วันหยุด(user)หรือไม่
     let nextIsPublic = false, nextIsUserHoliday = false;
@@ -671,7 +691,7 @@ export default function App() {
       shift_allowance: shiftEarning,
       total_earning: regularEarning + otEarning + shiftEarning,
     };
-  }, [dIn, dOut, selectedKey, std, salary, otRate, paymentType, dailyRate, shiftAllowance, shiftStart, publicHolidays, holidays]);
+  }, [dIn, dOut, selectedKey, std, salary, otRate, paymentType, dailyRate, shiftAllowance, shiftStart, shiftEnd, publicHolidays, holidays]);
 
   // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
   const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);

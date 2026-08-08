@@ -55,6 +55,18 @@ function deductOtHours(h) {
   return Math.max(0, h);
 }
 
+/**
+ * เข้างานถือว่า "เข้ากะ" หรือไม่ — เข้างาน >= เวลาเริ่มกะ และยังไม่เกินเวลาจบกะ
+ * - ไม่มีเวลาจบกะ → แค่ >= เวลาเริ่มกะก็พอ
+ * - กะข้ามคืน (จบ ≤ เริ่ม เช่น 22:00–06:00) → อยู่ในช่วง [เริ่ม, เที่ยงคืน] ∪ [เที่ยงคืน, จบ]
+ */
+function isWithinShift(inMin, startMin, endMin) {
+  if (startMin == null) return false;
+  if (endMin == null) return inMin >= startMin;
+  if (endMin > startMin) return inMin >= startMin && inMin <= endMin;
+  return inMin >= startMin || inMin <= endMin; // กะข้ามคืน
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SALARY (เก็บตรงในตาราง user คอลัมน์ `salary` — รายเดือนอย่างเดียว)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -316,6 +328,7 @@ async function upsertWorkEntry(data) {
     // ── การตั้งค่าเบี้ยกะ (เก็บในตาราง user) ──
     const shiftAllowance = Number(user.shift_allowance) || 0;
     const shiftStart = user.shift_start || '';
+    const shiftEnd = user.shift_end || '';
 
     const paymentType = user.payment_type || 'monthly';
     const dailyRate = Number(user.daily_rate) || 0;
@@ -364,8 +377,9 @@ async function upsertWorkEntry(data) {
 
         const inMin = ih * 60 + im;
         const shiftStartMin = parseHHMM(shiftStart);
-        // มีกะ = วันนี้ได้เบี้ยกะ (เข้างานตรงเวลาเริ่มกะพอดี)
-        const hasShift = shiftAllowance > 0 && shiftStartMin != null && inMin === shiftStartMin;
+        const shiftEndMin = parseHHMM(shiftEnd);
+        // มีกะ = เข้างาน >= เวลาเริ่มกะ และยังไม่เกินเวลาจบกะ
+        const hasShift = shiftAllowance > 0 && isWithinShift(inMin, shiftStartMin, shiftEndMin);
 
         // ── ถ้าทำข้ามคืน (ทำเกินวัน) → ตรวจว่า "วันถัดไป" เป็นนักขัตฤกษ์/วันหยุดหรือไม่ ──
         let nextIsPublic = false, nextIsUserHoliday = false;
