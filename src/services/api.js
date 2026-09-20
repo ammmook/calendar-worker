@@ -962,7 +962,8 @@ function normalizeDate(raw) {
 function normalizeTime(raw) {
   if (!raw) return '';
   const str = String(raw).trim();
-  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(str)) return str.substring(0, 5);
+  const timeMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (timeMatch) return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
   const isoMatch = str.match(/T(\d{2}):(\d{2})/);
   if (isoMatch) return `${isoMatch[1]}:${isoMatch[2]}`;
   try {

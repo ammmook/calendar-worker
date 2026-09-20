@@ -4,6 +4,8 @@ import {
   Stethoscope, UmbrellaOff, Plane, GraduationCap, Moon, Palmtree, Sun,
   CalendarCheck,
 } from 'lucide-react';
+import TimePicker from './TimePicker';
+import { isValidTimeValue } from './timeUtils';
 
 // ─── Helpers (mirror App.jsx) ─────────────────────────────────────────────────
 const dateKey = (y, m, d) =>
@@ -231,11 +233,21 @@ export default function WorkCalendar({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
                     <div className="min-w-0">
                       <label className={labelCls}>{t.clock_in}</label>
-                      <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dIn} onChange={(e) => setDIn(e.target.value)} disabled={isSelectedHoliday} />
+                      <TimePicker
+                        value={dIn}
+                        onChange={setDIn}
+                        className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
+                        disabled={isSelectedHoliday}
+                      />
                     </div>
                     <div className="min-w-0">
                       <label className={labelCls}>{t.clock_out}</label>
-                      <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dOut} onChange={(e) => setDOut(e.target.value)} disabled={isSelectedHoliday} />
+                      <TimePicker
+                        value={dOut}
+                        onChange={setDOut}
+                        className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
+                        disabled={isSelectedHoliday}
+                      />
                     </div>
                   </div>
 
@@ -313,7 +325,7 @@ export default function WorkCalendar({
                     )}
                     <button
                       onClick={saveSelectedEntry}
-                      disabled={!dIn || isSelectedHoliday || isSavingEntry}
+                      disabled={!isValidTimeValue(dIn) || (!!dOut && !isValidTimeValue(dOut)) || isSelectedHoliday || isSavingEntry}
                       className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2 relative overflow-hidden
                         ${isSelectedHoliday
                           ? 'bg-[#D1D5E0] cursor-not-allowed'
@@ -387,11 +399,21 @@ export default function WorkCalendar({
                 <div className="grid grid-cols-2 gap-3 w-full min-w-0">
                   <div className="min-w-0">
                     <label className={labelCls}>{t.clock_in}</label>
-                    <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dIn} onChange={(e) => setDIn(e.target.value)} disabled={isSelectedHoliday} />
+                    <TimePicker
+                      value={dIn}
+                      onChange={setDIn}
+                      className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
+                      disabled={isSelectedHoliday}
+                    />
                   </div>
                   <div className="min-w-0">
                     <label className={labelCls}>{t.clock_out}</label>
-                    <input type="time" className={`${inputCls} ${isSelectedHoliday ? 'opacity-50 cursor-not-allowed bg-[#E8EAEF]' : ''}`} value={dOut} onChange={(e) => setDOut(e.target.value)} disabled={isSelectedHoliday} />
+                    <TimePicker
+                      value={dOut}
+                      onChange={setDOut}
+                      className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
+                      disabled={isSelectedHoliday}
+                    />
                   </div>
                 </div>
 
@@ -467,7 +489,7 @@ export default function WorkCalendar({
                   )}
                   <button
                     onClick={saveSelectedEntry}
-                    disabled={!dIn || isSelectedHoliday || isSavingEntry}
+                    disabled={!isValidTimeValue(dIn) || (!!dOut && !isValidTimeValue(dOut)) || isSelectedHoliday || isSavingEntry}
                     className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 relative overflow-hidden
                       ${isSelectedHoliday
                         ? 'bg-[#D1D5E0] cursor-not-allowed'

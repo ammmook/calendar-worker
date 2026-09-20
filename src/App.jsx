@@ -19,6 +19,7 @@ import { getLang } from './locales';
 import { useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
+import { isValidTimeValue } from './components/timeUtils';
 import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
 
@@ -342,7 +343,7 @@ export default function App() {
   };
 
   const saveSelectedEntry = async () => {
-    if (!dIn || !selectedKey || !user?.email) return false;
+    if (!isValidTimeValue(dIn) || (dOut && !isValidTimeValue(dOut)) || !selectedKey || !user?.email) return false;
     
     // Optimistic update so data is shown on screen immediately
     setEntries((prev) => ({
@@ -563,7 +564,7 @@ export default function App() {
 
   // Preview คำนวณสดจากเวลาที่กรอก (ก่อนกดบันทึก) — ใช้ตรรกะเดียวกับ upsertWorkEntry ใน api.js
   const previewCalc = useMemo(() => {
-    if (!dIn || !dOut || !selectedKey) return null;
+    if (!isValidTimeValue(dIn) || !isValidTimeValue(dOut) || !selectedKey) return null;
     const pIn = String(dIn).split(':'), pOut = String(dOut).split(':');
     const ih = Number(pIn[0] || 0), im = Number(pIn[1] || 0);
     const oh = Number(pOut[0] || 0), om = Number(pOut[1] || 0);
