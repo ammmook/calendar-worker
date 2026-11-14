@@ -126,6 +126,7 @@ export default function App() {
   const [socialSecurity, setSocialSecurity] = useState(0);
 
   const [dIn, setDIn] = useState('');
+  const [dNote, setDNote] = useState('');
   const [dOut, setDOut] = useState('');
   const [toast, setToast] = useState({ show: false, msg: '' });
   const [view, setView] = useState('calendar'); // 'calendar' | 'dashboard'
@@ -278,7 +279,8 @@ export default function App() {
   useEffect(() => {
     setDIn(selEntry.in || '');
     setDOut(selEntry.out || '');
-  }, [selectedKey, selEntry.in, selEntry.out]);
+    setDNote(selEntry.note || '');
+  }, [selectedKey, selEntry.in, selEntry.out, selEntry.note]);
 
   // ── Monthly aggregates ──
   const currentMonthSummary = useMemo(() => {
@@ -352,6 +354,7 @@ export default function App() {
         ...(prev[selectedKey] || {}),
         in: dIn,
         out: dOut,
+        note: dNote.trim(),
         leave: null
       }
     }));
@@ -360,7 +363,7 @@ export default function App() {
     try {
       const entryData = frontendEntryToSheet(
         selectedKey,
-        { in: dIn, out: dOut, leave: null },
+        { in: dIn, out: dOut, note: dNote.trim(), leave: null },
         user.email
       );
       const res = await WorkEntryAPI.upsert(entryData);
@@ -912,6 +915,7 @@ export default function App() {
               selectedKey={selectedKey} setSelectedKey={setSelectedKey}
               handleDayClick={handleDayClick} toggleHoliday={toggleHoliday}
               dIn={dIn} dOut={dOut} setDIn={setDIn} setDOut={setDOut}
+              dNote={dNote} setDNote={setDNote}
               saveSelectedEntry={saveSelectedEntry} deleteSelectedEntry={deleteSelectedEntry}
               isSavingEntry={isSavingEntry} isDeletingEntry={isDeletingEntry}
               showLeaveSelector={showLeaveSelector} showDeleteConfirm={showDeleteConfirm}

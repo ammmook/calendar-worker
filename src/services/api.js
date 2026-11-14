@@ -266,7 +266,7 @@ function pickWorkEntryColumns(data) {
     'clock_in', 'clock_out', 'leave_type', 'working_hour',
     'ot_hour', 'ot_earning', 'user_email',
     'ot_hour_15', 'ot_earning_15', 'ot_hour_1', 'ot_earning_1', 'ot_hour_3', 'ot_earning_3',
-    'regular_earning', 'shift_allowance', 'total_earning',
+    'regular_earning', 'shift_allowance', 'total_earning', 'note',
   ];
   const row = {};
   COLS.forEach((c) => {
@@ -996,6 +996,7 @@ export function sheetEntriesToFrontend(sheetEntries) {
       in: normalizeTime(entry.clock_in),
       out: normalizeTime(entry.clock_out),
       _id: String(entry.work_entry_id || ''),
+      note: entry.note || '',
     };
 
     if (entry.leave_type && String(entry.leave_type).trim() !== '') {
@@ -1022,5 +1023,6 @@ export function frontendEntryToSheet(dateStr, entry, userEmail) {
     clock_in: entry.in || '',
     clock_out: entry.out || '',
     leave_type: entry.leave?.type || '',
+    note: entry.note || '',
   };
 }

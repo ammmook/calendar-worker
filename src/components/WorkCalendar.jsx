@@ -1,11 +1,12 @@
 import React, { useRef } from 'react';
+import Swal from 'sweetalert2';
 import {
-  ChevronLeft, ChevronRight, X, Trash2, CheckCircle2, CalendarDays,
-  Stethoscope, UmbrellaOff, Plane, GraduationCap, Moon, Palmtree, Sun,
+  ChevronLeft, ChevronRight, X, CalendarDays,
+  GraduationCap, Moon, Palmtree, Sun,
   CalendarCheck,
 } from 'lucide-react';
-import TimePicker from './TimePicker';
-import { isValidTimeValue } from './timeUtils';
+import DayDetailForm from './DayDetailForm';
+import { LEAVE_META } from './leaveMeta';
 
 // ─── Helpers (mirror App.jsx) ─────────────────────────────────────────────────
 const dateKey = (y, m, d) =>
@@ -17,17 +18,6 @@ const todayKeyFn = () => {
 const fmt1 = (n) => n.toFixed(1);
 const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const AnimatedWaitText = () => {
-  const [dots, setDots] = React.useState('');
-  React.useEffect(() => {
-    const seq = ['.  ', '.. ', '...', '.. '];
-    let i = 0;
-    const t = setInterval(() => { i = (i + 1) % seq.length; setDots(seq[i]); }, 300);
-    return () => clearInterval(t);
-  }, []);
-  return <span className="inline-block text-left whitespace-pre">{dots}</span>;
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // หน้า "ปฏิทินการทำงาน" — ปฏิทิน + panel/modal แก้ไขวัน (สกัดจาก App.jsx)
 export default function WorkCalendar({
@@ -37,7 +27,7 @@ export default function WorkCalendar({
   entries, setEntries, earningsSummary, holidays, publicHolidays, paymentType,
   selectedKey, setSelectedKey,
   handleDayClick, toggleHoliday,
-  dIn, dOut, setDIn, setDOut,
+  dIn, dOut, setDIn, setDOut, dNote, setDNote,
   saveSelectedEntry, deleteSelectedEntry,
   isSavingEntry, isDeletingEntry,
   showLeaveSelector, showDeleteConfirm,
@@ -50,6 +40,46 @@ export default function WorkCalendar({
   const firstDow = new Date(viewY, viewM, 1).getDay();
   const emptyCells = Array.from({ length: firstDow });
   const dayCells = Array.from({ length: daysInM }, (_, i) => i + 1);
+
+  // props ที่ DayDetailForm ใช้ร่วมกัน (desktop panel + modal มือถือ)
+  const formProps = {
+    lang, t,
+    selectedKey, entries, setEntries, showToast,
+    dIn, dOut, setDIn, setDOut, dNote, setDNote,
+    isSelectedHoliday, isSavingEntry, isDeletingEntry,
+    saveSelectedEntry, deleteSelectedEntry,
+    paymentType, previewCalc,
+    calc: {
+      detHReg, netDetOT, detE, detOTRateEarn, detShift,
+      detOT15h, detOT15e, detOT1h, detOT1e, detOT3h, detOT3e,
+    },
+    labelCls, inputCls,
+  };
+
+  // กดนอก modal มือถือ: ถ้ามีเวลาที่แก้ค้างยังไม่บันทึก ให้ถามก่อนปิด
+  const isDirty = !!selectedKey && (dIn !== (selEntry.in || '') || dOut !== (selEntry.out || '') || dNote.trim() !== (selEntry.note || ''));
+  const closeModal = async () => {
+    if (isDirty) {
+      const res = await Swal.fire({
+        title: t.discard_title,
+        text: t.discard_text,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3B4FE4',
+        cancelButtonColor: '#9CA3AF',
+        confirmButtonText: t.discard_yes,
+        cancelButtonText: t.keep_editing,
+        customClass: {
+          container: 'font-sans',
+          popup: 'rounded-2xl',
+          confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
+          cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
+        },
+      });
+      if (!res.isConfirmed) return;
+    }
+    setSelectedKey(null);
+  };
 
   const goTodayAndSelect = () => {
     goToday();
@@ -170,182 +200,10 @@ export default function WorkCalendar({
             </div>
 
             <div className="p-4 w-full overflow-hidden">
-              {selEntry.leave !== null && selEntry.leave !== undefined ? (
-                /* Leave info display */
-                <div className="flex flex-col gap-3 w-full">
-                  <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
-                    <div className="text-center">
-                      {(() => {
-                        const PANEL_LEAVE = {
-                          sick:     { Icon: Stethoscope,   color: '#F43F5E', bg: '#FFF1F3', label: lang === 'th' ? 'ลาป่วย'   : 'Sick Leave'     },
-                          personal: { Icon: UmbrellaOff,   color: '#F472B6', bg: '#FCE7F3', label: lang === 'th' ? 'ลากิจ'   : 'Personal Leave' },
-                          vacation: { Icon: Plane,         color: '#3B4FE4', bg: '#EEF0FD', label: lang === 'th' ? 'ลาพักร้อน' : 'Annual Leave'  },
-                          training: { Icon: GraduationCap, color: '#111827', bg: '#F3F4F6', label: lang === 'th' ? 'อบรม'     : 'Training'       },
-                        };
-                        const info = PANEL_LEAVE[selEntry.leave?.type] || PANEL_LEAVE.sick;
-                        return (
-                          <>
-                            <div className="w-14 h-14 rounded-2xl grid place-items-center mx-auto mb-2" style={{ backgroundColor: info.bg }}>
-                              <info.Icon size={28} style={{ color: info.color }} />
-                            </div>
-                            <div className="text-sm font-bold text-[#111827]">{info.label}</div>
-                          </>
-                        );
-                      })()}
-                      <div className="text-xs text-[#9CA3AF] mt-1">
-                        {selEntry.leave?.type === 'training'
-                          ? (lang === 'th' ? 'บันทึกการอบรมแล้ว' : 'Training recorded for this day')
-                          : (lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day')}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 w-full">
-                    {(entries[selectedKey]?._id || entries[selectedKey]?.leave) && (
-                      <button
-                        onClick={deleteSelectedEntry}
-                        disabled={isDeletingEntry}
-                        title={t.delete_entry || 'Delete'}
-                        className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                          ${isDeletingEntry
-                            ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                            : 'bg-[#FFF1F3] text-[#F43F5E] cursor-pointer hover:bg-[#FEE2E2]'}`}
-                      >
-                        {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => {
-                        setEntries((p) => ({
-                          ...p,
-                          [selectedKey]: { ...p[selectedKey], leave: null }
-                        }));
-                        showToast(lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Changed to working day');
-                      }}
-                      className="flex-1 py-2.5 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
-                    >
-                      {lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Change to Working Day'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 w-full min-w-0">
-                  {/* Time inputs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
-                    <div className="min-w-0">
-                      <label className={labelCls}>{t.clock_in}</label>
-                      <TimePicker
-                        value={dIn}
-                        onChange={setDIn}
-                        className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
-                        disabled={isSelectedHoliday}
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <label className={labelCls}>{t.clock_out}</label>
-                      <TimePicker
-                        value={dOut}
-                        onChange={setDOut}
-                        className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
-                        disabled={isSelectedHoliday}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Calc summary */}
-                  <div className="bg-[#F8F9FB] rounded-[10px] p-3 flex flex-col gap-2">
-                    <div className="flex justify-between items-center mb-2.5">
-                      <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                      <span className="text-[13px] font-bold text-[#3B4FE4]">{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                      <div className="text-right">
-                        <div className="text-[13px] font-bold text-[#c29302]">{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
-                        {netDetOT > 0 && detOTRateEarn > 0 && (
-                          <div className="text-[10px] font-bold text-[#c29302] leading-none">+{fmtB(detOTRateEarn)}</div>
-                        )}
-                      </div>
-                    </div>
-                    {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
-                    {previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0) && (
-                      <div className="flex flex-col gap-1 pl-3 -mt-0.5">
-                        {detOT15h > 0 && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-medium text-[#c29302]">OT ×1.5 · {fmt1(detOT15h)}h</span>
-                            <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
-                          </div>
-                        )}
-                        {detOT1h > 0 && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-medium text-[#c29302]">OT ×1 · {fmt1(detOT1h)}h</span>
-                            <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT1e)}</span>
-                          </div>
-                        )}
-                        {detOT3h > 0 && (
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-medium text-[#c29302]">OT ×3 · {fmt1(detOT3h)}h</span>
-                            <span className="text-[10px] font-bold text-[#c29302]">+{fmtB(detOT3e)}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                      <span className="text-[13px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
-                    </div>
-                    <hr className="border-[#E8EAEF]" />
-                    {detShift > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.shift_earnings}</span>
-                        <span className="text-[13px] font-bold text-[#E8730C]">+{fmtB(detShift)}</span>
-                      </div>
-                    )}
-                    {(paymentType !== 'monthly' || detE > 0) && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                        <span className="text-[13px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Save / Update / Delete */}
-                  <div className="flex gap-2 w-full mt-1">
-                    {(entries[selectedKey]?._id || entries[selectedKey]?.in) && (
-                      <button
-                        onClick={deleteSelectedEntry}
-                        disabled={isSelectedHoliday || isDeletingEntry}
-                        title={t.delete_entry}
-                        className={`px-4 py-2.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                          ${isSelectedHoliday || isDeletingEntry
-                            ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                            : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
-                      >
-                        {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={16} />}
-                      </button>
-                    )}
-                    <button
-                      onClick={saveSelectedEntry}
-                      disabled={!isValidTimeValue(dIn) || (!!dOut && !isValidTimeValue(dOut)) || isSelectedHoliday || isSavingEntry}
-                      className={`flex-1 py-2.5 rounded-[10px] text-white text-[13px] font-bold border-none transition-all flex items-center justify-center gap-2 relative overflow-hidden
-                        ${isSelectedHoliday
-                          ? 'bg-[#D1D5E0] cursor-not-allowed'
-                          : isSavingEntry
-                            ? 'bg-[#7B8CED] cursor-wait text-transparent'
-                            : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] hover:-translate-y-px hover:shadow-[0_4px_14px_rgba(59,79,228,0.32)]'}`}
-                    >
-                      <div className={`flex items-center gap-2 transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
-                        <CheckCircle2 size={14} />
-                        <span>{entries[selectedKey]?.in ? t.update_entry : t.save_entry}</span>
-                      </div>
-                      {isSavingEntry && (
-                        <div className="absolute inset-0 flex items-center justify-center text-white">
-                          <AnimatedWaitText />
-                        </div>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
+              <DayDetailForm
+                variant="panel"
+                {...formProps}
+              />
             </div>
           </div>
           )}
@@ -373,7 +231,7 @@ export default function WorkCalendar({
       {selectedKey && !showLeaveSelector && !showDeleteConfirm && (
         <div
           className="xl:hidden fixed inset-0 z-[200] bg-[#111827]/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
-          onClick={() => setSelectedKey(null)}
+          onClick={closeModal}
         >
           <div
             className="bg-white rounded-[20px] w-full max-w-[340px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden max-h-[90vh] scale-100 animate-[zoomIn_0.2s_ease_both]"
@@ -394,121 +252,10 @@ export default function WorkCalendar({
             </div>
 
             <div className="p-5 overflow-y-auto">
-              <div className="flex flex-col gap-4 w-full min-w-0">
-                {/* Time inputs */}
-                <div className="grid grid-cols-2 gap-3 w-full min-w-0">
-                  <div className="min-w-0">
-                    <label className={labelCls}>{t.clock_in}</label>
-                    <TimePicker
-                      value={dIn}
-                      onChange={setDIn}
-                      className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
-                      disabled={isSelectedHoliday}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className={labelCls}>{t.clock_out}</label>
-                    <TimePicker
-                      value={dOut}
-                      onChange={setDOut}
-                      className={`${inputCls} ${isSelectedHoliday ? 'bg-[#E8EAEF]' : ''}`}
-                      disabled={isSelectedHoliday}
-                    />
-                  </div>
-                </div>
-
-                {/* Calc summary */}
-                <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.regular}</span>
-                    <span className="text-[14px] font-bold text-[#3B4FE4]">{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.overtime}</span>
-                    <div className="text-right">
-                      <div className="text-[14px] font-bold text-[#c29302]">{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
-                      {netDetOT > 0 && detOTRateEarn > 0 && (
-                        <div className="text-[11px] font-bold text-[#c29302] leading-none">+{fmtB(detOTRateEarn)}</div>
-                      )}
-                    </div>
-                  </div>
-                  {/* รายละเอียด OT แยกอัตรา (ก่อนบันทึก) */}
-                  {previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0) && (
-                    <div className="flex flex-col gap-1 pl-3 -mt-1">
-                      {detOT15h > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-medium text-[#c29302]">OT ×1.5 · {fmt1(detOT15h)}h</span>
-                          <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT15e)}</span>
-                        </div>
-                      )}
-                      {detOT1h > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-medium text-[#c29302]">OT ×1 · {fmt1(detOT1h)}h</span>
-                          <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT1e)}</span>
-                        </div>
-                      )}
-                      {detOT3h > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[11px] font-medium text-[#c29302]">OT ×3 · {fmt1(detOT3h)}h</span>
-                          <span className="text-[11px] font-bold text-[#c29302]">+{fmtB(detOT3e)}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.total}</span>
-                    <span className="text-[14px] font-bold text-[#111827]">{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
-                  </div>
-                  <div className="h-px bg-[#E8EAEF] w-full" />
-                  {detShift > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.shift_earnings}</span>
-                      <span className="text-[14px] font-bold text-[#E8730C]">+{fmtB(detShift)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]">{t.earnings}</span>
-                    <span className="text-[16px] font-bold text-[#10B981]">{detE > 0 ? fmtB(detE) : '—'}</span>
-                  </div>
-                </div>
-
-                {/* Save / Update / Delete */}
-                <div className="flex gap-2.5 w-full mt-2">
-                  {entries[selectedKey]?.in && (
-                    <button
-                      onClick={deleteSelectedEntry}
-                      disabled={isSelectedHoliday || isDeletingEntry}
-                      title={t.delete_entry}
-                      className={`px-5 py-3.5 rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
-                        ${isSelectedHoliday || isDeletingEntry
-                          ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                          : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
-                    >
-                      {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={18} />}
-                    </button>
-                  )}
-                  <button
-                    onClick={saveSelectedEntry}
-                    disabled={!isValidTimeValue(dIn) || (!!dOut && !isValidTimeValue(dOut)) || isSelectedHoliday || isSavingEntry}
-                    className={`flex-1 py-3.5 rounded-[10px] text-white text-[14px] font-bold border-none transition-all flex items-center justify-center gap-2.5 relative overflow-hidden
-                      ${isSelectedHoliday
-                        ? 'bg-[#D1D5E0] cursor-not-allowed'
-                        : isSavingEntry
-                          ? 'bg-[#7B8CED] cursor-wait text-transparent'
-                          : 'bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]'}`}
-                  >
-                    <div className={`flex items-center gap-2.5 transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
-                      <CheckCircle2 size={16} />
-                      <span>{entries[selectedKey]?.in ? t.update_entry : t.save_entry}</span>
-                    </div>
-                    {isSavingEntry && (
-                      <div className="absolute inset-0 flex items-center justify-center text-white">
-                        <AnimatedWaitText />
-                      </div>
-                    )}
-                  </button>
-                </div>
-              </div>
+              <DayDetailForm
+                variant="modal"
+                {...formProps}
+              />
             </div>
           </div>
         </div>
@@ -541,13 +288,7 @@ function DayCell({
   // Leave tag
   const isLeave = entry?.leave !== null && entry?.leave !== undefined;
   const leaveType = entry?.leave?.type;
-  const LEAVE_ICONS = {
-    sick: { color: '#F43F5E', bg: 'rgba(244,63,94,0.12)', Icon: Stethoscope },
-    personal: { color: '#F472B6', bg: 'rgba(244,114,182,0.12)', Icon: UmbrellaOff },
-    vacation: { color: '#3B4FE4', bg: 'rgba(59,79,228,0.12)', Icon: Plane },
-    training: { color: '#111827', bg: 'rgba(17,24,39,0.10)', Icon: GraduationCap },
-  };
-  const leaveInfo = isLeave && leaveType ? LEAVE_ICONS[leaveType] : null;
+  const leaveInfo = isLeave && leaveType ? LEAVE_META[leaveType] : null;
   const isTrainingEntry = leaveType === 'training';
   const trainingLabel = lang === 'th' ? 'อบรม/ดูงานนอกสถานที่' : 'Training / Off-site';
 
@@ -604,7 +345,11 @@ function DayCell({
 
   return (
     <div
-      onClick={() => { if (!isLongPress.current) handleDayClick(k); }}
+      onClick={() => {
+        // กดค้างสลับวันหยุดแล้ว → ข้าม click ที่ตามมา และรีเซ็ต flag เพื่อไม่ให้ค้างไปกลืนการกดครั้งถัดไป
+        if (isLongPress.current) { isLongPress.current = false; return; }
+        handleDayClick(k);
+      }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
