@@ -205,7 +205,15 @@ export default function MonthlySummary({
                         {(() => { const li = LEAVE_META[e.leave?.type] || LEAVE_META.vacation; return lang === 'th' ? li.th : li.en; })()}
                       </div>
                     ) : hasEntry ? (
-                      <div className="text-[11px] text-muted">{e.in} → {e.out}</div>
+                      <>
+                        <div className="text-[11px] text-muted">{e.in} → {e.out}</div>
+                        {e.note && (
+                          <div className="text-[10px] text-muted truncate flex items-center gap-1" title={e.note}>
+                            <span className="w-1 h-1 rounded-full bg-muted shrink-0" />
+                            <span className="truncate">{e.note}</span>
+                          </div>
+                        )}
+                      </>
                     ) : isHol ? (
                       <div className="text-[10px] font-medium text-[#998ed9]">{t.holiday_legend}</div>
                     ) : (
