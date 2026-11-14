@@ -36,8 +36,8 @@ export function DonutChart({ segments, centerLabel, centerValue, size = 200, thi
         </g>
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-4 text-center">
-        <span className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.06em]">{centerLabel}</span>
-        <span className="text-[17px] font-bold text-[#111827] leading-tight mt-0.5 break-all">{centerValue}</span>
+        <span className="text-[10px] font-bold text-muted uppercase tracking-[0.06em]">{centerLabel}</span>
+        <span className="text-[17px] font-bold text-ink leading-tight mt-0.5 break-all">{centerValue}</span>
       </div>
     </div>
   );
@@ -50,12 +50,12 @@ export function LegendRow({ color, label, sub, value, total, raw }) {
     <div className="flex items-center gap-2.5">
       <span className="w-3 h-3 rounded-[4px] shrink-0" style={{ background: color }} />
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold text-[#374151] leading-tight truncate">{label}</div>
-        {sub && <div className="text-[10px] text-[#9CA3AF] leading-tight truncate">{sub}</div>}
+        <div className="text-[12px] font-semibold text-ink-2 leading-tight truncate">{label}</div>
+        {sub && <div className="text-[10px] text-muted leading-tight truncate">{sub}</div>}
       </div>
       <div className="text-right shrink-0">
-        <div className="text-[12px] font-bold text-[#111827] leading-tight">{value}</div>
-        <div className="text-[10px] text-[#9CA3AF] leading-tight">{pct}%</div>
+        <div className="text-[12px] font-bold text-ink leading-tight">{value}</div>
+        <div className="text-[10px] text-muted leading-tight">{pct}%</div>
       </div>
     </div>
   );

@@ -21,19 +21,10 @@ import LoginPage from './components/LoginPage';
 import ProfilePage, { OT_MODE } from './components/ProfilePage';
 import { isValidTimeValue } from './components/timeUtils';
 import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
+import { todayKey, yearOptions } from './utils/format';
 import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const dateKey = (y, m, d) =>
-  `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-const todayKey = () => {
-  const t = new Date();
-  return dateKey(t.getFullYear(), t.getMonth() + 1, t.getDate());
-};
-
-const fmt1 = (n) => n.toFixed(1);
-const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 /** บวก n วันจากสตริง "YYYY-MM-DD" → คืน "YYYY-MM-DD" */
 const addDaysStr = (dateStr, n) => {
   const [y, m, d] = String(dateStr).split('-').map(Number);
@@ -57,17 +48,6 @@ const VIBE_SUCCESS = [35, 25, 35];
 const VIBE_HOLIDAY = 18;
 
 // Weekend rest days removed due to custom monthly logic not matching daily work log
-
-const AnimatedWaitText = () => {
-  const [dots, setDots] = useState('');
-  useEffect(() => {
-    const seq = ['.  ', '.. ', '...', '.. '];
-    let i = 0;
-    const t = setInterval(() => { i = (i + 1) % seq.length; setDots(seq[i]); }, 300);
-    return () => clearInterval(t);
-  }, []);
-  return <span className="inline-block text-left whitespace-pre">{dots}</span>;
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function App() {
@@ -124,6 +104,7 @@ export default function App() {
 
   // ── ประกันสังคม (หักจากเงินเดือน) — เก็บใน user ──
   const [socialSecurity, setSocialSecurity] = useState(0);
+  const [profileStatus, setProfileStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
 
   const [dIn, setDIn] = useState('');
   const [dNote, setDNote] = useState('');
@@ -138,10 +119,13 @@ export default function App() {
   const [isDeletingEntry, setIsDeletingEntry] = useState(false);
   const [isSavingLeave, setIsSavingLeave] = useState(false);
 
-  // ── Load user profile from Google Sheets on login ──
+  // ── Load user profile on login ──
+  // 'loading' | 'ready' | 'error' — ProfilePage บันทึกได้ต่อเมื่อ 'ready' เท่านั้น
+  // (กันฟอร์มที่ค่ายังเป็น 0 ไปเขียนทับโปรไฟล์จริง)
   useEffect(() => {
     if (!user?.email) return;
     let cancelled = false;
+    setProfileStatus('loading');
     console.log('[TimeFlow] Loading user profile for:', user.email);
 
     (async () => {
@@ -168,10 +152,11 @@ export default function App() {
           if (u.shift_end) setShiftEnd(u.shift_end);
 
           console.log('[TimeFlow] ✅ User profile loaded');
-        } else {
-          // User ไม่เจอ → สร้างใหม่ด้วย defaults
+          setProfileStatus('ready');
+        } else if (res.error === 'User not found') {
+          // User ไม่เจอจริง ๆ → สร้างใหม่ด้วย defaults
           console.log('[TimeFlow] User not found, creating new user...');
-          await UserAPI.create({
+          const created = await UserAPI.create({
             email: user.email,
             salary_monthly: 0,
             ot_hourly: 0,
@@ -181,9 +166,16 @@ export default function App() {
             payment_type: 'monthly',
             daily_rate: 0,
           });
+          if (cancelled) return;
+          setProfileStatus(created?.success ? 'ready' : 'error');
+        } else {
+          // error อื่น (เครือข่าย/RLS) — ห้ามถือว่าเป็น user ใหม่
+          console.error('[TimeFlow] Failed to load user profile:', res.error);
+          setProfileStatus('error');
         }
       } catch (err) {
         console.error('[TimeFlow] Failed to load user profile:', err);
+        if (!cancelled) setProfileStatus('error');
       }
     })();
 
@@ -241,7 +233,7 @@ export default function App() {
       initialLoadDoneRef.current = true;
       setDataLoaded(true);
     }
-  }, [user?.email, lang, viewY]);
+  }, [user?.email, viewY]);
 
   useEffect(() => {
     loadEntries();
@@ -269,9 +261,12 @@ export default function App() {
     return () => { cancelled = true; };
   }, [user?.email]);
 
+  // เคลียร์ timer เดิมก่อนเสมอ ไม่งั้น toast ใหม่จะถูก timer ของอันเก่าปิดก่อนเวลา
+  const toastTimer = useRef(null);
   const showToast = (msg) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ show: true, msg });
-    setTimeout(() => setToast({ show: false, msg: '' }), 2600);
+    toastTimer.current = setTimeout(() => setToast({ show: false, msg: '' }), 2600);
   };
 
   // ── Sync selected entry → detail inputs ──
@@ -316,7 +311,7 @@ export default function App() {
   const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
 
   // Toggle holiday for a date key
-  const toggleHoliday = async (e, k) => {
+  const toggleHoliday = useCallback(async (e, k) => {
     e.stopPropagation();
     
     // Calculate the new state before putting it in setHolidays
@@ -342,7 +337,7 @@ export default function App() {
         console.error('[TimeFlow] Failed to save holiday', err);
       }
     }
-  };
+  }, [holidays, user?.email]);
 
   const saveSelectedEntry = async () => {
     if (!isValidTimeValue(dIn) || (dOut && !isValidTimeValue(dOut)) || !selectedKey || !user?.email) return false;
@@ -437,8 +432,8 @@ export default function App() {
           popup: 'rounded-2xl',
           confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
           cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
-          title: 'text-[18px] text-[#111827]',
-          htmlContainer: 'text-[14px] text-[#6B7280]'
+          title: 'text-[18px] text-ink',
+          htmlContainer: 'text-[14px] text-muted'
         }
       }).then((result) => {
         if (result.isConfirmed) {
@@ -534,7 +529,7 @@ export default function App() {
     if (window.innerWidth < 1280) setSelectedKey(null);
   };
 
-  const handleDayClick = (dateKey) => {
+  const handleDayClick = useCallback((dateKey) => {
     if (selectedKey === dateKey) {
       setSelectedKey(null);
     } else {
@@ -545,7 +540,7 @@ export default function App() {
       setLeaveSelectorKey(dateKey);
       setShowLeaveSelector(true);
     }
-  };
+  }, [selectedKey, holidays]);
 
   // Ensure bottom sheet closes if date is deselected
   useEffect(() => {
@@ -716,8 +711,8 @@ export default function App() {
   const isSelectedHoliday = selectedKey ? holidays.has(selectedKey) : false;
 
   // ── Shared utility classes ──
-  const labelCls = 'text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] block mb-1';
-  const inputCls = 'w-full min-w-0 block bg-[#F8F9FB] border-[1.5px] border-[#D1D5E0] rounded-[6px] text-[#111827] text-sm font-medium px-1 sm:px-3 py-2 outline-none cursor-pointer transition-colors focus:border-[#3B4FE4] focus:bg-white box-border';
+  const labelCls = 'text-[10px] font-bold text-muted uppercase tracking-[0.08em] block mb-1';
+  const inputCls = 'w-full min-w-0 block bg-surface-alt border-[1.5px] border-line-strong rounded-[6px] text-ink text-sm font-medium px-1 sm:px-3 py-2 outline-none cursor-pointer transition-colors focus:border-primary focus:bg-white box-border';
 
   // ── Auth guard — show login if not signed in ──────────────────────────────
   if (authLoading) {
@@ -729,6 +724,9 @@ export default function App() {
   if (page === 'profile') {
     return (
       <ProfilePage
+        // key เปลี่ยนเมื่อโหลดโปรไฟล์เสร็จ → ฟอร์มรีเซ็ตจากค่าจริง ไม่ใช่ snapshot ตอนยังเป็น 0
+        key={profileStatus}
+        profileStatus={profileStatus}
         salary={salary} setSalary={setSalary}
         otRate={otRate} setOtRate={setOtRate}
         std={std} setStd={setStd}
@@ -754,73 +752,78 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[#374151] font-sans antialiased selection:bg-[#EEF0FD]">
+    <div className="min-h-screen bg-white text-ink-2 font-sans antialiased selection:bg-primary-soft">
       
       {/* ════════════════════════════════════════════
           TOPBAR
       ════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-50 w-full h-[60px] bg-white border-b border-[#E8EAEF] flex items-center justify-between px-6">
+      <header className="sticky top-0 z-50 w-full h-[60px] bg-white border-b border-line flex items-center justify-between px-6">
 
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-[30px] h-[30px] bg-[#3B4FE4] rounded-lg grid place-items-center shrink-0">
+          <div className="w-[30px] h-[30px] bg-primary rounded-lg grid place-items-center shrink-0">
             <CalendarDays size={15} className="text-white" />
           </div>
-          <span className="font-bold text-[17px] text-[#111827] tracking-tight">TimeFlow</span>
+          <span className="font-bold text-[17px] text-ink tracking-tight">TimeFlow</span>
         </div>
 
         {/* Period filters (desktop) */}
         <div className="hidden sm:flex items-center gap-2">
-          <span className="text-xs font-semibold text-[#9CA3AF] mr-1">{t.period}</span>
+          <span className="text-xs font-semibold text-muted mr-1">{t.period}</span>
 
           <div className="relative">
             <select
               value={viewM}
+              aria-label={t.month_label}
               onChange={(e) => setViewM(Number(e.target.value))}
-              className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[#111827] text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-[#3B4FE4] hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-[#3B4FE4] focus:shadow-[0_0_0_3px_#EEF0FD]"
+              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
             >
               {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
             </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
           </div>
 
           <div className="relative">
             <select
               value={viewY}
+              aria-label={t.year_label}
               onChange={(e) => {
                 setViewY(Number(e.target.value));
-                showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...');
+                showToast(t.loading_data);
               }}
-              className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[#111827] text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-[#3B4FE4] hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-[#3B4FE4] focus:shadow-[0_0_0_3px_#EEF0FD]"
+              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
             >
-              {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
+              {yearOptions(today, viewY).map((y) => (
                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
               ))}
             </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
+            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
           </div>
 
           <button
             onClick={goToday}
-            className="px-3.5 py-[7px] rounded-[10px] bg-white border-[1.5px] border-[#D1D5E0] text-[#374151] text-[13px] font-medium cursor-pointer shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-[#3B4FE4] hover:text-[#3B4FE4] hover:bg-[#EEF0FD] hover:-translate-y-px"
+            className="px-3.5 py-[7px] rounded-[10px] bg-white border-[1.5px] border-line-strong text-ink-2 text-[13px] font-medium cursor-pointer shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-primary hover:text-primary hover:bg-primary-soft hover:-translate-y-px"
           >
             {t.today}
           </button>
         </div>
 
         {/* Tab toggle (always visible) — Work Calendar | Dashboard */}
-        <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[10px] p-1">
+        <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[10px] p-1">
           {[
             { id: 'calendar', Icon: CalendarDays, label: t.work_calendar },
             { id: 'dashboard', Icon: LayoutDashboard, label: t.dashboard },
           ].map(({ id, Icon, label }) => (
             <button
               key={id}
+              type="button"
               onClick={() => setView(id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all
+              aria-label={label}
+              aria-pressed={view === id}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all
                 ${view === id
-                  ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                  : 'text-[#6B7280] hover:text-[#374151]'}`}
+                  ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                  : 'text-muted hover:text-ink-2'}`}
             >
               <Icon size={13} />
               <span className="hidden sm:inline">{label}</span>
@@ -831,8 +834,10 @@ export default function App() {
         {/* Language Toggle & User Menu */}
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => setLang(l => l === 'en' ? 'th' : 'en')}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-white border-2 border-[#E8EAEF] text-[11px] font-bold text-[#6B7280] cursor-pointer transition-all hover:border-[#C7CCFA] hover:text-[#3B4FE4]"
+            aria-label={t.switch_language}
+            className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white border-2 border-line text-[11px] font-bold text-muted cursor-pointer transition-all hover:border-primary-mid hover:text-primary"
           >
             {lang.toUpperCase()}
           </button>
@@ -853,46 +858,54 @@ export default function App() {
       <div className="flex min-h-[calc(100vh-60px)]">
 
         {/* ── SIDEBAR ─────────────────────────────── */}
-        <aside className="hidden xl:flex flex-col w-[220px] shrink-0 bg-white border-r border-[#E8EAEF] sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto p-4 gap-1">
+        <aside className="hidden xl:flex flex-col w-[220px] shrink-0 bg-white border-r border-line sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto p-4 gap-1">
 
           {/* Nav: Work Calendar / Dashboard */}
-          <div className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.1em] px-3 pt-3 pb-2">{t.menu}</div>
-          <div
+          <div className="text-[10px] font-bold text-muted uppercase tracking-[0.1em] px-3 pt-3 pb-2">{t.menu}</div>
+          <button
+            type="button"
             onClick={() => setView('calendar')}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
-              ${view === 'calendar' ? 'bg-[#EEF0FD] text-[#3B4FE4]' : 'text-[#6B7280] hover:bg-[#F8F9FB] hover:text-[#374151]'}`}
+            aria-current={view === 'calendar' ? 'page' : undefined}
+            className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
+              ${view === 'calendar' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-alt hover:text-ink-2'}`}
           >
             <CalendarDays size={15} />
             {t.work_calendar}
-          </div>
-          <div
+          </button>
+          <button
+            type="button"
             onClick={() => setView('dashboard')}
-            className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
-              ${view === 'dashboard' ? 'bg-[#EEF0FD] text-[#3B4FE4]' : 'text-[#6B7280] hover:bg-[#F8F9FB] hover:text-[#374151]'}`}
+            aria-current={view === 'dashboard' ? 'page' : undefined}
+            className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
+              ${view === 'dashboard' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-alt hover:text-ink-2'}`}
           >
             <LayoutDashboard size={15} />
             {t.dashboard}
-          </div>
+          </button>
 
           {/* Sub-tabs (แสดงเมื่ออยู่หน้า Dashboard) */}
           {view === 'dashboard' && (
-            <div className="mt-1 ml-3 pl-3 border-l border-[#E8EAEF] flex flex-col gap-1">
-              <div
+            <div className="mt-1 ml-3 pl-3 border-l border-line flex flex-col gap-1">
+              <button
+                type="button"
                 onClick={() => setDashTab('monthly')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
-                  ${dashTab === 'monthly' ? 'text-[#3B4FE4]' : 'text-[#6B7280] hover:text-[#374151]'}`}
+                aria-current={dashTab === 'monthly' ? 'page' : undefined}
+                className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
+                  ${dashTab === 'monthly' ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'monthly' ? 'bg-[#3B4FE4]' : 'bg-[#D1D5E0]'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'monthly' ? 'bg-primary' : 'bg-line-strong'}`} />
                 {t.monthly}
-              </div>
-              <div
+              </button>
+              <button
+                type="button"
                 onClick={() => setDashTab('yearly')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
-                  ${dashTab === 'yearly' ? 'text-[#3B4FE4]' : 'text-[#6B7280] hover:text-[#374151]'}`}
+                aria-current={dashTab === 'yearly' ? 'page' : undefined}
+                className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
+                  ${dashTab === 'yearly' ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'yearly' ? 'bg-[#3B4FE4]' : 'bg-[#D1D5E0]'}`} />
+                <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'yearly' ? 'bg-primary' : 'bg-line-strong'}`} />
                 {t.annual}
-              </div>
+              </button>
             </div>
           )}
         </aside>
@@ -936,18 +949,20 @@ export default function App() {
             <div className="flex flex-col gap-6 w-full">
 
               {/* Sub-tab toggle (mobile-first: เต็มความกว้างบนมือถือ) */}
-              <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[12px] p-1 w-full sm:w-auto sm:self-start">
+              <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1 w-full sm:w-auto sm:self-start">
                 {[
                   { id: 'monthly', Icon: LayoutDashboard, label: t.monthly },
                   { id: 'yearly', Icon: BarChart2, label: t.annual },
                 ].map(({ id, Icon, label }) => (
                   <button
                     key={id}
+                    type="button"
                     onClick={() => setDashTab(id)}
+                    aria-pressed={dashTab === id}
                     className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-[9px] text-[13px] font-semibold cursor-pointer transition-all
                       ${dashTab === id
-                        ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                        : 'text-[#6B7280] hover:text-[#374151]'}`}
+                        ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                        : 'text-muted hover:text-ink-2'}`}
                   >
                     <Icon size={14} />
                     {label}
@@ -1026,20 +1041,20 @@ export default function App() {
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+              <div className="w-12 h-1.5 bg-line rounded-full"></div>
             </div>
 
             <div className="flex flex-col items-center justify-center p-6 pb-10 gap-4">
-              <div className="w-14 h-14 bg-[#FEF2F2] rounded-full flex items-center justify-center mb-1 text-[#EF4444]">
+              <div className="w-14 h-14 bg-[#FEF2F2] rounded-full flex items-center justify-center mb-1 text-danger">
                 <Trash2 size={24} />
               </div>
-              <h3 className="text-[17px] font-bold text-[#111827] text-center leading-tight">{t.confirm_delete_title || 'Delete this entry?'}</h3>
-              <p className="text-[14px] text-[#6B7280] text-center mb-2 px-2 leading-relaxed">{t.confirm_delete || 'Are you sure you want to delete this entry?'}</p>
+              <h3 className="text-[17px] font-bold text-ink text-center leading-tight">{t.confirm_delete_title || 'Delete this entry?'}</h3>
+              <p className="text-[14px] text-muted text-center mb-2 px-2 leading-relaxed">{t.confirm_delete || 'Are you sure you want to delete this entry?'}</p>
               
               <div className="flex w-full gap-3 mt-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3.5 rounded-[12px] bg-[#F8F9FB] text-[#6B7280] text-[15px] font-bold border border-[#E8EAEF] transition-all cursor-pointer hover:bg-[#E8EAEF]"
+                  className="flex-1 py-3.5 rounded-[12px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition-all cursor-pointer hover:bg-line"
                 >
                   {t.cancel || 'Cancel'}
                 </button>
@@ -1048,7 +1063,7 @@ export default function App() {
                     performDelete();
                     setShowDeleteConfirm(false);
                   }}
-                  className="flex-1 py-3.5 rounded-[12px] bg-[#EF4444] text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-[#DC2828] shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
+                  className="flex-1 py-3.5 rounded-[12px] bg-danger text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-[#DC2828] shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
                 >
                   {t.confirm_yes || 'Yes, delete it'}
                 </button>
@@ -1083,7 +1098,7 @@ export default function App() {
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+              <div className="w-12 h-1.5 bg-line rounded-full"></div>
             </div>
 
             <div className="flex flex-col items-center justify-center p-6 pb-10 gap-4">
@@ -1091,14 +1106,14 @@ export default function App() {
                 <AlertCircle size={32} />
               </div>
               <div className="text-center space-y-1 px-4">
-                <h3 className="text-[18px] font-bold text-[#111827] leading-tight">{t.profile_incomplete_title}</h3>
-                <p className="text-[14px] text-[#6B7280] leading-relaxed">{t.profile_incomplete_msg}</p>
+                <h3 className="text-[18px] font-bold text-ink leading-tight">{t.profile_incomplete_title}</h3>
+                <p className="text-[14px] text-muted leading-relaxed">{t.profile_incomplete_msg}</p>
               </div>
               
               <div className="flex w-full gap-3 mt-2">
                 <button
                   onClick={() => setShowProfileIncomplete(false)}
-                  className="flex-1 py-3.5 rounded-[14px] bg-[#F8F9FB] text-[#6B7280] text-[15px] font-bold border border-[#E8EAEF] transition-all cursor-pointer hover:bg-[#E8EAEF]"
+                  className="flex-1 py-3.5 rounded-[14px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition-all cursor-pointer hover:bg-line"
                 >
                   {t.cancel || 'Cancel'}
                 </button>
@@ -1107,7 +1122,7 @@ export default function App() {
                     setShowProfileIncomplete(false);
                     setPage('profile');
                   }}
-                  className="flex-1 py-3.5 rounded-[14px] bg-[#3B4FE4] text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-[#2A3BC0] shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
+                  className="flex-1 py-3.5 rounded-[14px] bg-primary text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-primary-dark shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
                 >
                   {t.go_to_profile}
                 </button>
@@ -1119,16 +1134,16 @@ export default function App() {
 
 
       {/* Toast */}
-      <div className={`fixed bottom-6 right-6 bg-[#111827] text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
+      <div role="status" aria-live="polite" className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
         ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <CheckCircle2 size={14} className="text-[#10B981]" />
+        <CheckCircle2 size={14} className="text-income" />
         {toast.msg}
       </div>
 
       {/* Saving Toast */}
-      <div className={`fixed bottom-6 right-6 bg-[#111827] text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
+      <div className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
         ${(isSavingEntry || isDeletingEntry || isSavingLeave) && !toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <Loader2 size={14} className="text-[#3B4FE4] animate-spin" />
+        <Loader2 size={14} className="text-primary animate-spin" />
         {lang === 'th' ? 'กำลังบันทึกและคำนวณเงิน...' : 'Saving and calculating...'}
       </div>
 
@@ -1157,31 +1172,31 @@ function UserMenu({ user, t, onProfile, onSignOut }) {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-[1.5px] border-[#E8EAEF] bg-white cursor-pointer transition-all hover:border-[#C7CCFA] hover:shadow-[0_2px_8px_rgba(17,24,39,0.08)] select-none"
+        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-[1.5px] border-line bg-white cursor-pointer transition-all hover:border-primary-mid hover:shadow-[0_2px_8px_rgba(17,24,39,0.08)] select-none"
       >
         {/* Avatar image */}
         {user?.picture ? (
           <img
             src={user.picture}
             alt={user.name}
-            className="w-7 h-7 rounded-full object-cover border border-[#E8EAEF]"
+            className="w-7 h-7 rounded-full object-cover border border-line"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-[#EEF0FD] grid place-items-center text-[11px] font-bold text-[#3B4FE4]">
+          <div className="w-7 h-7 rounded-full bg-primary-soft grid place-items-center text-[11px] font-bold text-primary">
             {initials}
           </div>
         )}
         {/* Name (desktop only) */}
-        <span className="hidden md:block text-[12px] font-semibold text-[#374151] max-w-[100px] truncate">
+        <span className="hidden md:block text-[12px] font-semibold text-ink-2 max-w-[100px] truncate">
           {user?.name?.split(' ')[0]}
         </span>
-        <ChevronDown size={12} className={`text-[#9CA3AF] transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown size={12} className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-[240px] bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_8px_32px_rgba(17,24,39,0.12)] z-[999] overflow-hidden animate-[fadeUp_0.2s_ease_both]">
+        <div className="absolute right-0 top-[calc(100%+8px)] w-[240px] bg-white border border-line rounded-2xl shadow-[0_8px_32px_rgba(17,24,39,0.12)] z-[999] overflow-hidden animate-[fadeUp_0.2s_ease_both]">
 
           {/* User info header */}
           <div className="px-4 py-3.5 border-b border-[#F3F4F8]">
@@ -1189,13 +1204,13 @@ function UserMenu({ user, t, onProfile, onSignOut }) {
               {user?.picture ? (
                 <img src={user.picture} alt="" className="w-9 h-9 rounded-xl object-cover" />
               ) : (
-                <div className="w-9 h-9 rounded-xl bg-[#EEF0FD] grid place-items-center text-[13px] font-bold text-[#3B4FE4]">
+                <div className="w-9 h-9 rounded-xl bg-primary-soft grid place-items-center text-[13px] font-bold text-primary">
                   {initials}
                 </div>
               )}
               <div className="min-w-0">
-                <div className="text-[13px] font-bold text-[#111827] truncate">{user?.name}</div>
-                <div className="text-[11px] text-[#9CA3AF] truncate">{user?.email}</div>
+                <div className="text-[13px] font-bold text-ink truncate">{user?.name}</div>
+                <div className="text-[11px] text-muted truncate">{user?.email}</div>
               </div>
             </div>
           </div>
@@ -1231,16 +1246,16 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
       className={`w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors
         ${danger
           ? 'text-[#F43F5E] hover:bg-[#FFF1F3]'
-          : 'text-[#374151] hover:bg-[#F8F9FB]'}`}
+          : 'text-ink-2 hover:bg-surface-alt'}`}
     >
       <div className={`w-7 h-7 rounded-[7px] grid place-items-center shrink-0
-        ${danger ? 'bg-[#FFF1F3]' : 'bg-[#F8F9FB]'}`}>
-        <Icon size={14} className={danger ? 'text-[#F43F5E]' : 'text-[#6B7280]'} />
+        ${danger ? 'bg-[#FFF1F3]' : 'bg-surface-alt'}`}>
+        <Icon size={14} className={danger ? 'text-[#F43F5E]' : 'text-muted'} />
       </div>
       <div className="min-w-0">
         <div className="text-[12px] font-semibold">{label}</div>
-        {sub && <div className="text-[10px] text-[#9CA3AF]">{sub}</div>}
+        {sub && <div className="text-[10px] text-muted">{sub}</div>}
       </div>
     </button>
-    );
-    }
+  );
+}

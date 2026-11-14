@@ -101,11 +101,11 @@ function WorkerIllustration() {
                 style={{ animationDelay: '0.3s' }}>
                 <div className="bg-white/18 backdrop-blur-md border border-white/30 rounded-2xl px-4 py-3 shadow-xl" style={{ minWidth: 130 }}>
                     <div className="flex items-center gap-2 mb-1.5">
-                        <div className="w-5 h-5 bg-[#10B981] rounded-full grid place-items-center shrink-0">
+                        <div className="w-5 h-5 bg-income rounded-full grid place-items-center shrink-0">
                             <Clock size={11} className="text-white" />
                         </div>
                         <span className="text-white text-[11px] font-bold">Clock In</span>
-                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#10B981] anim-pulse-dot" />
+                        <div className="ml-auto w-1.5 h-1.5 rounded-full bg-income anim-pulse-dot" />
                     </div>
                     <div className="text-white/95 text-[19px] font-bold font-mono tracking-widest">08:32</div>
                     <div className="text-white/50 text-[10px] mt-0.5">Mon 24 Mar 2025</div>
@@ -117,10 +117,10 @@ function WorkerIllustration() {
                 style={{ animationDelay: '0.7s' }}>
                 <div className="bg-white/18 backdrop-blur-md border border-white/30 rounded-2xl px-4 py-3 shadow-xl">
                     <div className="flex items-center gap-1.5 mb-1">
-                        <TrendingUp size={12} className="text-[#fbde3a]" />
+                        <TrendingUp size={12} className="text-ot-bar" />
                         <span className="text-white/65 text-[10px] font-semibold uppercase tracking-wider">OT Earned Today</span>
                     </div>
-                    <div className="text-[#fbde3a] text-[17px] font-bold">+฿450</div>
+                    <div className="text-ot-bar text-[17px] font-bold">+฿450</div>
                     <div className="text-white/50 text-[10px]">2.5 hrs overtime</div>
                 </div>
             </div>
@@ -183,19 +183,19 @@ export default function LoginPage() {
     const isInteractionDisabled = authLoading || isSigningIn;
 
     return (
-        <div className="min-h-screen bg-[#F8F9FB] flex flex-col lg:flex-row font-sans overflow-hidden">
+        <div className="min-h-screen bg-surface-alt flex flex-col lg:flex-row font-sans overflow-hidden">
 
             {/* ════════════════════════════════════════
           LEFT: indigo panel + illustration
           (desktop only — hidden on mobile)
       ════════════════════════════════════════ */}
             <div className="hidden lg:flex flex-col w-[52%] xl:w-[55%] min-h-screen
-        bg-gradient-to-br from-[#3B4FE4] via-[#3045D8] to-[#2236B8]
+        bg-gradient-to-br from-primary via-[#3045D8] to-[#2236B8]
         relative overflow-hidden anim-slide-left">
 
                 {/* Mesh blobs */}
                 <div className="pointer-events-none absolute -top-20 -left-20 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
-                <div className="pointer-events-none absolute bottom-0 right-0 w-96 h-96 bg-[#fbde3a]/6 rounded-full blur-3xl" />
+                <div className="pointer-events-none absolute bottom-0 right-0 w-96 h-96 bg-ot-bar/6 rounded-full blur-3xl" />
                 <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 w-60 h-60 bg-white/3 rounded-full blur-2xl" />
 
                 {/* Top logo */}
@@ -235,17 +235,17 @@ export default function LoginPage() {
 
                 {/* Mobile background blobs */}
                 <div className="pointer-events-none fixed inset-0 overflow-hidden lg:hidden">
-                    <div className="absolute -top-32 -left-32 w-72 h-72 bg-[#EEF0FD] rounded-full opacity-70 blur-3xl" />
-                    <div className="absolute -bottom-24 -right-16 w-64 h-64 bg-[#ECFDF5] rounded-full opacity-60 blur-3xl" />
+                    <div className="absolute -top-32 -left-32 w-72 h-72 bg-primary-soft rounded-full opacity-70 blur-3xl" />
+                    <div className="absolute -bottom-24 -right-16 w-64 h-64 bg-income-soft rounded-full opacity-60 blur-3xl" />
                 </div>
 
                 {/* Mobile logo */}
                 <div className="lg:hidden flex flex-col items-center mb-8 anim-fade-in">
-                    <div className="w-[52px] h-[52px] bg-[#3B4FE4] rounded-2xl grid place-items-center shadow-[0_8px_28px_rgba(59,79,228,0.28)] mb-3">
+                    <div className="w-[52px] h-[52px] bg-primary rounded-2xl grid place-items-center shadow-[0_8px_28px_rgba(59,79,228,0.28)] mb-3">
                         <CalendarDays size={24} className="text-white" />
                     </div>
-                    <h1 className="text-[22px] font-bold text-[#111827] tracking-tight">TimeFlow</h1>
-                    <p className="text-[13px] text-[#9CA3AF] mt-0.5">Time tracking &amp; OT management</p>
+                    <h1 className="text-[22px] font-bold text-ink tracking-tight">TimeFlow</h1>
+                    <p className="text-[13px] text-muted mt-0.5">Time tracking &amp; OT management</p>
                 </div>
 
                 {/* Card container */}
@@ -253,22 +253,22 @@ export default function LoginPage() {
 
                     {/* Desktop heading above card */}
                     <div className="hidden lg:block mb-7">
-                        <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.12em] mb-2">
+                        <p className="text-[11px] font-bold text-muted uppercase tracking-[0.12em] mb-2">
                             Welcome to TimeFlow
                         </p>
-                        <h2 className="text-[28px] font-bold text-[#111827] tracking-tight leading-tight">
+                        <h2 className="text-[28px] font-bold text-ink tracking-tight leading-tight">
                             Sign in to your<br />workspace
                         </h2>
                     </div>
 
                     {/* White card */}
-                    <div className="bg-white rounded-3xl border border-[#E8EAEF]
+                    <div className="bg-white rounded-3xl border border-line
             shadow-[0_8px_40px_rgba(17,24,39,0.08)] p-7 anim-shimmer">
 
                         {/* Mobile heading inside card */}
                         <div className="lg:hidden mb-5">
-                            <h2 className="text-[18px] font-bold text-[#111827]">Welcome Back</h2>
-                            <p className="text-[13px] text-[#9CA3AF] mt-0.5">Sign in with your Google account</p>
+                            <h2 className="text-[18px] font-bold text-ink">Welcome Back</h2>
+                            <p className="text-[13px] text-muted mt-0.5">Sign in with your Google account</p>
                         </div>
 
                         {/* Error */}
@@ -283,10 +283,10 @@ export default function LoginPage() {
                             onClick={handleGoogleClick}
                             disabled={isInteractionDisabled}
                             className="w-full flex items-center justify-center gap-3 px-5 py-3.5
-                rounded-[14px] border-[1.5px] border-[#D1D5E0] bg-white
-                text-[#374151] font-semibold text-[14px] cursor-pointer
+                rounded-[14px] border-[1.5px] border-line-strong bg-white
+                text-ink-2 font-semibold text-[14px] cursor-pointer
                 transition-all duration-200
-                hover:border-[#3B4FE4] hover:shadow-[0_4px_18px_rgba(59,79,228,0.16)]
+                hover:border-primary hover:shadow-[0_4px_18px_rgba(59,79,228,0.16)]
                 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none
                 disabled:opacity-50 disabled:cursor-not-allowed
                 shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
@@ -313,7 +313,7 @@ export default function LoginPage() {
 
                         <p className="text-center text-[11px] text-[#C4C9D4] mt-5 leading-relaxed">
                             By signing in you agree to our{' '}
-                            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-[#3B4FE4] hover:underline">Privacy Policy</a>
+                            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy</a>
                         </p>
                     </div>
 

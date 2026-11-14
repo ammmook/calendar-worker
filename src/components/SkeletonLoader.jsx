@@ -23,10 +23,10 @@ function SkeletonBlock({ className = '', style }) {
 
 /* ─── Stat card skeleton (KPI/summary card) ──────────────────────────── */
 const STAT_VARIANTS = [
-  { stripe: 'bg-[#fbde3a]', icon: 'bg-[#fffdef] text-[#c29302]', Icon: Timer },
-  { stripe: 'bg-[#FDBA74]', icon: 'bg-[#FFF3E6] text-[#E8730C]', Icon: Moon },
-  { stripe: 'bg-[#3B4FE4]', icon: 'bg-[#EEF0FD] text-[#3B4FE4]', Icon: TrendingUp },
-  { stripe: 'bg-[#10B981]', icon: 'bg-[#ECFDF5] text-[#10B981]', Icon: Banknote },
+  { stripe: 'bg-ot-bar', icon: 'bg-ot-soft text-ot', Icon: Timer },
+  { stripe: 'bg-[#FDBA74]', icon: 'bg-shift-soft text-shift', Icon: Moon },
+  { stripe: 'bg-primary', icon: 'bg-primary-soft text-primary', Icon: TrendingUp },
+  { stripe: 'bg-income', icon: 'bg-income-soft text-income', Icon: Banknote },
 ];
 
 /* การ์ดสรุป 5 ใบ (4 stat + hero) ตรงกับ grid grid-cols-2 lg:grid-cols-5 */
@@ -36,7 +36,7 @@ function SkeletonStatCards() {
       {STAT_VARIANTS.map(({ stripe, icon, Icon }, i) => (
         <div
           key={i}
-          className="relative overflow-hidden rounded-2xl border border-[#E8EAEF] p-4 sm:p-6 bg-white shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
+          className="relative overflow-hidden rounded-2xl border border-line p-4 sm:p-6 bg-white shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
           style={{ animationDelay: `${i * 0.06}s` }}
         >
           <span className={`absolute top-0 left-4 sm:left-6 right-4 sm:right-6 h-[3px] rounded-b-[4px] opacity-60 ${stripe}`} />
@@ -69,7 +69,7 @@ function SkeletonTabsHeader() {
   return (
     <div className="flex items-center justify-between flex-wrap gap-3">
       {/* Sub-tabs */}
-      <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[12px] p-1">
+      <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1">
         {Array.from({ length: 3 }).map((_, i) => (
           <div key={i} className="flex items-center gap-1.5 px-3 py-2 rounded-[9px]">
             <SkeletonBlock className="w-3.5 h-3.5 rounded" />
@@ -86,8 +86,8 @@ function SkeletonTabsHeader() {
 /* ─── OT by rate card skeleton (แถวชิดๆ 3 อัตรา) ──────────────────────── */
 function SkeletonOtRows() {
   return (
-    <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-line">
         <SkeletonBlock className="h-[15px] w-32 rounded-md" />
         <SkeletonBlock className="h-[11px] w-24 rounded" />
       </div>
@@ -108,7 +108,7 @@ function SkeletonOtRows() {
           </div>
         ))}
       </div>
-      <div className="px-5 py-3.5 border-t border-[#E8EAEF] flex items-center justify-between">
+      <div className="px-5 py-3.5 border-t border-line flex items-center justify-between">
         <SkeletonBlock className="h-[11px] w-24 rounded" />
         <SkeletonBlock className="h-[15px] w-14 rounded" />
       </div>
@@ -136,8 +136,8 @@ export function SkeletonYearly() {
       <SkeletonOtRows />
 
       {/* Leave summary card */}
-      <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+      <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
           <SkeletonBlock className="h-[15px] w-28 rounded-md" />
           <SkeletonBlock className="h-[11px] w-16 rounded" />
         </div>
@@ -154,7 +154,7 @@ export function SkeletonYearly() {
               <SkeletonBlock className="h-[5px] w-full rounded-full" />
             </div>
           ))}
-          <div className="mt-2 pt-3 border-t border-[#E8EAEF] flex items-center justify-between">
+          <div className="mt-2 pt-3 border-t border-line flex items-center justify-between">
             <SkeletonBlock className="h-[11px] w-28 rounded" />
             <SkeletonBlock className="h-[15px] w-12 rounded" />
           </div>
@@ -167,9 +167,9 @@ export function SkeletonYearly() {
 /* ─── Skeleton Calendar card ──────────────────────────────────────────── */
 function SkeletonCalendarCard({ daysShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] }) {
   return (
-    <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
       {/* Calendar header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-line">
         <SkeletonBlock className="h-[17px] w-28 rounded-md" />
         <div className="flex items-center gap-1.5">
           <SkeletonBlock className="w-[64px] h-[30px] rounded-lg" />
@@ -182,7 +182,7 @@ function SkeletonCalendarCard({ daysShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] 
         {/* Weekday row */}
         <div className="grid grid-cols-7 mb-1.5">
           {daysShort.map((d, i) => (
-            <div key={i} className="text-center text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.06em] py-1.5">
+            <div key={i} className="text-center text-[11px] font-bold text-muted uppercase tracking-[0.06em] py-1.5">
               {d}
             </div>
           ))}
@@ -206,8 +206,8 @@ function SkeletonCalendarCard({ daysShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] 
 /* ─── Skeleton Right Panel (day detail placeholder) ──────────────────── */
 function SkeletonDayDetail() {
   return (
-    <div className="hidden xl:flex flex-col bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
-      <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF]">
+    <div className="hidden xl:flex flex-col bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+      <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-line">
         <SkeletonBlock className="h-3.5 w-28 rounded-md" />
         <SkeletonBlock className="h-4 w-10 rounded-full" />
       </div>
@@ -267,9 +267,9 @@ export function SkeletonCalendarView({ daysShort }) {
 /* ─── Auth Loading Skeleton (full page) ──────────────────────────────── */
 export function SkeletonAuthLoading() {
   return (
-    <div className="min-h-screen bg-[#F8F9FB] grid place-items-center font-sans">
+    <div className="min-h-screen bg-surface-alt grid place-items-center font-sans">
       <div className="flex flex-col items-center gap-5">
-        <div className="w-12 h-12 bg-[#3B4FE4] rounded-2xl grid place-items-center shadow-lg skeleton-pulse-icon">
+        <div className="w-12 h-12 bg-primary rounded-2xl grid place-items-center shadow-lg skeleton-pulse-icon">
           <CalendarDays size={22} className="text-white" />
         </div>
         {/* Fake topbar shimmer */}

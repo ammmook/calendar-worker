@@ -27,6 +27,9 @@ export default function TimePicker({
   onChange,
   disabled = false,
   className = '',
+  label,                  // ชื่อกลุ่ม เช่น "เวลาเข้างาน" (อ่านให้ screen reader)
+  hourLabel = 'Hour',
+  minuteLabel = 'Minute',
 }) {
   const { hour, minute } = parseTimeValue(value);
   const minuteInputRef = useRef(null);
@@ -74,7 +77,9 @@ export default function TimePicker({
 
   return (
     <div
-      className={`${className} flex items-center gap-0.5 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'}`}
+      role="group"
+      aria-label={label}
+      className={`${className} focus-within:border-primary focus-within:bg-white flex items-center gap-0.5 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'}`}
     >
       <input
         type="text"
@@ -83,14 +88,14 @@ export default function TimePicker({
         maxLength={2}
         value={hour}
         disabled={disabled}
-        aria-label="Hour"
+        aria-label={label ? `${label} ${hourLabel}` : hourLabel}
         className="min-w-0 flex-1 bg-transparent text-center text-inherit outline-none"
         onChange={(event) => handleSegmentChange('hour', event.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         onBlur={() => handleSegmentBlur('hour')}
       />
-      <span className="shrink-0 text-[#9CA3AF]" aria-hidden="true">:</span>
+      <span className="shrink-0 text-muted" aria-hidden="true">:</span>
       <input
         ref={minuteInputRef}
         type="text"
@@ -99,14 +104,14 @@ export default function TimePicker({
         maxLength={2}
         value={minute}
         disabled={disabled}
-        aria-label="Minute"
+        aria-label={label ? `${label} ${minuteLabel}` : minuteLabel}
         className="min-w-0 flex-1 bg-transparent text-center text-inherit outline-none"
         onChange={(event) => handleSegmentChange('minute', event.target.value)}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
         onBlur={() => handleSegmentBlur('minute')}
       />
-      <Clock size={15} className="ml-1 shrink-0 text-[#9CA3AF]" aria-hidden="true" />
+      <Clock size={15} className="ml-1 shrink-0 text-muted" aria-hidden="true" />
     </div>
   );
 }

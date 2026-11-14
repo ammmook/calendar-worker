@@ -8,6 +8,7 @@ import {
 import { getLang } from '../locales';
 import { WorkEntryAPI } from '../services/api';
 import { DonutChart, LegendRow } from './charts';
+import { fmt1, fmtB } from '../utils/format';
 
 import { OT_MODE } from './ProfilePage';
 
@@ -40,8 +41,6 @@ const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'Ju
 // OT tier colors (สำหรับโดนัทกราฟ) — เฉดอำพัน
 const OT_TIER_COLORS = ['#fcd34d', '#c29302', '#92700a'];
 
-const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmt1 = (n) => n.toFixed(1);
 
 // Weekend rest days removed due to custom monthly logic not matching daily work log
 
@@ -192,7 +191,7 @@ export default function YearlyDashboard({
     // ── Chart geometry ─────────────────────────────────────────────────────────
     const CHART_H = 220;
     const CHART_PAD = { top: 20, right: 10, bottom: 36, left: 52 };
-    const maxVal = Math.max(...monthlyStats.map(m => m.totalEarn), salary * 1.2);
+    const maxVal = Math.max(...monthlyStats.map(m => m.totalEarn), salary * 1.2) || 1; // กัน 0 → NaN ตอนยังไม่มีข้อมูล
     const yTicks = 4;
 
     const barGroup = (idx, totalW) => {
@@ -213,11 +212,11 @@ export default function YearlyDashboard({
 
     // ── Bar chart (แนวโน้มรายได้) — reuse ในแท็บ Graph ──
     const barChart = (
-        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
+        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                 <div>
-                    <div className="text-[15px] font-bold text-[#111827]">{t.monthly_earnings_title} {year}</div>
-                    <div className="text-[11px] text-[#9CA3AF] mt-0.5">{t.hover_bars}</div>
+                    <div className="text-[15px] font-bold text-ink">{t.monthly_earnings_title} {year}</div>
+                    <div className="text-[11px] text-muted mt-0.5">{t.hover_bars}</div>
                 </div>
                 {/* Legend */}
                 <div className="hidden sm:flex items-center gap-4">
@@ -362,20 +361,20 @@ export default function YearlyDashboard({
 
                     return (
                         <div
-                            className="absolute pointer-events-none z-20 bg-white border border-[#E8EAEF] rounded-xl shadow-[0_8px_28px_rgba(17,24,39,0.12)] p-3.5"
+                            className="absolute pointer-events-none z-20 bg-white border border-line rounded-xl shadow-[0_8px_28px_rgba(17,24,39,0.12)] p-3.5"
                             style={{ left: tx, top: ty, width: TW }}
                         >
                             <div className="flex items-center justify-between mb-2.5">
-                                <span className="text-[13px] font-bold text-[#111827]">{m.fullMonth}</span>
-                                <span className="text-[10px] font-semibold text-[#9CA3AF]">{m.daysWorked} {t.table_days}</span>
+                                <span className="text-[13px] font-bold text-ink">{m.fullMonth}</span>
+                                <span className="text-[10px] font-semibold text-muted">{m.daysWorked} {t.table_days}</span>
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <TooltipRow label={t.total} value={fmtB(m.totalEarn)} color="#111827" bold />
-                                <div className="border-t border-[#E8EAEF] my-0.5" />
+                                <div className="border-t border-line my-0.5" />
                                 <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="#3B4FE4" />
                                 <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="#c29302" />
                                 <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="#E8730C" />
-                                <div className="border-t border-[#E8EAEF] my-0.5" />
+                                <div className="border-t border-line my-0.5" />
                                 <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="#9CA3AF" />
                             </div>
                         </div>
@@ -392,15 +391,17 @@ export default function YearlyDashboard({
             {/* ── Page header: tabs (แทน title) + year picker ── */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 {/* Sub-tabs */}
-                <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[12px] p-1">
+                <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1">
                     {tabs.map(({ id, Icon, label }) => (
                         <button
                             key={id}
+                            type="button"
                             onClick={() => setTab(id)}
+                            aria-pressed={tab === id}
                             className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition-all
                                 ${tab === id
-                                    ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                                    : 'text-[#6B7280] hover:text-[#374151]'}`}
+                                    ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                                    : 'text-muted hover:text-ink-2'}`}
                         >
                             <Icon size={14} />
                             <span>{label}</span>
@@ -409,26 +410,29 @@ export default function YearlyDashboard({
                 </div>
 
                 {/* Year picker */}
-                <div className="flex items-center gap-2 bg-white border border-[#E8EAEF] rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
+                <div className="flex items-center gap-2 bg-white border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
                     <button
+                        type="button"
+                        aria-label={t.prev_month}
                         onClick={() => {
                             if (setViewY) setViewY(year - 1);
                             else setYear(y => y - 1);
                         }}
-                        className="w-8 h-8 rounded-lg grid place-items-center text-[#6B7280] hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all"
+                        className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all"
                     >
                         <ChevronLeft size={15} />
                     </button>
                     <div className="relative flex items-center justify-center">
                         <select
                             value={year}
+                            aria-label={t.year_label}
                             onChange={(e) => {
                                 const newY = Number(e.target.value);
                                 if (setViewY) setViewY(newY);
                                 else setYear(newY);
-                                if (showToast) showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...');
+                                if (showToast) showToast(t.loading_data);
                             }}
-                            className="appearance-none bg-transparent font-bold text-[15px] text-[#111827] tabular-nums px-2 cursor-pointer outline-none text-center hover:text-[#3B4FE4]"
+                            className="appearance-none bg-transparent font-bold text-[15px] text-ink tabular-nums px-2 cursor-pointer outline-none text-center hover:text-primary"
                         >
                             {Array.from({ length: 7 }, (_, i) => today.getFullYear() - 3 + i).map((y) => (
                                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
@@ -436,11 +440,13 @@ export default function YearlyDashboard({
                         </select>
                     </div>
                     <button
+                        type="button"
+                        aria-label={t.next_month}
                         onClick={() => {
                             if (setViewY) setViewY(year + 1);
                             else setYear(y => y + 1);
                         }}
-                        className="w-8 h-8 rounded-lg grid place-items-center text-[#6B7280] hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all"
+                        className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all"
                     >
                         <ChevronRight size={15} />
                     </button>
@@ -449,24 +455,24 @@ export default function YearlyDashboard({
 
             {/* ══════════════ TAB: LIST (รายละเอียดรายเดือน) ══════════════ */}
             {tab === 'list' && (
-                <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.35s_ease_both]">
-                    <div className="flex items-start justify-between px-5 py-4 border-b border-[#E8EAEF]">
+                <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.35s_ease_both]">
+                    <div className="flex items-start justify-between px-5 py-4 border-b border-line">
                         <div>
-                            <div className="text-[15px] font-bold text-[#111827]">{t.monthly_breakdown}</div>
+                            <div className="text-[15px] font-bold text-ink">{t.monthly_breakdown}</div>
                             {socialSecurity > 0 && (
                                 <div className="text-[11px] font-medium text-[#F43F5E] mt-1">
                                     {t.social_security_monthly_note} {fmtB(socialSecurity)}
                                 </div>
                             )}
                         </div>
-                        <div className="text-[11px] text-[#9CA3AF] shrink-0">{t.per_month}</div>
+                        <div className="text-[11px] text-muted shrink-0">{t.per_month}</div>
                     </div>
                     <div className="w-full overflow-x-auto">
                         <table className="w-full text-[13px] sm:text-sm">
                             <thead>
-                                <tr className="border-b border-[#E8EAEF]">
+                                <tr className="border-b border-line">
                                     {[t.table_month, t.table_days, t.table_reg, t.table_ot, t.table_shift, t.table_total].map((h, i) => (
-                                        <th key={h} className={`px-2 sm:px-4 py-2.5 text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.08em] ${i === 0 ? 'text-left' : 'text-right'}`}>
+                                        <th key={h} className={`px-2 sm:px-4 py-2.5 text-[10px] font-bold text-muted uppercase tracking-[0.08em] ${i === 0 ? 'text-left' : 'text-right'}`}>
                                             {h}
                                         </th>
                                     ))}
@@ -478,29 +484,29 @@ export default function YearlyDashboard({
                                     return (
                                         <tr
                                             key={i}
-                                            className={`border-b border-[#F3F4F8] transition-colors hover:bg-[#F8F9FB] cursor-default
-                        ${isCurr ? 'bg-[#EEF0FD]/40' : ''}`}
+                                            className={`border-b border-[#F3F4F8] transition-colors hover:bg-surface-alt cursor-default
+                        ${isCurr ? 'bg-primary-soft/40' : ''}`}
                                         >
                                             <td className="px-2 sm:px-4 py-2.5">
                                                 <div className="flex items-center gap-2">
-                                                    <span className={`text-[11px] font-bold w-[6px] h-[6px] rounded-full shrink-0 ${m.totalEarn > 0 ? 'bg-[#3B4FE4]' : 'bg-[#E8EAEF]'}`} />
-                                                    <span className={`text-[13px] font-semibold ${isCurr ? 'text-[#3B4FE4]' : 'text-[#374151]'}`}>
+                                                    <span className={`text-[11px] font-bold w-[6px] h-[6px] rounded-full shrink-0 ${m.totalEarn > 0 ? 'bg-primary' : 'bg-line'}`} />
+                                                    <span className={`text-[13px] font-semibold ${isCurr ? 'text-primary' : 'text-ink-2'}`}>
                                                         {m.fullMonth}
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] text-[#6B7280]">{m.daysWorked}</td>
-                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#10B981]">
-                                                {m.regEarn > 0 ? fmtB(m.regEarn) : <span className="text-[#D1D5E0]">—</span>}
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] text-muted">{m.daysWorked}</td>
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-income">
+                                                {m.regEarn > 0 ? fmtB(m.regEarn) : <span className="text-line-strong">—</span>}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#c29302]">
-                                                {m.otEarn > 0 ? fmtB(m.otEarn) : <span className="text-[#D1D5E0]">—</span>}
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-ot">
+                                                {m.otEarn > 0 ? fmtB(m.otEarn) : <span className="text-line-strong">—</span>}
                                             </td>
-                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-[#E8730C]">
-                                                {m.shiftEarn > 0 ? fmtB(m.shiftEarn) : <span className="text-[#D1D5E0]">—</span>}
+                                            <td className="px-2 sm:px-4 py-2.5 text-right text-[12px] font-semibold text-shift">
+                                                {m.shiftEarn > 0 ? fmtB(m.shiftEarn) : <span className="text-line-strong">—</span>}
                                             </td>
                                             <td className="px-2 sm:px-4 py-2.5 text-right">
-                                                <span className={`text-[13px] font-bold ${m.totalEarn > 0 ? 'text-[#111827]' : 'text-[#D1D5E0]'}`}>
+                                                <span className={`text-[13px] font-bold ${m.totalEarn > 0 ? 'text-ink' : 'text-line-strong'}`}>
                                                     {m.totalEarn > 0 ? fmtB(m.totalEarn) : '—'}
                                                 </span>
                                             </td>
@@ -510,13 +516,13 @@ export default function YearlyDashboard({
                             </tbody>
                             {/* Totals row */}
                             <tfoot>
-                                <tr className="bg-[#F8F9FB] border-t-2 border-[#E8EAEF]">
-                                    <td className="px-2 sm:px-4 py-3 text-[12px] font-bold text-[#111827]">{t.total_year} {year}</td>
-                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#374151]">{yearTotals.totalDays}</td>
-                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#10B981]">{fmtB(yearTotals.totalRegEarn)}</td>
-                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#c29302]">{fmtB(yearTotals.totalOTEarn)}</td>
-                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-[#E8730C]">{fmtB(yearTotals.totalShiftEarn)}</td>
-                                    <td className="px-2 sm:px-4 py-3 text-right text-[14px] font-bold text-[#3B4FE4]">{fmtB(yearTotals.totalEarn)}</td>
+                                <tr className="bg-surface-alt border-t-2 border-line">
+                                    <td className="px-2 sm:px-4 py-3 text-[12px] font-bold text-ink">{t.total_year} {year}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-ink-2">{yearTotals.totalDays}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-income">{fmtB(yearTotals.totalRegEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-ot">{fmtB(yearTotals.totalOTEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[12px] font-bold text-shift">{fmtB(yearTotals.totalShiftEarn)}</td>
+                                    <td className="px-2 sm:px-4 py-3 text-right text-[14px] font-bold text-primary">{fmtB(yearTotals.totalEarn)}</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -530,8 +536,8 @@ export default function YearlyDashboard({
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
                         {/* Income breakdown donut */}
-                        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-                            <div className="px-5 py-4 border-b border-[#E8EAEF] text-[15px] font-bold text-[#111827]">
+                        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                            <div className="px-5 py-4 border-b border-line text-[15px] font-bold text-ink">
                                 {t.income_breakdown}
                             </div>
                             <div className="p-5 flex flex-col items-center gap-4">
@@ -551,28 +557,28 @@ export default function YearlyDashboard({
                                     <LegendRow color="#c29302" label={t.ot_earnings} value={fmtB(yearTotals.totalOTEarn)} total={grossEarn} raw={yearTotals.totalOTEarn} />
                                     <LegendRow color="#E8730C" label={t.shift_earnings} value={fmtB(yearTotals.totalShiftEarn)} total={grossEarn} raw={yearTotals.totalShiftEarn} />
                                 </div>
-                                <div className="w-full mt-1 pt-4 border-t border-[#E8EAEF] flex flex-col gap-2">
+                                <div className="w-full mt-1 pt-4 border-t border-line flex flex-col gap-2">
                                     <div className="flex items-center justify-between text-[13px]">
-                                        <span className="text-[#6B7280]">{t.gross_income}</span>
-                                        <span className="font-semibold text-[#111827]">{fmtB(grossEarn)}</span>
+                                        <span className="text-muted">{t.gross_income}</span>
+                                        <span className="font-semibold text-ink">{fmtB(grossEarn)}</span>
                                     </div>
                                     <div className="flex items-center justify-between text-[13px]">
-                                        <span className="text-[#6B7280]">{t.less_social_security}</span>
-                                        <span className="font-semibold text-[#EF4444]">−{fmtB(ssDeducted)}</span>
+                                        <span className="text-muted">{t.less_social_security}</span>
+                                        <span className="font-semibold text-danger">−{fmtB(ssDeducted)}</span>
                                     </div>
-                                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-dashed border-[#E8EAEF]">
-                                        <span className="text-[13px] font-bold text-[#111827]">{t.net_remaining}</span>
-                                        <span className="text-[18px] font-bold text-[#10B981]">{fmtB(netEarn)}</span>
+                                    <div className="flex items-center justify-between mt-1 pt-3 border-t border-dashed border-line">
+                                        <span className="text-[13px] font-bold text-ink">{t.net_remaining}</span>
+                                        <span className="text-[18px] font-bold text-income">{fmtB(netEarn)}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* OT breakdown donut */}
-                        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-                            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                                <span className="text-[15px] font-bold text-[#111827]">{t.ot_breakdown}</span>
-                                <span className="text-[11px] text-[#9CA3AF]">{fmt1(yearTotals.totalOTHrs)}h</span>
+                        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+                                <span className="text-[15px] font-bold text-ink">{t.ot_breakdown}</span>
+                                <span className="text-[11px] text-muted">{fmt1(yearTotals.totalOTHrs)}h</span>
                             </div>
                             <div className="p-5 flex flex-col items-center gap-4">
                                 <DonutChart
@@ -595,9 +601,9 @@ export default function YearlyDashboard({
                                         />
                                     ))}
                                 </div>
-                                <div className="w-full mt-1 pt-4 border-t border-[#E8EAEF] flex items-center justify-between">
-                                    <span className="text-[13px] font-bold text-[#111827]">{t.total_ot_earnings}</span>
-                                    <span className="text-[18px] font-bold text-[#c29302]">{fmtB(yearTotals.totalOTEarn)}</span>
+                                <div className="w-full mt-1 pt-4 border-t border-line flex items-center justify-between">
+                                    <span className="text-[13px] font-bold text-ink">{t.total_ot_earnings}</span>
+                                    <span className="text-[18px] font-bold text-ot">{fmtB(yearTotals.totalOTEarn)}</span>
                                 </div>
                             </div>
                         </div>
@@ -621,9 +627,9 @@ export default function YearlyDashboard({
                             label={t.ot_earnings}
                             value={fmtB(yearTotals.totalOTEarn)}
                             sub={`${fmt1(yearTotals.totalOTHrs)}h ${t.total_ot_hours}`}
-                            iconCls="bg-[#fffdef] text-[#c29302]"
-                            valCls="text-[#c29302]"
-                            stripe="bg-[#fbde3a]"
+                            iconCls="bg-ot-soft text-ot"
+                            valCls="text-ot"
+                            stripe="bg-ot-bar"
                         />
 
                         {/* Shift Pay */}
@@ -632,8 +638,8 @@ export default function YearlyDashboard({
                             label={t.shift_earnings}
                             value={fmtB(yearTotals.totalShiftEarn)}
                             sub={`${yearTotals.totalShiftDays} ${t.shift_days_label}`}
-                            iconCls="bg-[#FFF3E6] text-[#E8730C]"
-                            valCls="text-[#E8730C]"
+                            iconCls="bg-shift-soft text-shift"
+                            valCls="text-shift"
                             stripe="bg-[#FDBA74]"
                         />
 
@@ -643,9 +649,9 @@ export default function YearlyDashboard({
                             label={t.regular_earnings}
                             value={fmtB(yearTotals.totalRegEarn)}
                             sub={`${yearTotals.totalDays} ${t.worked_days}`}
-                            iconCls="bg-[#ECFDF5] text-[#10B981]"
-                            valCls="text-[#10B981]"
-                            stripe="bg-[#10B981]"
+                            iconCls="bg-income-soft text-income"
+                            valCls="text-income"
+                            stripe="bg-income"
                         />
 
                         {/* OT Hours */}
@@ -654,9 +660,9 @@ export default function YearlyDashboard({
                             label={t.total_ot_hours}
                             value={`${fmt1(yearTotals.totalOTHrs)}h`}
                             sub={t.across_months}
-                            iconCls="bg-[#EEF0FD] text-[#3B4FE4]"
-                            valCls="text-[#3B4FE4]"
-                            stripe="bg-[#3B4FE4]"
+                            iconCls="bg-primary-soft text-primary"
+                            valCls="text-primary"
+                            stripe="bg-primary"
                         />
 
                         {/* Total annual */}
@@ -672,7 +678,7 @@ export default function YearlyDashboard({
                             </div>
                             <div className="text-[11px] text-white/70 mt-1.5">{yearTotals.totalDays} {t.worked_days}</div>
                             {yearTotals.bestMonth && (
-                                <div className="absolute top-4 right-4 bg-white/20 text-white/90 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em] flex items-center gap-1">
+                                <div className="absolute top-4 right-4 bg-white/20 text-white/90 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em] flex items-center gap-1">
                                     <Award size={8} /> <span className="hidden sm:inline">{t.best_month}</span> {yearTotals.bestMonth.month}
                                 </div>
                             )}
@@ -680,41 +686,41 @@ export default function YearlyDashboard({
                     </div>
 
                     {/* OT by rate — แสดงเป็นแถวชิดๆ (ไม่ใช่แถบชาร์จพลัง) */}
-                    <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                            <div className="text-[15px] font-bold text-[#111827]">{t.ot_by_rate}</div>
-                            <div className="text-[11px] text-[#9CA3AF]">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
+                    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+                            <div className="text-[15px] font-bold text-ink">{t.ot_by_rate}</div>
+                            <div className="text-[11px] text-muted">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
                         </div>
                         <div className="p-2.5 flex flex-col gap-0.5">
                             {otTiers.map((tier) => (
-                                <div key={tier.key} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-[#fffdef] transition-colors">
+                                <div key={tier.key} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-ot-soft transition-colors">
                                     <div className="flex items-center gap-2 min-w-0">
-                                        <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0 bg-[#fffdef]">
-                                            <Timer size={12} className="text-[#c29302]" />
+                                        <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0 bg-ot-soft">
+                                            <Timer size={12} className="text-ot" />
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="text-[12px] font-bold text-[#374151] leading-tight">{tier.label}</div>
-                                            <div className="text-[10px] text-[#9CA3AF] leading-tight truncate">{tier.hint}</div>
+                                            <div className="text-[12px] font-bold text-ink-2 leading-tight">{tier.label}</div>
+                                            <div className="text-[10px] text-muted leading-tight truncate">{tier.hint}</div>
                                         </div>
                                     </div>
                                     <div className="text-right shrink-0 leading-tight">
-                                        <div className="text-[12px] font-bold text-[#c29302]">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
-                                        <div className="text-[10px] text-[#9CA3AF]">{fmt1(tier.hours)} h</div>
+                                        <div className="text-[12px] font-bold text-ot">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
+                                        <div className="text-[10px] text-muted">{fmt1(tier.hours)} h</div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                        <div className="px-5 py-3.5 border-t border-[#E8EAEF] flex items-center justify-between">
-                            <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.total_ot_hours}</span>
-                            <span className="text-[15px] font-bold text-[#c29302]">{fmt1(yearTotals.totalOTHrs)}<span className="text-[11px] font-normal text-[#9CA3AF]">h</span></span>
+                        <div className="px-5 py-3.5 border-t border-line flex items-center justify-between">
+                            <span className="text-[11px] font-semibold text-muted uppercase tracking-[0.08em]">{t.total_ot_hours}</span>
+                            <span className="text-[15px] font-bold text-ot">{fmt1(yearTotals.totalOTHrs)}<span className="text-[11px] font-normal text-muted">h</span></span>
                         </div>
                     </div>
 
                     {/* Leave Summary */}
-                    <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-                            <div className="text-[15px] font-bold text-[#111827]">{t.leave_summary}</div>
-                            <div className="text-[11px] text-[#9CA3AF]">{totalLeave} {t.leave_used}</div>
+                    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+                            <div className="text-[15px] font-bold text-ink">{t.leave_summary}</div>
+                            <div className="text-[11px] text-muted">{totalLeave} {t.leave_used}</div>
                         </div>
 
                         <div className="p-4 flex flex-col gap-3 flex-1">
@@ -729,7 +735,7 @@ export default function YearlyDashboard({
                                                 <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0" style={{ background: lt.bg }}>
                                                     <LeaveIcon size={12} style={{ color: lt.color }} />
                                                 </div>
-                                                <span className="text-[12px] font-semibold text-[#374151]">
+                                                <span className="text-[12px] font-semibold text-ink-2">
                                                     {lt.key === 'sick' ? t.sick_leave : lt.key === 'personal' ? t.personal_leave : t.vacation_leave}
                                                 </span>
                                             </div>
@@ -737,7 +743,7 @@ export default function YearlyDashboard({
                                                 <span className="text-[12px] font-bold" style={{ color: lt.color }}>
                                                     {used}
                                                 </span>
-                                                <span className="text-[11px] text-[#9CA3AF]">/ {lt.max}</span>
+                                                <span className="text-[11px] text-muted">/ {lt.max}</span>
                                             </div>
                                         </div>
                                         {/* Progress bar */}
@@ -752,15 +758,15 @@ export default function YearlyDashboard({
                             })}
 
                             {/* Leave total summary */}
-                            <div className="mt-2 pt-3 border-t border-[#E8EAEF] flex items-center justify-between">
-                                <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.total_leave_taken}</span>
-                                <span className="text-[15px] font-bold text-[#111827]">{totalLeave} <span className="text-[11px] font-normal text-[#9CA3AF]">{t.days_unit}</span></span>
+                            <div className="mt-2 pt-3 border-t border-line flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-muted uppercase tracking-[0.08em]">{t.total_leave_taken}</span>
+                                <span className="text-[15px] font-bold text-ink">{totalLeave} <span className="text-[11px] font-normal text-muted">{t.days_unit}</span></span>
                             </div>
 
                             {/* Info note */}
-                            <div className="flex items-start gap-2 bg-[#F8F9FB] rounded-[8px] p-2.5 mt-1">
-                                <Info size={12} className="text-[#9CA3AF] mt-0.5 shrink-0" />
-                                <p className="text-[10px] text-[#9CA3AF] leading-relaxed">
+                            <div className="flex items-start gap-2 bg-surface-alt rounded-[8px] p-2.5 mt-1">
+                                <Info size={12} className="text-muted mt-0.5 shrink-0" />
+                                <p className="text-[10px] text-muted leading-relaxed">
                                     {t.leave_info} {year}.
                                 </p>
                             </div>
@@ -776,15 +782,15 @@ export default function YearlyDashboard({
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function AnnualCard({ Icon, label, value, sub, iconCls, valCls, stripe }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-[#E8EAEF] bg-white p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]">
+        <div className="relative overflow-hidden rounded-2xl border border-line bg-white p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong">
             <span className={`absolute top-0 left-5 right-5 h-[3px] rounded-b-[4px] opacity-60 ${stripe}`} />
             <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] grid place-items-center mb-3 ${iconCls}`}>
                 <Icon size={14} strokeWidth={2} className="sm:hidden" />
                 <Icon size={16} strokeWidth={2} className="hidden sm:block" />
             </div>
-            <div className="text-[10px] font-bold text-[#9CA3AF] uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 truncate">{label}</div>
+            <div className="text-[10px] font-bold text-muted uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 truncate">{label}</div>
             <div className={`text-[1.4rem] sm:text-[1.65rem] font-bold leading-none tracking-tight truncate ${valCls}`}>{value}</div>
-            {sub && <div className="text-[10px] sm:text-[11px] mt-1.5 text-[#9CA3AF] truncate">{sub}</div>}
+            {sub && <div className="text-[10px] sm:text-[11px] mt-1.5 text-muted truncate">{sub}</div>}
         </div>
     );
 }
@@ -793,7 +799,7 @@ function LegendDot({ color, label }) {
     return (
         <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-[3px]" style={{ background: color }} />
-            <span className="text-[11px] text-[#6B7280] font-medium">{label}</span>
+            <span className="text-[11px] text-muted font-medium">{label}</span>
         </div>
     );
 }
@@ -801,7 +807,7 @@ function LegendDot({ color, label }) {
 function TooltipRow({ label, value, color, bold }) {
     return (
         <div className="flex items-center justify-between">
-            <span className="text-[11px] text-[#6B7280]">{label}</span>
+            <span className="text-[11px] text-muted">{label}</span>
             <span className="text-[12px] font-bold" style={{ color: color || '#111827', fontWeight: bold ? 800 : 700 }}>
                 {value}
             </span>

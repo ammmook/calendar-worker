@@ -3,20 +3,8 @@ import { Trash2, CheckCircle2 } from 'lucide-react';
 import TimePicker from './TimePicker';
 import { isValidTimeValue } from './timeUtils';
 import { LEAVE_META } from './leaveMeta';
-
-const fmt1 = (n) => n.toFixed(1);
-const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-export const AnimatedWaitText = () => {
-  const [dots, setDots] = React.useState('');
-  React.useEffect(() => {
-    const seq = ['.  ', '.. ', '...', '.. '];
-    let i = 0;
-    const timer = setInterval(() => { i = (i + 1) % seq.length; setDots(seq[i]); }, 300);
-    return () => clearInterval(timer);
-  }, []);
-  return <span className="inline-block text-left whitespace-pre">{dots}</span>;
-};
+import AnimatedWaitText from './AnimatedWaitText';
+import { fmt1, fmtB } from '../utils/format';
 
 // ขนาด/ระยะของแต่ละ variant (panel = desktop side panel, modal = มือถือ)
 const VARIANT = {
@@ -56,7 +44,7 @@ const VARIANT = {
   },
 };
 
-const ROW_LABEL = 'text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.07em]';
+const ROW_LABEL = 'text-[11px] font-semibold text-muted uppercase tracking-[0.07em]';
 
 // ฟอร์มรายละเอียดวัน (วันทำงาน / วันลา) — ใช้ร่วมกันทั้ง desktop panel และ modal มือถือ
 export default function DayDetailForm({
@@ -84,16 +72,14 @@ export default function DayDetailForm({
     const showDelete = entry._id || entry.leave;
     return (
       <div className="flex flex-col gap-3 w-full">
-        <div className="bg-[#F8F9FB] rounded-[10px] p-4 flex flex-col gap-3">
+        <div className="bg-surface-alt rounded-[10px] p-4 flex flex-col gap-3">
           <div className="text-center">
             <div className="w-14 h-14 rounded-2xl grid place-items-center mx-auto mb-2" style={{ backgroundColor: info.bg }}>
               <info.Icon size={28} style={{ color: info.color }} />
             </div>
-            <div className="text-sm font-bold text-[#111827]">{lang === 'th' ? info.th : info.en}</div>
-            <div className="text-xs text-[#9CA3AF] mt-1">
-              {isTraining
-                ? (lang === 'th' ? 'บันทึกการอบรมแล้ว' : 'Training recorded for this day')
-                : (lang === 'th' ? 'บันทึกการลาแล้ว' : 'Leave recorded for this day')}
+            <div className="text-sm font-bold text-ink">{lang === 'th' ? info.th : info.en}</div>
+            <div className="text-xs text-muted mt-1">
+              {isTraining ? t.training_recorded : t.leave_recorded}
             </div>
           </div>
         </div>
@@ -106,7 +92,7 @@ export default function DayDetailForm({
               aria-label={t.delete_entry || 'Delete'}
               className={`${v.delBtn} rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
                 ${isDeletingEntry
-                  ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
+                  ? 'bg-line text-muted cursor-not-allowed'
                   : 'bg-[#FFF1F3] text-[#F43F5E] cursor-pointer hover:bg-[#FEE2E2]'}`}
             >
               {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={v.delIcon} />}
@@ -115,11 +101,11 @@ export default function DayDetailForm({
           <button
             onClick={() => {
               setEntries((p) => ({ ...p, [selectedKey]: { ...p[selectedKey], leave: null } }));
-              showToast(lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Changed to working day');
+              showToast(t.changed_to_work);
             }}
-            className="flex-1 py-2.5 rounded-[10px] border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors"
+            className="flex-1 py-2.5 rounded-[10px] border border-line text-muted font-semibold text-sm hover:bg-surface-alt transition-colors"
           >
-            {lang === 'th' ? 'เปลี่ยนเป็นวันทำงาน' : 'Change to Working Day'}
+            {t.change_to_work}
           </button>
         </div>
       </div>
@@ -130,7 +116,7 @@ export default function DayDetailForm({
   const hasOtBreakdown = previewCalc && (detOT15h > 0 || detOT1h > 0 || detOT3h > 0);
   const showDelete = entry?._id || entry?.in;
   const saveDisabled = !isValidTimeValue(dIn) || (!!dOut && !isValidTimeValue(dOut)) || isSelectedHoliday || isSavingEntry;
-  const lockedCls = isSelectedHoliday ? 'bg-[#E8EAEF]' : '';
+  const lockedCls = isSelectedHoliday ? 'bg-line' : '';
 
   const otRows = [
     { show: detOT15h > 0, label: 'OT ×1.5', h: detOT15h, e: detOT15e },
@@ -143,27 +129,29 @@ export default function DayDetailForm({
       {/* Time inputs */}
       <div className={`grid ${v.timeGrid} gap-3 w-full min-w-0`}>
         <div className="min-w-0">
-          <label className={labelCls}>{t.clock_in}</label>
-          <TimePicker value={dIn} onChange={setDIn} className={`${inputCls} ${lockedCls}`} disabled={isSelectedHoliday} />
+          <span className={labelCls}>{t.clock_in}</span>
+          <TimePicker value={dIn} onChange={setDIn} className={`${inputCls} ${lockedCls}`} disabled={isSelectedHoliday}
+            label={t.clock_in} hourLabel={t.hour_label} minuteLabel={t.minute_label} />
         </div>
         <div className="min-w-0">
-          <label className={labelCls}>{t.clock_out}</label>
-          <TimePicker value={dOut} onChange={setDOut} className={`${inputCls} ${lockedCls}`} disabled={isSelectedHoliday} />
+          <span className={labelCls}>{t.clock_out}</span>
+          <TimePicker value={dOut} onChange={setDOut} className={`${inputCls} ${lockedCls}`} disabled={isSelectedHoliday}
+            label={t.clock_out} hourLabel={t.hour_label} minuteLabel={t.minute_label} />
         </div>
       </div>
 
       {/* Calc summary */}
-      <div className={`bg-[#F8F9FB] rounded-[10px] flex flex-col ${v.box}`}>
+      <div className={`bg-surface-alt rounded-[10px] flex flex-col ${v.box}`}>
         <div className={`flex justify-between items-center ${v.firstRowMb}`}>
           <span className={ROW_LABEL}>{t.regular}</span>
-          <span className={`${v.val} font-bold text-[#3B4FE4]`}>{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
+          <span className={`${v.val} font-bold text-primary`}>{detHReg > 0 ? fmt1(detHReg) + 'h' : '—'}</span>
         </div>
         <div className="flex justify-between items-center">
           <span className={ROW_LABEL}>{t.overtime}</span>
           <div className="text-right">
-            <div className={`${v.val} font-bold text-[#c29302]`}>{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
+            <div className={`${v.val} font-bold text-ot`}>{netDetOT > 0 ? fmt1(netDetOT) + 'h' : '—'}</div>
             {netDetOT > 0 && detOTRateEarn > 0 && (
-              <div className={`${v.sub} font-bold text-[#c29302] leading-none`}>+{fmtB(detOTRateEarn)}</div>
+              <div className={`${v.sub} font-bold text-ot leading-none`}>+{fmtB(detOTRateEarn)}</div>
             )}
           </div>
         </div>
@@ -172,27 +160,27 @@ export default function DayDetailForm({
           <div className={`flex flex-col gap-1 ${v.subList}`}>
             {otRows.filter((r) => r.show).map((r) => (
               <div key={r.label} className="flex justify-between items-center">
-                <span className={`${v.sub} font-medium text-[#c29302]`}>{r.label} · {fmt1(r.h)}h</span>
-                <span className={`${v.sub} font-bold text-[#c29302]`}>+{fmtB(r.e)}</span>
+                <span className={`${v.sub} font-medium text-ot`}>{r.label} · {fmt1(r.h)}h</span>
+                <span className={`${v.sub} font-bold text-ot`}>+{fmtB(r.e)}</span>
               </div>
             ))}
           </div>
         )}
         <div className="flex justify-between items-center">
           <span className={ROW_LABEL}>{t.total}</span>
-          <span className={`${v.val} font-bold text-[#111827]`}>{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
+          <span className={`${v.val} font-bold text-ink`}>{detHReg > 0 || netDetOT > 0 ? fmt1(detHReg + netDetOT) + 'h' : '—'}</span>
         </div>
-        <hr className="border-[#E8EAEF]" />
+        <hr className="border-line" />
         {detShift > 0 && (
           <div className="flex justify-between items-center">
             <span className={ROW_LABEL}>{t.shift_earnings}</span>
-            <span className={`${v.val} font-bold text-[#E8730C]`}>+{fmtB(detShift)}</span>
+            <span className={`${v.val} font-bold text-shift`}>+{fmtB(detShift)}</span>
           </div>
         )}
         {(paymentType !== 'monthly' || detE > 0) && (
           <div className="flex justify-between items-center">
             <span className={ROW_LABEL}>{t.earnings}</span>
-            <span className={`${v.earnVal} font-bold text-[#10B981]`}>{detE > 0 ? fmtB(detE) : '—'}</span>
+            <span className={`${v.earnVal} font-bold text-income`}>{detE > 0 ? fmtB(detE) : '—'}</span>
           </div>
         )}
       </div>
@@ -208,7 +196,7 @@ export default function DayDetailForm({
         disabled={isSelectedHoliday}
         placeholder={t.note_placeholder}
         aria-label={t.note}
-        className="w-full min-w-0 resize-none rounded-[10px] border border-[#E8EAEF] bg-white px-3 py-2 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] outline-none focus:border-[#3B4FE4] disabled:bg-[#E8EAEF] transition-all"
+        className="w-full min-w-0 resize-none rounded-[10px] border border-line bg-white px-3 py-2 text-[13px] text-ink placeholder:text-muted outline-none focus:border-primary disabled:bg-line transition-all"
       />
 
       {/* Save / Update / Delete */}
@@ -221,8 +209,8 @@ export default function DayDetailForm({
             aria-label={t.delete_entry}
             className={`${v.delBtn} rounded-[10px] border-none transition-all flex items-center justify-center shrink-0
               ${isSelectedHoliday || isDeletingEntry
-                ? 'bg-[#E8EAEF] text-[#9CA3AF] cursor-not-allowed'
-                : 'bg-[#F8F9FB] text-[#9CA3AF] cursor-pointer hover:bg-[#E8EAEF] hover:text-[#6B7280]'}`}
+                ? 'bg-line text-muted cursor-not-allowed'
+                : 'bg-surface-alt text-muted cursor-pointer hover:bg-line hover:text-muted'}`}
           >
             {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={v.delIcon} />}
           </button>
@@ -232,10 +220,10 @@ export default function DayDetailForm({
           disabled={saveDisabled}
           className={`flex-1 ${v.saveBtn} rounded-[10px] text-white font-bold border-none transition-all flex items-center justify-center relative overflow-hidden
             ${isSelectedHoliday
-              ? 'bg-[#D1D5E0] cursor-not-allowed'
+              ? 'bg-line-strong cursor-not-allowed'
               : isSavingEntry
                 ? 'bg-[#7B8CED] cursor-wait text-transparent'
-                : `bg-[#3B4FE4] cursor-pointer hover:bg-[#2A3BC0] ${v.saveActive}`}`}
+                : `bg-primary cursor-pointer hover:bg-primary-dark ${v.saveActive}`}`}
         >
           <div className={`flex items-center ${v.saveInner} transition-opacity ${isSavingEntry ? 'opacity-0' : 'opacity-100'}`}>
             <CheckCircle2 size={v.saveIcon} />

@@ -5,14 +5,8 @@ import {
   CalendarDays, List, PieChart, LayoutGrid,
 } from 'lucide-react';
 import { DonutChart, LegendRow } from './charts';
-
-const fmt1 = (n) => n.toFixed(1);
-const fmtB = (n) => '฿' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dateKey = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-const todayKeyFn = () => {
-  const t = new Date();
-  return dateKey(t.getFullYear(), t.getMonth() + 1, t.getDate());
-};
+import { LEAVE_META } from './leaveMeta';
+import { fmt1, fmtB, dateKey, todayKey as todayKeyFn, yearOptions } from '../utils/format';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // แท็บ "รายเดือน" — มี 3 แท็บย่อย: List Worklog / Graph / สรุปรายได้ (Summary)
@@ -72,6 +66,7 @@ export default function MonthlySummary({
     [entries, monthKey]
   );
   const todayK = todayKeyFn();
+  const isCurrentMonth = viewY === today.getFullYear() && viewM === today.getMonth();
 
   const tabs = [
     { id: 'summary', Icon: LayoutGrid, label: t.tab_summary },
@@ -85,15 +80,17 @@ export default function MonthlySummary({
       {/* ── Header: tabs (แทน title) + month nav ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         {/* Sub-tabs */}
-        <div className="flex items-center gap-1 bg-[#F8F9FB] border border-[#E8EAEF] rounded-[12px] p-1">
+        <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1">
           {tabs.map(({ id, Icon, label }) => (
             <button
               key={id}
+              type="button"
               onClick={() => setTab(id)}
+              aria-pressed={tab === id}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition-all
                 ${tab === id
-                  ? 'bg-white text-[#3B4FE4] shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                  : 'text-[#6B7280] hover:text-[#374151]'}`}
+                  ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
+                  : 'text-muted hover:text-ink-2'}`}
             >
               <Icon size={14} />
               <span>{label}</span>
@@ -106,32 +103,32 @@ export default function MonthlySummary({
           {/* Mobile month/year selects */}
           <div className="flex sm:hidden items-center gap-2">
             <div className="relative">
-              <select value={viewM} onChange={(e) => setViewM(Number(e.target.value))}
-                className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-[#3B4FE4]">
+              <select value={viewM} aria-label={t.month_label} onChange={(e) => setViewM(Number(e.target.value))}
+                className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-primary">
                 {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
               </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
             </div>
             <div className="relative">
-              <select value={viewY} onChange={(e) => { setViewY(Number(e.target.value)); showToast(lang === 'th' ? 'กำลังโหลดข้อมูล...' : 'Loading data...'); }}
-                className="appearance-none bg-white border-[1.5px] border-[#D1D5E0] rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-[#3B4FE4]">
-                {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
+              <select value={viewY} aria-label={t.year_label} onChange={(e) => { setViewY(Number(e.target.value)); showToast(t.loading_data); }}
+                className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-primary">
+                {yearOptions(today, viewY).map((y) => (
                   <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
                 ))}
               </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#6B7280] text-[10px]">▾</span>
+              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-white border border-[#E8EAEF] rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
-            <button onClick={goToday}
-              className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[#6B7280] text-[12px] font-semibold hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all">
+          <div className="flex items-center gap-1.5 bg-white border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
+            <button type="button" onClick={goToday}
+              className="flex items-center gap-1.5 h-10 sm:h-8 px-2.5 rounded-lg text-muted text-[12px] font-semibold hover:bg-primary-soft hover:text-primary cursor-pointer transition-all">
               <CalendarCheck size={13} /> {t.today}
             </button>
-            <button onClick={prevMonth} className="w-8 h-8 rounded-lg grid place-items-center text-[#6B7280] hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all">
+            <button type="button" onClick={prevMonth} aria-label={t.prev_month} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all">
               <ChevronLeft size={15} />
             </button>
-            <button onClick={nextMonth} className="w-8 h-8 rounded-lg grid place-items-center text-[#6B7280] hover:bg-[#EEF0FD] hover:text-[#3B4FE4] cursor-pointer transition-all">
+            <button type="button" onClick={nextMonth} aria-label={t.next_month} className="w-10 h-10 sm:w-8 sm:h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all">
               <ChevronRight size={15} />
             </button>
           </div>
@@ -140,10 +137,10 @@ export default function MonthlySummary({
 
       {/* ══════════════ TAB: LIST WORKLOG ══════════════ */}
       {tab === 'list' && (
-        <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col animate-[fadeUp_0.35s_ease_both]">
-          <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-[#E8EAEF] shrink-0">
-            <span className="text-sm font-bold text-[#111827]">{t.monthly_worklog}</span>
-            <span className="text-[11px] text-[#9CA3AF] font-medium">{workedCount} {t.entries}</span>
+        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col animate-[fadeUp_0.35s_ease_both]">
+          <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-line shrink-0">
+            <span className="text-sm font-bold text-ink">{t.monthly_worklog}</span>
+            <span className="text-[11px] text-muted font-medium">{workedCount} {t.entries}</span>
           </div>
           <div className="p-2.5 flex flex-col gap-1">
             {Array.from({ length: daysInM }, (_, i) => i + 1).map((day) => {
@@ -168,27 +165,28 @@ export default function MonthlySummary({
 
               // สีขอบซ้าย + กล่องเลขวันตามประเภทวัน (นักขัตฤกษ์ > วันหยุด > OT > กะ)
               const accent = publicHol
-                ? { border: 'border-l-[#EF4444]', box: 'bg-[#FEECEC] text-[#EF4444]', hover: 'hover:bg-[#FEF2F2]' }
+                ? { border: 'border-l-danger', box: 'bg-[#FEECEC] text-danger', hover: 'hover:bg-[#FEF2F2]' }
                 : isHol
                   ? { border: 'border-l-[#998ed9]', box: 'bg-[rgba(153,142,217,0.15)] text-[#998ed9]', hover: 'hover:bg-[rgba(153,142,217,0.06)]' }
                   : hasOT
-                    ? { border: 'border-l-[#fbde3a]', box: 'bg-[#fffdef] text-[#c29302]', hover: 'hover:bg-[#fffdef]' }
+                    ? { border: 'border-l-ot-bar', box: 'bg-ot-soft text-ot', hover: 'hover:bg-ot-soft' }
                     : hasShift
-                      ? { border: 'border-l-[#FDBA74]', box: 'bg-[#FFF3E6] text-[#E8730C]', hover: 'hover:bg-[#FFF3E6]' }
+                      ? { border: 'border-l-[#FDBA74]', box: 'bg-shift-soft text-shift', hover: 'hover:bg-shift-soft' }
                       : isEmpty
-                        ? { border: 'border-l-transparent', box: 'bg-[#F3F4F6] text-[#C0C5CE]', hover: 'hover:bg-[#F8F9FB]' }
-                        : { border: 'border-l-transparent', box: 'bg-[#F8F9FB] text-[#374151]', hover: 'hover:bg-[#F8F9FB]' };
+                        ? { border: 'border-l-transparent', box: 'bg-[#F3F4F6] text-[#C0C5CE]', hover: 'hover:bg-surface-alt' }
+                        : { border: 'border-l-transparent', box: 'bg-surface-alt text-ink-2', hover: 'hover:bg-surface-alt' };
               const hasAccent = publicHol || isHol || hasOT || hasShift;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={k}
                   onClick={() => onSelectDay(k)}
-                  className={`grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
+                  className={`w-full text-left bg-transparent grid grid-cols-[36px_1fr_auto] items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer transition-all border
                     ${isEmpty ? 'opacity-60' : ''}
                     ${hasAccent ? `border-l-[3px] ${accent.border} border-r-transparent border-t-transparent border-b-transparent ${accent.hover}`
-                      : `border-transparent ${accent.hover} hover:border-[#E8EAEF]`}
-                    ${isToday ? 'ring-1 ring-[#6fa3cb]' : ''}`}
+                      : `border-transparent ${accent.hover} hover:border-line`}
+                    ${isToday ? 'ring-1 ring-today' : ''}`}
                 >
                   {/* Day box */}
                   <div className={`w-9 h-9 rounded-lg grid place-items-center text-sm font-bold shrink-0 ${accent.box}`}>
@@ -197,20 +195,17 @@ export default function MonthlySummary({
 
                   {/* Middle info */}
                   <div className="min-w-0">
-                    <div className={`text-[11px] font-semibold ${isEmpty ? 'text-[#C0C5CE]' : 'text-[#6B7280]'}`}>{t.days_short[dw]}</div>
+                    <div className={`text-[11px] font-semibold ${isEmpty ? 'text-[#C0C5CE]' : 'text-muted'}`}>{t.days_short[dw]}</div>
                     {publicHol ? (
-                      <div className="text-[10px] font-bold text-[#EF4444] truncate flex items-center gap-1" title={publicHolName}>
+                      <div className="text-[10px] font-bold text-danger truncate flex items-center gap-1" title={publicHolName}>
                         <CalendarDays size={10} className="shrink-0" /> {publicHolName || t.public_holiday_legend}
                       </div>
                     ) : isLeaveEntry ? (
                       <div className="text-[10px] font-medium" style={{ color: e.leave?.type === 'training' ? '#111827' : '#8B5CF6' }}>
-                        {e.leave?.type === 'sick' ? (lang === 'th' ? 'ลาป่วย' : 'Sick')
-                          : e.leave?.type === 'personal' ? (lang === 'th' ? 'ลากิจ' : 'Personal')
-                          : e.leave?.type === 'training' ? (lang === 'th' ? 'อบรม' : 'Training')
-                          : (lang === 'th' ? 'ลาพักร้อน' : 'Vacation')}
+                        {(() => { const li = LEAVE_META[e.leave?.type] || LEAVE_META.vacation; return lang === 'th' ? li.th : li.en; })()}
                       </div>
                     ) : hasEntry ? (
-                      <div className="text-[11px] text-[#9CA3AF]">{e.in} → {e.out}</div>
+                      <div className="text-[11px] text-muted">{e.in} → {e.out}</div>
                     ) : isHol ? (
                       <div className="text-[10px] font-medium text-[#998ed9]">{t.holiday_legend}</div>
                     ) : (
@@ -222,25 +217,25 @@ export default function MonthlySummary({
                   {hasEntry && !isLeaveEntry && (
                     <div className="text-right flex flex-col items-end gap-0.5">
                       {(paymentType !== 'monthly' || eEarn > 0) && (
-                        <div className="text-[12px] font-bold text-[#10B981]">{fmtB(eEarn)}</div>
+                        <div className="text-[12px] font-bold text-income">{fmtB(eEarn)}</div>
                       )}
                       <div className="flex items-center gap-1">
-                        <span className="text-[10px] font-semibold text-[#3B4FE4]">{fmt1(hTotal)}h</span>
+                        <span className="text-[10px] font-semibold text-primary">{fmt1(hTotal)}h</span>
                         {hasOT && (
-                          <span className="text-[9px] font-bold bg-[#fffdef] text-[#c29302] px-1 py-px rounded">+{fmt1(netOt)}h OT</span>
+                          <span className="text-[10px] font-bold bg-ot-soft text-ot px-1 py-px rounded">+{fmt1(netOt)}h OT</span>
                         )}
                         {hasShift && (
-                          <span className="flex items-center gap-0.5 text-[9px] font-bold bg-[#FFF3E6] text-[#E8730C] px-1 py-px rounded">
+                          <span className="flex items-center gap-0.5 text-[10px] font-bold bg-shift-soft text-shift px-1 py-px rounded">
                             <Moon size={8} strokeWidth={2.5} /> {t.shift_short}
                           </span>
                         )}
                       </div>
                       {hasOT && de?.ot_earning > 0 && (
-                        <span className="text-[9px] font-bold text-[#c29302] leading-none">+{fmtB(de.ot_earning)}</span>
+                        <span className="text-[10px] font-bold text-ot leading-none">+{fmtB(de.ot_earning)}</span>
                       )}
                     </div>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -252,8 +247,8 @@ export default function MonthlySummary({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-[fadeUp_0.35s_ease_both]">
 
           {/* Income breakdown donut */}
-          <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-            <div className="px-5 py-4 border-b border-[#E8EAEF] text-[15px] font-bold text-[#111827]">
+          <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+            <div className="px-5 py-4 border-b border-line text-[15px] font-bold text-ink">
               {t.income_breakdown}
             </div>
             <div className="p-5 flex flex-col items-center gap-4">
@@ -275,28 +270,28 @@ export default function MonthlySummary({
                 <LegendRow color="#E8730C" label={t.shift_earnings} value={fmtB(shiftEarn)} total={grossEarn} raw={shiftEarn} />
               </div>
               {/* Net summary */}
-              <div className="w-full mt-1 pt-4 border-t border-[#E8EAEF] flex flex-col gap-2">
+              <div className="w-full mt-1 pt-4 border-t border-line flex flex-col gap-2">
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-[#6B7280]">{t.gross_income}</span>
-                  <span className="font-semibold text-[#111827]">{fmtB(grossEarn)}</span>
+                  <span className="text-muted">{t.gross_income}</span>
+                  <span className="font-semibold text-ink">{fmtB(grossEarn)}</span>
                 </div>
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-[#6B7280]">{t.less_social_security}</span>
-                  <span className="font-semibold text-[#EF4444]">−{fmtB(socialSecurity || 0)}</span>
+                  <span className="text-muted">{t.less_social_security}</span>
+                  <span className="font-semibold text-danger">−{fmtB(socialSecurity || 0)}</span>
                 </div>
-                <div className="flex items-center justify-between mt-1 pt-3 border-t border-dashed border-[#E8EAEF]">
-                  <span className="text-[13px] font-bold text-[#111827]">{t.net_remaining}</span>
-                  <span className="text-[18px] font-bold text-[#10B981]">{fmtB(totalEarn)}</span>
+                <div className="flex items-center justify-between mt-1 pt-3 border-t border-dashed border-line">
+                  <span className="text-[13px] font-bold text-ink">{t.net_remaining}</span>
+                  <span className="text-[18px] font-bold text-income">{fmtB(totalEarn)}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* OT breakdown donut */}
-          <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-              <span className="text-[15px] font-bold text-[#111827]">{t.ot_breakdown}</span>
-              <span className="text-[11px] text-[#9CA3AF]">{fmt1(totalOT)}h</span>
+          <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+              <span className="text-[15px] font-bold text-ink">{t.ot_breakdown}</span>
+              <span className="text-[11px] text-muted">{fmt1(totalOT)}h</span>
             </div>
             <div className="p-5 flex flex-col items-center gap-4">
               <DonutChart
@@ -320,9 +315,9 @@ export default function MonthlySummary({
                   />
                 ))}
               </div>
-              <div className="w-full mt-1 pt-4 border-t border-[#E8EAEF] flex items-center justify-between">
-                <span className="text-[13px] font-bold text-[#111827]">{t.total_ot_earnings}</span>
-                <span className="text-[18px] font-bold text-[#c29302]">{fmtB(otEarn)}</span>
+              <div className="w-full mt-1 pt-4 border-t border-line flex items-center justify-between">
+                <span className="text-[13px] font-bold text-ink">{t.total_ot_earnings}</span>
+                <span className="text-[18px] font-bold text-ot">{fmtB(otEarn)}</span>
               </div>
             </div>
           </div>
@@ -346,7 +341,7 @@ export default function MonthlySummary({
               transition-all duration-[220ms] ease-[cubic-bezier(0.4,0,0.2,1)]
               hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
               <span className="absolute top-4 right-4 sm:top-5 sm:right-5 bg-white/25 text-white/90 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-[0.06em]">
-                {t.this_month}
+                {isCurrentMonth ? t.this_month : `${t.short_months[viewM]} ${lang === 'th' ? viewY + 543 : viewY}`}
               </span>
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] bg-white/25 grid place-items-center mb-3 sm:mb-4">
                 <CircleDollarSign size={17} className="text-white" />
@@ -358,33 +353,33 @@ export default function MonthlySummary({
           </div>
 
           {/* OT by rate — แสดงเป็นการ์ดปกติ (ไม่ใช่แถบชาร์จพลัง) */}
-          <div className="bg-white border border-[#E8EAEF] rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8EAEF]">
-              <div className="text-[15px] font-bold text-[#111827]">{t.ot_by_rate}</div>
-              <div className="text-[11px] text-[#9CA3AF]">{fmt1(totalOT)}h · {fmtB(otEarn)}</div>
+          <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line">
+              <div className="text-[15px] font-bold text-ink">{t.ot_by_rate}</div>
+              <div className="text-[11px] text-muted">{fmt1(totalOT)}h · {fmtB(otEarn)}</div>
             </div>
             <div className="p-2.5 flex flex-col gap-0.5">
               {otTiers.map((tier) => (
-                <div key={tier.key} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-[#fffdef] transition-colors">
+                <div key={tier.key} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-ot-soft transition-colors">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0 bg-[#fffdef]">
-                      <Timer size={12} className="text-[#c29302]" />
+                    <div className="w-6 h-6 rounded-[6px] grid place-items-center shrink-0 bg-ot-soft">
+                      <Timer size={12} className="text-ot" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[12px] font-bold text-[#374151] leading-tight">{tier.label}</div>
-                      <div className="text-[10px] text-[#9CA3AF] leading-tight truncate">{tier.hint}</div>
+                      <div className="text-[12px] font-bold text-ink-2 leading-tight">{tier.label}</div>
+                      <div className="text-[10px] text-muted leading-tight truncate">{tier.hint}</div>
                     </div>
                   </div>
                   <div className="text-right shrink-0 leading-tight">
-                    <div className="text-[12px] font-bold text-[#c29302]">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
-                    <div className="text-[10px] text-[#9CA3AF]">{fmt1(tier.hours)} h</div>
+                    <div className="text-[12px] font-bold text-ot">{tier.earn > 0 ? '+' + fmtB(tier.earn) : '—'}</div>
+                    <div className="text-[10px] text-muted">{fmt1(tier.hours)} h</div>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="px-5 py-3.5 border-t border-[#E8EAEF] flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-[0.08em]">{t.total_ot_hours}</span>
-              <span className="text-[15px] font-bold text-[#c29302]">{fmt1(totalOT)}<span className="text-[11px] font-normal text-[#9CA3AF]">h</span></span>
+            <div className="px-5 py-3.5 border-t border-line flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-muted uppercase tracking-[0.08em]">{t.total_ot_hours}</span>
+              <span className="text-[15px] font-bold text-ot">{fmt1(totalOT)}<span className="text-[11px] font-normal text-muted">h</span></span>
             </div>
           </div>
         </div>
@@ -396,20 +391,20 @@ export default function MonthlySummary({
 // ─── SummaryCard ──────────────────────────────────────────────────────────────
 const variantStyles = {
   amber: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#fbde3a]', icon: 'bg-[#fffdef] text-[#c29302]', val: 'text-[#c29302]',
+    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    stripe: 'bg-ot-bar', icon: 'bg-ot-soft text-ot', val: 'text-ot',
   },
   indigo: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#3B4FE4]', icon: 'bg-[#EEF0FD] text-[#3B4FE4]', val: 'text-[#3B4FE4]',
+    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    stripe: 'bg-primary', icon: 'bg-primary-soft text-primary', val: 'text-primary',
   },
   green: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#10B981]', icon: 'bg-[#ECFDF5] text-[#10B981]', val: 'text-[#10B981]',
+    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    stripe: 'bg-income', icon: 'bg-income-soft text-income', val: 'text-income',
   },
   orange: {
-    wrap: 'bg-white border-[#E8EAEF] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-[#D1D5E0]',
-    stripe: 'bg-[#FDBA74]', icon: 'bg-[#FFF3E6] text-[#E8730C]', val: 'text-[#E8730C]',
+    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    stripe: 'bg-[#FDBA74]', icon: 'bg-shift-soft text-shift', val: 'text-shift',
   },
 };
 
@@ -424,9 +419,9 @@ function SummaryCard({ variant, Icon, label, value, sub }) {
         <Icon size={14} strokeWidth={2} className="sm:hidden" />
         <Icon size={17} strokeWidth={2} className="hidden sm:block" />
       </div>
-      <div className="text-[10px] sm:text-[11px] font-bold text-[#9CA3AF] uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 sm:mb-1.5 truncate">{label}</div>
+      <div className="text-[10px] sm:text-[11px] font-bold text-muted uppercase tracking-[0.05em] sm:tracking-[0.1em] mb-1 sm:mb-1.5 truncate">{label}</div>
       <div className={`text-[1.4rem] sm:text-[2rem] font-bold leading-none tracking-tight truncate ${st.val}`}>{value}</div>
-      {sub && <div className="text-[10px] sm:text-[12px] mt-1 sm:mt-1.5 text-[#9CA3AF] truncate">{sub}</div>}
+      {sub && <div className="text-[10px] sm:text-[12px] mt-1 sm:mt-1.5 text-muted truncate">{sub}</div>}
     </div>
   );
 }

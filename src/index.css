@@ -6,11 +6,52 @@
   --font-sans: "Google Sans", ui-sans-serif, system-ui, sans-serif;
   --color-holiday: rgba(110, 116, 255, 0.08);
   --color-holiday-border: rgba(110, 116, 255, 0.3);
+
+  /* ── TimeFlow design tokens ── ใช้ผ่านคลาส เช่น bg-primary, text-muted, border-line */
+  --color-primary: #3B4FE4;       /* คราม — ปุ่มหลัก/วันที่เลือก */
+  --color-primary-dark: #2A3BC0;
+  --color-primary-soft: #EEF0FD;
+  --color-primary-mid: #C7CCFA;
+  --color-ink: #111827;           /* ข้อความหลัก */
+  --color-ink-2: #374151;
+  --color-muted: #6B7280;         /* ข้อความรอง — contrast 4.8:1 บนพื้นขาว (ผ่าน AA) */
+  --color-faint: #9CA3AF;         /* ไอคอน/เส้น เท่านั้น — ห้ามใช้เป็นสีข้อความ */
+  --color-line: #E8EAEF;
+  --color-line-strong: #D1D5E0;
+  --color-surface-alt: #F8F9FB;
+  --color-ot: #c29302;            /* OT (เหลืองอำพัน) */
+  --color-ot-soft: #fffdef;
+  --color-ot-line: #ffe270;
+  --color-ot-bar: #fbde3a;
+  --color-shift: #E8730C;         /* เบี้ยกะ (ส้มอ่อน) */
+  --color-shift-soft: #FFF3E6;
+  --color-income: #10B981;        /* รายได้ (เขียว) */
+  --color-income-soft: #ECFDF5;
+  --color-danger: #EF4444;        /* นักขัตฤกษ์/ลบ */
+  --color-today: #6fa3cb;         /* วันนี้ */
+  --color-today-soft: #f0f5fa;
+  --color-today-ink: #2F6F9F;     /* วันนี้แบบตัวหนังสือ (contrast ผ่าน AA) */
 }
 
 @layer base {
   body {
     @apply bg-white text-slate-800 font-sans antialiased m-0 p-0;
+  }
+
+  /* วงโฟกัสของคีย์บอร์ดตั้งต้น — ชิ้นไหนมี outline-none ของตัวเองจะไม่โดน */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}
+
+/* เคารพการตั้งค่าลดการเคลื่อนไหวของผู้ใช้ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

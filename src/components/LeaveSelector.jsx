@@ -72,17 +72,17 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
       >
         {/* Mobile handle */}
         <div className="xl:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 bg-[#E8EAEF] rounded-full"></div>
+          <div className="w-12 h-1.5 bg-line rounded-full"></div>
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#E8EAEF]">
-          <h2 className="text-lg font-bold text-[#111827]">
+        <div className="flex items-center justify-between p-6 border-b border-line">
+          <h2 className="text-lg font-bold text-ink">
             {mode === 'choice' ? (lang === 'th' ? 'เลือกสถานะ' : 'Select Status') : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select Leave Type')}
           </h2>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-[#F8F9FB] transition-colors bg-transparent border-none cursor-pointer"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:bg-surface-alt transition-colors bg-transparent border-none cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -97,16 +97,16 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 onClick={handleSelectWork}
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
                   ${isWork
-                    ? 'border-[#3B4FE4] bg-[#EEF0FD] shadow-sm'
-                    : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
+                    ? 'border-primary bg-primary-soft shadow-sm'
+                    : 'border-line hover:border-line-strong hover:bg-surface-alt'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isWork ? 'bg-[#3B4FE4] text-white' : 'bg-[#F0F1F9] text-[#6B7280]'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isWork ? 'bg-primary text-white' : 'bg-[#F0F1F9] text-muted'}`}>
                   <Clock size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-[#111827]">{lang === 'th' ? 'ทำงาน' : 'Working'}</div>
-                  <div className="text-xs text-[#9CA3AF]">{lang === 'th' ? 'บันทึกเวลาทำงาน' : 'Record work time'}</div>
+                  <div className="font-semibold text-ink">{lang === 'th' ? 'ทำงาน' : 'Working'}</div>
+                  <div className="text-xs text-muted">{lang === 'th' ? 'บันทึกเวลาทำงาน' : 'Record work time'}</div>
                 </div>
               </button>
 
@@ -115,16 +115,16 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 onClick={handleSelectTraining}
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
                   ${isTraining
-                    ? 'border-[#111827] bg-[#F3F4F6] shadow-sm'
-                    : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
+                    ? 'border-ink bg-[#F3F4F6] shadow-sm'
+                    : 'border-line hover:border-line-strong hover:bg-surface-alt'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isTraining ? 'bg-[#111827] text-white' : 'bg-[#F0F1F9] text-[#6B7280]'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isTraining ? 'bg-ink text-white' : 'bg-[#F0F1F9] text-muted'}`}>
                   <GraduationCap size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-[#111827]">{lang === 'th' ? 'อบรม' : 'Training'}</div>
-                  <div className="text-xs text-[#9CA3AF]">{lang === 'th' ? 'นอกสถานที่ / ดูงาน (ได้เงินปกติ)' : 'Off-site / study visit (regular pay)'}</div>
+                  <div className="font-semibold text-ink">{lang === 'th' ? 'อบรม' : 'Training'}</div>
+                  <div className="text-xs text-muted">{lang === 'th' ? 'นอกสถานที่ / ดูงาน (ได้เงินปกติ)' : 'Off-site / study visit (regular pay)'}</div>
                 </div>
               </button>
 
@@ -134,15 +134,15 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
                   ${isLeave
                     ? 'border-[#8B5CF6] bg-[#F5F3FF] shadow-sm'
-                    : 'border-[#E8EAEF] hover:border-[#D1D5E0] hover:bg-[#F8F9FB]'
+                    : 'border-line hover:border-line-strong hover:bg-surface-alt'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isLeave ? 'bg-[#8B5CF6] text-white' : 'bg-[#F0F1F9] text-[#6B7280]'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isLeave ? 'bg-[#8B5CF6] text-white' : 'bg-[#F0F1F9] text-muted'}`}>
                   <UmbrellaOff size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-[#111827]">{lang === 'th' ? 'ลางาน' : 'Taking Leave'}</div>
-                  <div className="text-xs text-[#9CA3AF]">
+                  <div className="font-semibold text-ink">{lang === 'th' ? 'ลางาน' : 'Taking Leave'}</div>
+                  <div className="text-xs text-muted">
                     {isLeave && currentLeaveType
                       ? leaveLabel[currentLeaveType]
                       : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select leave type')
@@ -183,8 +183,8 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                     <leave.icon size={20} />
                   </div>
                   <div>
-                    <div className="font-semibold text-[#111827]">{leaveLabel[leave.key]}</div>
-                    <div className="text-xs text-[#9CA3AF]">{leaveDesc[leave.key]}</div>
+                    <div className="font-semibold text-ink">{leaveLabel[leave.key]}</div>
+                    <div className="text-xs text-muted">{leaveDesc[leave.key]}</div>
                   </div>
                 </button>
               ))}
@@ -192,7 +192,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Back Button */}
               <button
                 onClick={() => setMode('choice')}
-                className="w-full mt-4 p-3 rounded-lg border border-[#E8EAEF] text-[#6B7280] font-semibold text-sm hover:bg-[#F8F9FB] transition-colors cursor-pointer bg-white"
+                className="w-full mt-4 p-3 rounded-lg border border-line text-muted font-semibold text-sm hover:bg-surface-alt transition-colors cursor-pointer bg-white"
               >
                 {lang === 'th' ? 'กลับ' : 'Back'}
               </button>
