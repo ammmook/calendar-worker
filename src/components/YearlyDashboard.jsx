@@ -647,13 +647,16 @@ export default function YearlyDashboard({
                         </div>
                     </div>
 
+                    {/* OT by rate + Leave Summary — desktop วางข้างกัน */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+
                     {/* OT by rate — แสดงเป็นแถวชิดๆ (ไม่ใช่แถบชาร์จพลัง) */}
-                    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+                    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
                         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                             <div className="text-[15px] font-bold text-ink">{t.ot_by_rate}</div>
                             <div className="text-[11px] text-muted">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
                         </div>
-                        <div className="p-2.5 flex flex-col gap-0.5">
+                        <div className="p-2.5 flex flex-col gap-0.5 flex-1">
                             {otTiers.map((tier) => (
                                 <div key={tier.key} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg hover:bg-ot-soft transition-colors">
                                     <div className="flex items-center gap-2 min-w-0">
@@ -734,6 +737,7 @@ export default function YearlyDashboard({
                                 </p>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             )}
