@@ -304,16 +304,14 @@ export default function App() {
   const otDays = currentMonthSummary.ot_days;
   const daysWorked = currentMonthSummary.days_worked;
 
-  const regEarn = paymentType === 'daily'
-    ? currentMonthSummary.total_regular_earning
-    : salary; // Full monthly salary as requested
+  const regEarn = currentMonthSummary.total_regular_earning || 0; // จาก backend (เดือนที่ไม่มี entry = 0)
 
   const otEarn = currentMonthSummary.total_ot_earning;
   // เบี้ยกะรวมของเดือน (backend เก็บ total_shift_allowance + shift_days ไว้ใน monthly_summary)
   const shiftEarn = currentMonthSummary.total_shift_allowance || 0;
   const shiftDays = currentMonthSummary.shift_days || 0;
   // หักประกันสังคมออกจากรายได้รวมของเดือน
-  const totalEarn = Math.max(0, regEarn + otEarn + shiftEarn - (socialSecurity || 0));
+  const totalEarn = currentMonthSummary.total_earning || 0; // หักประกันสังคมแล้วจาก backend
   // อัตรา OT วันธรรมดาที่แสดงบนการ์ด = base (เงินเดือน ÷ 30 ÷ std) × 1.5 ; รายวัน fallback ค่า OT Rate ที่กรอกเอง
   const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
 
@@ -387,7 +385,9 @@ export default function App() {
         await loadEntries(true, true);
 
         vibrate(VIBE_SUCCESS);
-        showToast(lang === 'th' ? 'บันทึกและคำนวณเงินแล้ว' : 'Saved and calculated');
+        showToast(res.summaryStale
+          ? (lang === 'th' ? 'บันทึกแล้ว แต่สรุปยอดอัปเดตไม่สำเร็จ ลองบันทึกซ้ำ' : 'Saved, but summary update failed — please save again')
+          : (lang === 'th' ? 'บันทึกและคำนวณเงินแล้ว' : 'Saved and calculated'));
         
         // Close modal/pane immediately
         setSelectedKey(null);

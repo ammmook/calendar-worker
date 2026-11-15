@@ -43,12 +43,13 @@ export default function MonthlySummary({
   const totalOT = s.total_ot_hour;
   const otDays = s.ot_days;
   const daysWorked = s.days_worked;
-  const regEarn = paymentType === 'daily' ? s.total_regular_earning : salary;
+  // ใช้ยอดจาก monthly_summary (backend) — เดือนที่ไม่มี entry = 0 (ไม่บวกเงินเดือน/ไม่หักประกันสังคม)
+  const regEarn = s.total_regular_earning || 0;
   const otEarn = s.total_ot_earning;
   const shiftEarn = s.total_shift_allowance || 0;
   const shiftDays = s.shift_days || 0;
   const grossEarn = regEarn + otEarn + shiftEarn;
-  const totalEarn = Math.max(0, grossEarn - (socialSecurity || 0));
+  const totalEarn = s.total_earning || 0; // หักประกันสังคมแล้วจาก backend
   const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
 
   // ── OT tier ──

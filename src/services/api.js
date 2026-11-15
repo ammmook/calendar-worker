@@ -283,9 +283,11 @@ async function upsertWorkEntry(data) {
     .eq('email', data.user_email)
     .maybeSingle();
   if (userErr) return { success: false, error: userErr.message };
+  // ไม่มี user → ห้ามบันทึก (ไม่งั้นได้ entry ที่เงิน 0 และไม่มี summary)
+  if (!user) return { success: false, error: 'User not found' };
 
-  if (user) {
-    await expandUserWithSalary(user);
+  {
+    expandUserWithSalary(user);
 
     // ── การตั้งค่าเบี้ยกะ (เก็บในตาราง user) ──
     const shiftAllowance = Number(user.shift_allowance) || 0;
@@ -386,27 +388,33 @@ async function upsertWorkEntry(data) {
     yearNum = d.getFullYear();
   }
 
-  // 2. หา existing entry ด้วย user_email + date
-  const { data: existing, error: exErr } = await supabase
+  // 2. upsert ด้วย unique (user_email, date) — atomic ไม่เกิด entry ซ้ำเมื่อกดเซฟรัว/สองแท็บ
+  //    ต้องรัน google-apps-script/work_entry_unique_migration.sql ก่อน
+  data.month_num = monthNum;
+  data.year_num = yearNum;
+  if (!data.work_entry_id) data.work_entry_id = generateId('WE');
+  const row = pickWorkEntryColumns(data);
+  const { data: saved, error: upErr } = await supabase
     .from('work_entry')
+    .upsert(row, { onConflict: 'user_email,date' })
     .select('work_entry_id')
-    .eq('user_email', data.user_email)
-    .eq('date', data.date)
     .maybeSingle();
-  if (exErr) return { success: false, error: exErr.message };
+  if (upErr) return { success: false, error: upErr.message };
 
-  let result;
-  if (existing) {
-    data.work_entry_id = existing.work_entry_id;
-    result = await updateWorkEntry(data);
-  } else {
-    result = await createWorkEntry(data);
-  }
+  const result = {
+    success: true,
+    data: { work_entry_id: saved?.work_entry_id || data.work_entry_id },
+    message: 'Work entry saved',
+  };
 
-  // อัปเดตตารางสรุปรายเดือนและรายปีหลังบันทึก work_entry แล้ว
-  if (monthNum && yearNum) {
+  // อัปเดตสรุปรายเดือน/รายปี — entry ถูกบันทึกแล้ว ถ้า recalc ล้มต้องไม่รายงานว่าเซฟล้มเหลว
+  try {
     await recalcMonthlySummary(data.user_email, monthNum, yearNum);
     await recalcYearlySummary(data.user_email, yearNum);
+  } catch (err) {
+    console.error('[TimeFlow API] recalc summary failed:', err);
+    result.summaryStale = true;
+    result.warning = err.message;
   }
 
   return result;
