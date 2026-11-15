@@ -71,8 +71,6 @@ export default function ProfilePage(props) {
                 sick_leave_day: leaveQuotas.sick,
                 personal_leave_day: leaveQuotas.personal,
                 annual_leave_day: leaveQuotas.vacation,
-                payment_type: 'monthly',
-                daily_rate: 0,
                 social_security: socialSecurity || 0,
                 shift_allowance: shiftAllowance || 0,
                 shift_start: shiftStart || '',
@@ -88,10 +86,8 @@ export default function ProfilePage(props) {
 
             // Sync changes back to App.jsx global state ONLY after successful save
             props.setSalary(finalSalary);
-            props.setDailyRate(0);
             props.setOtRate(finalOtRate);
             props.setLeaveQuotas(leaveQuotas);
-            props.setPaymentType('monthly');
             props.setShiftAllowance(shiftAllowance);
             props.setShiftStart(shiftStart);
             props.setShiftEnd(shiftEnd);

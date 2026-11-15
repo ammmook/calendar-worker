@@ -27,9 +27,11 @@ import { calcWorkDay, parseWorkSpan, addDaysStr, baseHourlyRate } from './utils/
 import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+/** log เฉพาะตอน dev (ไม่ปล่อยอีเมล/ข้อมูลผู้ใช้ออก console ของ production) */
+const devLog = (...a) => { if (import.meta.env.DEV) console.log(...a); };
 /** สั่น (haptic) — no-op ถ้าเบราว์เซอร์ไม่รองรับ (เช่น iOS Safari) */
 const vibrate = (pattern) => {
-  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pattern); } catch {}
+  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(pattern); } catch { /* ไม่รองรับ — ข้าม */ }
 };
 // รูปแบบการสั่น: บันทึก/แก้ไข/ลบ สำเร็จ = จังหวะคู่ ; toggle วันหยุด = จังหวะสั้นเดียว (ให้ต่างกัน)
 const VIBE_SUCCESS = [35, 25, 35];
@@ -56,7 +58,7 @@ export default function App() {
 
   // Persist language to localStorage
   useEffect(() => {
-    try { localStorage.setItem('timeflow_lang', lang); } catch {}
+    try { localStorage.setItem('timeflow_lang', lang); } catch { /* storage ถูกบล็อก — ข้าม */ }
   }, [lang]);
 
   const [entries, setEntries] = useState({});
@@ -73,9 +75,6 @@ export default function App() {
   const [otRate, setOtRate] = useState(0);
   const std = 8; // ชั่วโมงทำงานปกติ/วัน คงที่ (ไม่มี input ให้แก้)
 
-  // ── Payment Type ──
-  const [paymentType, setPaymentType] = useState('monthly'); // 'monthly' | 'daily'
-  const [dailyRate, setDailyRate] = useState(0);
   const [leaveQuotas, setLeaveQuotas] = useState({ sick: 0, personal: 0, vacation: 0 });
 
   // ── Shift Allowance (เบี้ยกะ) — เก็บในตาราง user ──
@@ -123,13 +122,13 @@ export default function App() {
     if (!user?.email) return;
     let cancelled = false;
     setProfileStatus('loading');
-    console.log('[TimeFlow] Loading user profile for:', user.email);
+    devLog('[TimeFlow] Loading user profile for:', user.email);
 
     (async () => {
       try {
         const res = await UserAPI.get(user.email);
         if (cancelled) return;
-        console.log('[TimeFlow] User profile response:', res);
+        devLog('[TimeFlow] User profile response:', res);
 
         if (res.success && res.data) {
           const u = res.data;
@@ -142,8 +141,6 @@ export default function App() {
             vacation: Number(u.annual_leave_day) || 0,
           });
 
-          if (u.payment_type) setPaymentType(u.payment_type);
-          setDailyRate(Number(u.daily_rate) || 0);
           setSocialSecurity(Number(u.social_security) || 0);
 
           // เบี้ยกะ — เก็บในตาราง user แล้ว
@@ -151,11 +148,11 @@ export default function App() {
           setShiftStart(u.shift_start || '');
           setShiftEnd(u.shift_end || '');
 
-          console.log('[TimeFlow] ✅ User profile loaded');
+          devLog('[TimeFlow] ✅ User profile loaded');
           setProfileStatus('ready');
         } else if (res.error === 'User not found') {
           // User ไม่เจอจริง ๆ → สร้างใหม่ด้วย defaults
-          console.log('[TimeFlow] User not found, creating new user...');
+          devLog('[TimeFlow] User not found, creating new user...');
           const created = await UserAPI.create({
             email: user.email,
             salary_monthly: 0,
@@ -163,8 +160,6 @@ export default function App() {
             sick_leave_day: 0,
             personal_leave_day: 0,
             annual_leave_day: 0,
-            payment_type: 'monthly',
-            daily_rate: 0,
           });
           if (cancelled) return;
           setProfileStatus(created?.success ? 'ready' : 'error');
@@ -190,7 +185,7 @@ export default function App() {
     const reqId = ++reqIdRef.current;
     if (!silent) setDataLoaded(false);
     // The first load uses skeleton loading; subsequent reloads are silent
-    console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
+    devLog('[TimeFlow] Loading work entries and holidays for:', user.email);
     try {
       // โหลดเฉพาะ "ปีที่ดูอยู่" (entries + summary มาใน getEarningsSummary คำขอเดียว) — ไม่ดึงทั้งประวัติ
       // วันหยุดของ user ชุดเล็กและไม่เปลี่ยนตามปี → โหลดเฉพาะครั้งแรก/บังคับ
@@ -268,37 +263,6 @@ export default function App() {
     setDOut(selEntry.out || '');
     setDNote(selEntry.note || '');
   }, [selectedKey, selEntry.in, selEntry.out, selEntry.note]);
-
-  // ── Monthly aggregates ──
-  const currentMonthSummary = useMemo(() => {
-    return earningsSummary.monthly.find(m => m.month_num === viewM + 1 && m.year_num === viewY) || {
-      days_worked: 0,
-      ot_days: 0,
-      shift_days: 0,
-      total_working_hour: 0,
-      total_ot_hour: 0,
-      total_ot_earning: 0,
-      total_regular_earning: 0,
-      total_shift_allowance: 0,
-      total_earning: 0
-    };
-  }, [earningsSummary.monthly, viewY, viewM]);
-
-  const totalReg = currentMonthSummary.total_working_hour;
-  const totalOT = currentMonthSummary.total_ot_hour;
-  const otDays = currentMonthSummary.ot_days;
-  const daysWorked = currentMonthSummary.days_worked;
-
-  const regEarn = currentMonthSummary.total_regular_earning || 0; // จาก backend (เดือนที่ไม่มี entry = 0)
-
-  const otEarn = currentMonthSummary.total_ot_earning;
-  // เบี้ยกะรวมของเดือน (backend เก็บ total_shift_allowance + shift_days ไว้ใน monthly_summary)
-  const shiftEarn = currentMonthSummary.total_shift_allowance || 0;
-  const shiftDays = currentMonthSummary.shift_days || 0;
-  // หักประกันสังคมออกจากรายได้รวมของเดือน
-  const totalEarn = currentMonthSummary.total_earning || 0; // หักประกันสังคมแล้วจาก backend
-  // อัตรา OT วันธรรมดาที่แสดงบนการ์ด = base (เงินเดือน ÷ 30 ÷ std) × 1.5 ; รายวัน fallback ค่า OT Rate ที่กรอกเอง
-  const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
 
   // Toggle holiday for a date key
   // อ่านค่าล่าสุดผ่าน ref เพื่อให้ callback ไม่เปลี่ยน identity ทุกครั้งที่ state เปลี่ยน (DayCell memo จึงได้ผล)
@@ -457,9 +421,8 @@ export default function App() {
     
     const isMobile = !isDesktopViewport();
     if (!leaveData.leave) {
-      // Check for profile completeness: salary/dailyRate and otRate must be configured
-      const isRateIncomplete = paymentType === 'monthly' ? !salary : !dailyRate;
-      if (isRateIncomplete || !otRate) {
+      // Check for profile completeness: salary and otRate must be configured
+      if (!salary || !otRate) {
         if (isMobile) {
           setShowProfileIncomplete(true);
           setSelectedKey(null);
@@ -586,7 +549,6 @@ export default function App() {
       nextIsPublic, nextIsUserHoliday,
       stdH, baseHourly: baseHourlyRate(salary, otRate, stdH),
       shiftAllowance, shiftStart, shiftEnd,
-      paymentType, dailyRate,
     });
     return {
       working_hour: r.workingHour,
@@ -599,7 +561,7 @@ export default function App() {
       shift_allowance: r.shiftAllowance,
       total_earning: r.totalEarning,
     };
-  }, [dIn, dOut, selectedKey, std, salary, otRate, paymentType, dailyRate, shiftAllowance, shiftStart, shiftEnd, publicHolidays, holidays]);
+  }, [dIn, dOut, selectedKey, std, salary, otRate, shiftAllowance, shiftStart, shiftEnd, publicHolidays, holidays]);
 
   // ใช้ค่า preview เมื่อกรอกเวลาครบ; ถ้าไม่ครบใช้ค่าที่บันทึกไว้เดิม
   const detHReg = previewCalc ? previewCalc.working_hour : (selDailyEarning?.working_hour || 0);
@@ -645,9 +607,6 @@ export default function App() {
         shiftEnd={shiftEnd} setShiftEnd={setShiftEnd}
         socialSecurity={socialSecurity} setSocialSecurity={setSocialSecurity}
         
-        paymentType={paymentType} setPaymentType={setPaymentType}
-        dailyRate={dailyRate} setDailyRate={setDailyRate}
-
         lang={lang}
         onBack={() => setPage('dashboard')}
       />
@@ -827,7 +786,7 @@ export default function App() {
               setViewM={setViewM} setViewY={setViewY} showToast={showToast}
               entries={entries} setEntries={setEntries}
               earningsSummary={earningsSummary} holidays={holidays}
-              publicHolidays={publicHolidays} paymentType={paymentType}
+              publicHolidays={publicHolidays}
               selectedKey={selectedKey} setSelectedKey={setSelectedKey}
               handleDayClick={handleDayClick} toggleHoliday={toggleHoliday}
               dIn={dIn} dOut={dOut} setDIn={setDIn} setDOut={setDOut}
@@ -887,7 +846,6 @@ export default function App() {
                   otRate={otRate}
                   std={std}
                   socialSecurity={socialSecurity}
-                  paymentType={paymentType}
                   lang={lang}
                   t={t}
                   viewY={viewY}
@@ -912,12 +870,8 @@ export default function App() {
                 <YearlyDashboard
                   entries={entries}
                   earningsSummary={earningsSummary}
-                  holidays={holidays}
                   salary={salary}
-                  otRate={otRate}
                   leaveQuotas={leaveQuotas}
-                  paymentType={paymentType}
-                  dailyRate={dailyRate}
                   socialSecurity={socialSecurity}
                   lang={lang}
                   viewY={viewY}

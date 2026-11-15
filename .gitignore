@@ -27,3 +27,6 @@ dist-ssr
 .env*
 *.md
 *.sql
+# เก็บไว้ใน repo (ไม่ถูก *.md / *.sql ด้านบนกลืน)
+!CLAUDE.md
+!google-apps-script/*.sql

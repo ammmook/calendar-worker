@@ -43,10 +43,8 @@ const OT_TIER_COLORS = ['#fcd34d', '#c29302', '#92700a'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function YearlyDashboard({
-    entries, earningsSummary, holidays, salary, otRate,
+    entries, earningsSummary, salary,
     leaveQuotas, lang,
-    paymentType = 'monthly',
-    dailyRate = 0,
     socialSecurity = 0,
     viewY,
     setViewY,
@@ -177,7 +175,8 @@ export default function YearlyDashboard({
 
     // ── Tooltip position handler ───────────────────────────────────────────────
     const handleBarHover = (mIdx) => {
-        setTooltip({ mIdx });
+        // เก็บความกว้างกราฟตอน hover (ไม่อ่าน ref ระหว่าง render)
+        setTooltip({ mIdx, totalW: chartRef.current?.offsetWidth || 800 });
     };
 
     // ── Bar chart (แนวโน้มรายได้) — reuse ในแท็บ Graph ──
@@ -319,7 +318,7 @@ export default function YearlyDashboard({
                 {tooltip !== null && (() => {
                     const mIdx = tooltip.mIdx;
                     const m = monthlyStats[mIdx];
-                    const totalW = chartRef.current?.offsetWidth || 800;
+                    const totalW = tooltip.totalW;
                     const { x, bW } = barGroup(mIdx, totalW);
                     const TW = 200;
 

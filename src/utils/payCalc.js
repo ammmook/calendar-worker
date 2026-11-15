@@ -79,14 +79,12 @@ const EMPTY = {
  * @param {boolean} p.nextIsUserHoliday        วันถัดไปเป็นวันหยุด user (ใช้เมื่อข้ามเที่ยงคืน และ nextIsPublic=false)
  * @param {number} p.stdH / p.baseHourly
  * @param {number} p.shiftAllowance / p.shiftStart / p.shiftEnd   (เวลาเป็น "HH:mm")
- * @param {string} p.paymentType / p.dailyRate
  */
 export function calcWorkDay({
   clockIn, clockOut,
   isPublicHolidayToday = false, nextIsPublic = false, nextIsUserHoliday = false,
   stdH, baseHourly,
   shiftAllowance = 0, shiftStart = '', shiftEnd = '',
-  paymentType = 'monthly', dailyRate = 0,
 }) {
   const { inMin, outMin, totalMins, crossedMidnight } = parseWorkSpan(clockIn, clockOut);
   if (totalMins <= 0) return { ...EMPTY };
@@ -153,9 +151,7 @@ export function calcWorkDay({
   }
 
   const shiftEarning = hasShift ? Number(shiftAllowance) : 0;
-  const regularEarning = paymentType === 'daily'
-    ? (Number(dailyRate) || 0) * (stdH > 0 ? workingHour / stdH : 0)
-    : 0; // Monthly Salary: ไม่คิดเงินรายวัน
+  const regularEarning = 0; // รายเดือน: ไม่คิดเงินรายวัน
 
   return {
     workingHour, otHour, otEarning,

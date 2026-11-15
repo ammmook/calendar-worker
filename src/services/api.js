@@ -33,19 +33,17 @@ function generateId(prefix) {
 
 /** log แบบเดียวกับของเดิม */
 function logCall(action, data) {
-  console.log(`[TimeFlow API] → ${action}`, data || '');
+  if (import.meta.env.DEV) console.log(`[TimeFlow API] → ${action}`, data || '');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  SALARY (เก็บตรงในตาราง user คอลัมน์ `salary` — รายเดือนอย่างเดียว)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** เติมฟิลด์ที่ frontend ใช้ (salary_monthly / payment_type / daily_rate) จากคอลัมน์ user.salary */
+/** เติมฟิลด์ที่ frontend ใช้ (salary_monthly) จากคอลัมน์ user.salary */
 function expandUserWithSalary(user) {
   if (!user) return user;
   user.salary_monthly = Number(user.salary) || 0;
-  user.payment_type = 'monthly';   // รองรับเฉพาะรายเดือน
-  user.daily_rate = 0;
   return user;
 }
 
@@ -66,14 +64,6 @@ async function getUser(email) {
   return { success: true, data: user };
 }
 
-async function getAllUsers() {
-  const { data: users, error } = await supabase.from('user').select('*');
-  if (error) return { success: false, error: error.message };
-  for (const u of users) {
-    await expandUserWithSalary(u);
-  }
-  return { success: true, data: users };
-}
 
 async function createUser(data) {
   if (!data || !data.email) {
@@ -129,7 +119,7 @@ async function updateUser(data) {
   if (!current) return { success: false, error: 'User not found' };
 
   // ── patch user (เงินเดือนเก็บในคอลัมน์ salary ; payment_type/daily_rate ไม่มีคอลัมน์แล้ว) ──
-  const SKIP_FIELDS = ['salary_monthly', 'salary', 'payment_type', 'daily_rate'];
+  const SKIP_FIELDS = ['salary_monthly', 'salary', 'payment_type', 'daily_rate']; // ฟิลด์เก่า ไม่มีคอลัมน์แล้ว กันไว้เผื่อ client เก่าส่งมา
   const upd = {};
   Object.keys(data).forEach((h) => {
     if (h === 'email') return;
@@ -148,85 +138,15 @@ async function updateUser(data) {
   return { success: true, message: 'User updated' };
 }
 
-async function upsertUser(data) {
-  if (!data || !data.email) return { success: false, error: 'email is required' };
-  const { data: existing, error } = await supabase
-    .from('user')
-    .select('email')
-    .eq('email', data.email)
-    .maybeSingle();
-  if (error) return { success: false, error: error.message };
-  return existing ? updateUser(data) : createUser(data);
-}
 
-async function deleteUser(email) {
-  if (!email) return { success: false, error: 'email is required' };
-  const { error } = await supabase.from('user').delete().eq('email', email);
-  if (error) return { success: false, error: error.message };
-  return { success: true, message: 'User deleted' };
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  WORK ENTRY API
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function getWorkEntries(email) {
-  if (!email) return { success: false, error: 'email is required' };
-  const { data, error } = await supabase
-    .from('work_entry')
-    .select('*')
-    .eq('user_email', email);
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: data || [] };
-}
 
-async function getWorkEntriesByMonth(email, month, year) {
-  if (!email) return { success: false, error: 'email is required' };
-  const { data, error } = await supabase
-    .from('work_entry')
-    .select('*')
-    .eq('user_email', email)
-    .eq('month_num', month)
-    .eq('year_num', year);
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: data || [] };
-}
 
-async function createWorkEntry(data) {
-  if (!data || !data.user_email) {
-    return { success: false, error: 'user_email is required' };
-  }
 
-  if (!data.work_entry_id) data.work_entry_id = generateId('WE');
-
-  // Auto-fill month_num / year_num จาก date ถ้ามี
-  if (data.date && (!data.month_num || !data.year_num)) {
-    const { month, year } = parseYMD(data.date);
-    data.month_num = data.month_num || month;
-    data.year_num = data.year_num || year;
-  }
-
-  const row = pickWorkEntryColumns(data);
-  const { error } = await supabase.from('work_entry').insert(row);
-  if (error) return { success: false, error: error.message };
-  return { success: true, data: { work_entry_id: data.work_entry_id }, message: 'Work entry created' };
-}
-
-async function updateWorkEntry(data) {
-  if (!data || !data.work_entry_id) {
-    return { success: false, error: 'work_entry_id is required' };
-  }
-  const row = pickWorkEntryColumns(data);
-  delete row.work_entry_id;
-  const { data: updated, error } = await supabase
-    .from('work_entry')
-    .update(row)
-    .eq('work_entry_id', data.work_entry_id)
-    .select('work_entry_id');
-  if (error) return { success: false, error: error.message };
-  if (!updated || updated.length === 0) return { success: false, error: 'Work entry not found' };
-  return { success: true, message: 'Work entry updated' };
-}
 
 /** เลือกเฉพาะคอลัมน์ของตาราง work_entry (คงชื่อแอทริบิวเดิม) */
 function pickWorkEntryColumns(data) {
@@ -322,8 +242,6 @@ async function upsertWorkEntry(data) {
     const shiftStart = user.shift_start || '';
     const shiftEnd = user.shift_end || '';
 
-    const paymentType = user.payment_type || 'monthly';
-    const dailyRate = Number(user.daily_rate) || 0;
     const otRate = Number(user.ot_hourly) || 0;
     const stdH = 8; // ชั่วโมงมาตรฐานคงที่ (ไม่มีคอลัมน์ working_hour แล้ว)
     // base ต่อชั่วโมง = เงินเดือน ÷ 30 วัน ÷ 8 (เช่น 22,000 ÷ 30 ÷ 8 = 91.67)
@@ -367,7 +285,6 @@ async function upsertWorkEntry(data) {
           isPublicHolidayToday, nextIsPublic, nextIsUserHoliday,
           stdH, baseHourly,
           shiftAllowance, shiftStart, shiftEnd,
-          paymentType, dailyRate,
         });
         workingHour = r.workingHour;
         otHour = r.otHour;
@@ -382,13 +299,7 @@ async function upsertWorkEntry(data) {
     data.working_hour = workingHour;
     data.ot_hour = otHour;
 
-    let regularEarning = 0;
-    if (paymentType === 'daily') {
-      regularEarning = dailyRate * (stdH > 0 ? workingHour / stdH : 0);
-    } else {
-      // Monthly Salary: ไม่คิดเงินรายวัน
-      regularEarning = 0;
-    }
+    const regularEarning = 0; // รายเดือน: ไม่คิดเงินรายวัน (เงินเดือนบวกที่ monthly_summary)
 
     const otEarning = otEarningOverride != null ? otEarningOverride : otHour * baseHourly * 1.5;
     const totalEarning = regularEarning + otEarning + shiftEarning;
@@ -480,25 +391,36 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_ot_earning_3 += Number(e.ot_earning_3) || 0;
   });
 
-  // Fetch user info for payment_type check
-  const { data: user } = await supabase
-    .from('user')
-    .select('*')
-    .eq('email', userEmail)
-    .maybeSingle();
-  if (user) await expandUserWithSalary(user);
-  const paymentType = user ? (user.payment_type || 'monthly') : 'monthly';
-  const salaryMonthly = user ? (Number(user.salary_monthly) || 0) : 0;
-  const socialSecurity = user ? (Number(user.social_security) || 0) : 0;
+  // user ปัจจุบัน + summary เดิมของเดือนนี้ (ดึงพร้อมกัน)
+  const [{ data: user }, { data: existing }] = await Promise.all([
+    supabase.from('user').select('*').eq('email', userEmail).maybeSingle(),
+    supabase.from('monthly_summary').select('*')
+      .eq('user_email', userEmail).eq('month_num', monthNum).eq('year_num', yearNum)
+      .maybeSingle(),
+  ]);
+  if (user) expandUserWithSalary(user);
 
-  // ถ้าเป็นรายเดือน ให้ใส่เงินเดือนเป็นฐานรายได้หลัก (ถ้ามีข้อมูลการลงเวลาในเดือนนั้น)
-  if (paymentType === 'monthly') {
-    total_regular_earning = (filtered && filtered.length > 0) ? salaryMonthly : 0;
-    total_earning = total_regular_earning + total_ot_earning + total_shift_allowance;
-  }
+  // เงินเดือน/ประกันสังคมที่ใช้คิด:
+  //  - เดือนที่ผ่านมาแล้ว และเคยบันทึก snapshot ไว้ → ใช้ค่าที่ snapshot (แก้เงินเดือนทีหลังไม่ย้อนกระทบ)
+  //  - เดือนปัจจุบัน/อนาคต หรือยังไม่มี snapshot → ใช้ค่าปัจจุบันของ user แล้วบันทึกเป็น snapshot
+  const now = new Date();
+  const isPastMonth = yearNum * 12 + monthNum < now.getFullYear() * 12 + (now.getMonth() + 1);
+  const hasSnapshot = existing && existing.salary_snapshot != null;
+  const useSnapshot = isPastMonth && hasSnapshot;
+  const salaryMonthly = useSnapshot
+    ? Number(existing.salary_snapshot) || 0
+    : (user ? Number(user.salary_monthly) || 0 : 0);
+  const socialSecurity = useSnapshot
+    ? Number(existing.social_security_snapshot) || 0
+    : (user ? Number(user.social_security) || 0 : 0);
+
+  // รายเดือน: ใส่เงินเดือนเป็นฐานรายได้หลัก เมื่อมีข้อมูลการลงเวลาในเดือนนั้น
+  const hasEntries = (filtered || []).length > 0;
+  total_regular_earning = hasEntries ? salaryMonthly : 0;
+  total_earning = total_regular_earning + total_ot_earning + total_shift_allowance;
 
   // หักประกันสังคม (ต่อเดือน) เมื่อมีการทำงานในเดือนนั้น
-  if (filtered && filtered.length > 0 && socialSecurity > 0) {
+  if (hasEntries && socialSecurity > 0) {
     total_earning = Math.max(0, total_earning - socialSecurity);
   }
 
@@ -521,15 +443,10 @@ async function recalcMonthlySummary(userEmail, monthNum, yearNum) {
     total_ot_earning_1,
     total_ot_hour_3,
     total_ot_earning_3,
+    // snapshot ของค่าที่ใช้คิดเดือนนี้ (ต้องรัน monthly_summary_snapshot_migration.sql)
+    salary_snapshot: salaryMonthly,
+    social_security_snapshot: socialSecurity,
   };
-
-  const { data: existing } = await supabase
-    .from('monthly_summary')
-    .select('summary_id')
-    .eq('user_email', userEmail)
-    .eq('month_num', monthNum)
-    .eq('year_num', yearNum)
-    .maybeSingle();
 
   if (existing) {
     const { error: upErr } = await supabase
@@ -824,7 +741,7 @@ function wrap(action, fn) {
     logCall(action, args.length ? args : '');
     try {
       const res = await fn(...args);
-      console.log(`[TimeFlow API] ← ${action}`, res && res.success ? '✅' : '❌', res);
+      if (import.meta.env.DEV) console.log(`[TimeFlow API] ← ${action}`, res && res.success ? '✅' : '❌', res);
       return res;
     } catch (err) {
       console.error(`[TimeFlow API] ✕ ${action} error:`, err);
@@ -835,19 +752,12 @@ function wrap(action, fn) {
 
 export const UserAPI = {
   get: wrap('getUser', getUser),
-  getAll: wrap('getAllUsers', getAllUsers),
   create: wrap('createUser', createUser),
   update: wrap('updateUser', updateUser),
-  upsert: wrap('upsertUser', upsertUser),
-  delete: wrap('deleteUser', deleteUser),
 };
 
 export const WorkEntryAPI = {
-  getByUser: wrap('getWorkEntries', getWorkEntries),
-  getByMonth: wrap('getWorkEntriesByMonth', getWorkEntriesByMonth),
   getEarningsSummary: wrap('getEarningsSummary', getEarningsSummary),
-  create: wrap('createWorkEntry', createWorkEntry),
-  update: wrap('updateWorkEntry', updateWorkEntry),
   upsert: wrap('upsertWorkEntry', upsertWorkEntry),
   delete: wrap('deleteWorkEntry', (workEntryId) => deleteWorkEntry(workEntryId)),
 };
@@ -878,7 +788,7 @@ function normalizeDate(raw) {
       const dd = String(d.getDate()).padStart(2, '0');
       return `${y}-${m}-${dd}`;
     }
-  } catch (_) { }
+  } catch { /* parse ไม่ได้ → ใช้ fallback ด้านล่าง */ }
   return str;
 }
 
@@ -895,7 +805,7 @@ function normalizeTime(raw) {
     if (!isNaN(d.getTime())) {
       return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
     }
-  } catch (_) { }
+  } catch { /* parse ไม่ได้ → ใช้ fallback ด้านล่าง */ }
   return str;
 }
 
@@ -910,7 +820,7 @@ export function sheetEntriesToFrontend(sheetEntries) {
     return result;
   }
 
-  console.log(`[TimeFlow] Converting ${sheetEntries.length} entries to frontend format`);
+  if (import.meta.env.DEV) console.log(`[TimeFlow] Converting ${sheetEntries.length} entries to frontend format`);
 
   sheetEntries.forEach((entry) => {
     const dateStr = normalizeDate(entry.date);
@@ -932,7 +842,7 @@ export function sheetEntriesToFrontend(sheetEntries) {
     result[dateStr] = obj;
   });
 
-  console.log(`[TimeFlow] Converted entries:`, Object.keys(result).length, 'dates');
+  if (import.meta.env.DEV) console.log(`[TimeFlow] Converted entries:`, Object.keys(result).length, 'dates');
   return result;
 }
 

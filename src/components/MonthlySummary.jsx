@@ -12,7 +12,7 @@ import { fmt1, fmtB, dateKey, todayKey as todayKeyFn, yearOptions } from '../uti
 // แท็บ "รายเดือน" — มี 3 แท็บย่อย: List Worklog / Graph / สรุปรายได้ (Summary)
 export default function MonthlySummary({
   earningsSummary, entries, holidays, publicHolidays,
-  salary, otRate = 0, std = 8, socialSecurity = 0, paymentType = 'monthly',
+  salary, otRate = 0, std = 8, socialSecurity = 0,
   lang, t, viewY, viewM, setViewM, setViewY, today,
   onSelectDay, showToast,
 }) {
@@ -225,7 +225,7 @@ export default function MonthlySummary({
                   {/* Right: hours / earnings */}
                   {hasEntry && !isLeaveEntry && (
                     <div className="text-right flex flex-col items-end gap-0.5">
-                      {(paymentType !== 'monthly' || eEarn > 0) && (
+                      {eEarn > 0 && (
                         <div className="text-[12px] font-bold text-income">{fmtB(eEarn)}</div>
                       )}
                       <div className="flex items-center gap-1">

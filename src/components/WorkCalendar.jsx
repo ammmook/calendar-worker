@@ -12,7 +12,7 @@ export default function WorkCalendar({
   viewY, viewM, lang, t, today,
   prevMonth, nextMonth, goToday,
   setViewM, setViewY, showToast,
-  entries, setEntries, earningsSummary, holidays, publicHolidays, paymentType,
+  entries, setEntries, earningsSummary, holidays, publicHolidays,
   selectedKey, setSelectedKey,
   handleDayClick, toggleHoliday,
   dIn, dOut, setDIn, setDOut, dNote, setDNote,
@@ -36,7 +36,7 @@ export default function WorkCalendar({
     dIn, dOut, setDIn, setDOut, dNote, setDNote,
     isSelectedHoliday, isSavingEntry, isDeletingEntry,
     saveSelectedEntry, deleteSelectedEntry,
-    paymentType, previewCalc,
+    previewCalc,
     calc: {
       detHReg, netDetOT, detE, detOTRateEarn, detShift,
       detOT15h, detOT15e, detOT1h, detOT1e, detOT3h, detOT3e,
@@ -193,7 +193,6 @@ export default function WorkCalendar({
                   dailyEarning={earningsSummary.daily[k]}
                   handleDayClick={handleDayClick}
                   toggleHoliday={toggleHoliday}
-                  paymentType={paymentType}
                   viewM={viewM}
                   lang={lang}
                   t={t}

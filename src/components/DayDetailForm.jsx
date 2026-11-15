@@ -54,7 +54,7 @@ export default function DayDetailForm({
   dIn, dOut, setDIn, setDOut, dNote, setDNote,
   isSelectedHoliday, isSavingEntry, isDeletingEntry,
   saveSelectedEntry, deleteSelectedEntry,
-  paymentType, previewCalc, calc,
+  previewCalc, calc,
   labelCls, inputCls,
 }) {
   const v = VARIANT[variant];
@@ -177,7 +177,7 @@ export default function DayDetailForm({
             <span className={`${v.val} font-bold text-shift`}>+{fmtB(detShift)}</span>
           </div>
         )}
-        {(paymentType !== 'monthly' || detE > 0) && (
+        {detE > 0 && (
           <div className="flex justify-between items-center">
             <span className={ROW_LABEL}>{t.earnings}</span>
             <span className={`${v.earnVal} font-bold text-income`}>{detE > 0 ? fmtB(detE) : '—'}</span>

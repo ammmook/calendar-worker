@@ -81,6 +81,8 @@ export function AuthProvider({ children }) {
     );
 }
 
+// hook ใช้คู่กับ provider ในไฟล์เดียว (ตั้งใจ) — ข้าม rule fast-refresh เฉพาะจุดนี้
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     const ctx = useContext(AuthContext);
     if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

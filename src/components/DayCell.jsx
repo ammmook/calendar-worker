@@ -9,13 +9,11 @@ import { fmt1, fmtB } from '../utils/format';
 // ปุ่มสลับวันหยุดเป็นพี่น้องกัน (ไม่ซ้อนปุ่มในปุ่ม)
 function DayCell({
   d, k, entry, isToday, isSel, isHol, isWE, dow, publicHol, dailyEarning,
-  handleDayClick, toggleHoliday, paymentType, viewM, lang, t,
+  handleDayClick, toggleHoliday, viewM, lang, t,
 }) {
   const publicHolName = publicHol ? (lang === 'th' ? publicHol.name_th : publicHol.name_en) : '';
 
-  const hTotal = dailyEarning?.working_hour || 0;
   const netOT = dailyEarning?.ot_hour || 0;
-  const eEarn = dailyEarning?.total_earning || 0;
   const hasOT = netOT > 0;
   const hasShift = (dailyEarning?.shift_allowance || 0) > 0;
   const hasEntry = !!entry;
@@ -184,16 +182,7 @@ function DayCell({
                       </span>
                     )}
                   </div>
-                ) : (
-                  paymentType !== 'monthly' ? (
-                    <span className="text-[11px] font-bold text-muted leading-none">{fmt1(hTotal)}h</span>
-                  ) : null
-                )}
-                {eEarn > 0 && paymentType !== 'monthly' && (
-                  <span className="text-[10px] font-bold text-income leading-none hidden sm:block">
-                    {fmtB(eEarn)}
-                  </span>
-                )}
+                ) : null}
               </div>
             </div>
           )

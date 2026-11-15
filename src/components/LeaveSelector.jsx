@@ -14,12 +14,12 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
   const closeRef = useRef(onCancel);
   useEffect(() => { closeRef.current = onCancel; });
 
-  // Reset mode when opening
-  useEffect(() => {
-    if (isOpen) {
-      setMode('choice');
-    }
-  }, [isOpen]);
+  // Reset mode when opening (ปรับ state ระหว่าง render แทน setState ใน effect)
+  const [prevOpen, setPrevOpen] = useState(isOpen);
+  if (isOpen !== prevOpen) {
+    setPrevOpen(isOpen);
+    if (isOpen) setMode('choice');
+  }
 
   // Escape ปิด + focus trap (วน Tab ภายใน dialog) + ย้าย focus เข้า dialog ตอนเปิด
   useEffect(() => {
