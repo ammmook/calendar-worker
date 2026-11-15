@@ -13,6 +13,7 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 import { supabase } from './supabaseClient';
+import { calcWorkDay, parseWorkSpan, addDaysStr } from '../utils/payCalc';
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -26,45 +27,6 @@ function generateId(prefix) {
 /** log แบบเดียวกับของเดิม */
 function logCall(action, data) {
   console.log(`[TimeFlow API] → ${action}`, data || '');
-}
-
-/** แปลง "HH:mm" → จำนวนนาทีตั้งแต่เที่ยงคืน (คืน null ถ้าไม่ถูกต้อง) */
-function parseHHMM(str) {
-  const p = String(str || '').split(':');
-  if (p.length < 2) return null;
-  const h = Number(p[0]);
-  const m = Number(p[1]);
-  if (isNaN(h) || isNaN(m)) return null;
-  return h * 60 + m;
-}
-
-/** บวก n วันจากสตริง "YYYY-MM-DD" → คืน "YYYY-MM-DD" */
-function addDaysStr(dateStr, n) {
-  const [y, m, d] = String(dateStr).split('-').map(Number);
-  const dt = new Date(y, m - 1, d + n);
-  const yy = dt.getFullYear();
-  const mo = String(dt.getMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getDate()).padStart(2, '0');
-  return `${yy}-${mo}-${dd}`;
-}
-
-/** หักเศษชั่วโมง OT ตามกฎ: ≤2 ไม่หัก ; >2 หัก 30น. ; ≥9 หัก 1ชม. (ใช้ทุกที่) */
-function deductOtHours(h) {
-  if (h >= 9) return Math.max(0, h - 1);
-  if (h > 2) return Math.max(0, h - 0.5);
-  return Math.max(0, h);
-}
-
-/**
- * เข้างานถือว่า "เข้ากะ" หรือไม่ — เข้างาน >= เวลาเริ่มกะ และยังไม่เกินเวลาจบกะ
- * - ไม่มีเวลาจบกะ → แค่ >= เวลาเริ่มกะก็พอ
- * - กะข้ามคืน (จบ ≤ เริ่ม เช่น 22:00–06:00) → อยู่ในช่วง [เริ่ม, เที่ยงคืน] ∪ [เที่ยงคืน, จบ]
- */
-function isWithinShift(inMin, startMin, endMin) {
-  if (startMin == null) return false;
-  if (endMin == null) return inMin >= startMin;
-  if (endMin > startMin) return inMin >= startMin && inMin <= endMin;
-  return inMin >= startMin || inMin <= endMin; // กะข้ามคืน
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -353,37 +315,18 @@ async function upsertWorkEntry(data) {
       // อบรม (นอกสถานที่/ดูงาน): ได้เงินปกติเต็มวัน — ไม่มี OT, ไม่มีเบี้ยกะ, ไม่เสียวันลา
       workingHour = stdH;
     } else if (data.clock_in && data.clock_out) {
-      const partsIn = String(data.clock_in).split(':');
-      const partsOut = String(data.clock_out).split(':');
-      const ih = Number(partsIn[0] || 0), im = Number(partsIn[1] || 0);
-      const oh = Number(partsOut[0] || 0), om = Number(partsOut[1] || 0);
+      const span = parseWorkSpan(data.clock_in, data.clock_out);
 
-      let totalMins = (oh * 60 + om) - (ih * 60 + im);
-      const crossedMidnight = totalMins < 0; // ทำเกินวัน (ข้ามเที่ยงคืน)
-      if (crossedMidnight) totalMins += 1440; // ข้ามวัน
-
-      if (totalMins > 0) {
-        const totalH = totalMins / 60;
-        // หักเวลาพัก 1 ชม. ออกจากช่วงเวลาทำงานก่อนคิด normal/OT
-        // เช่น std 8 → 9:00–18:00 (9 ชม.) = ปกติเต็ม ; 9:00–19:00 (10 ชม.) = OT 1 ชม.
-        const netH = Math.max(0, totalH - 1);
-        workingHour = Math.min(netH, stdH);
-
+      if (span.totalMins > 0) {
         // ── ตรวจว่าวันนี้เป็นวันหยุดทางการ (public holiday) หรือไม่ ──
         const { data: phRows } = await supabase
           .from('public_holidays').select('date').eq('date', data.date);
         const phSet = new Set((phRows || []).map((r) => normalizeHolidayDate(r.date)));
         const isPublicHolidayToday = phSet.has(data.date);
 
-        const inMin = ih * 60 + im;
-        const shiftStartMin = parseHHMM(shiftStart);
-        const shiftEndMin = parseHHMM(shiftEnd);
-        // มีกะ = เข้างาน >= เวลาเริ่มกะ และยังไม่เกินเวลาจบกะ
-        const hasShift = shiftAllowance > 0 && isWithinShift(inMin, shiftStartMin, shiftEndMin);
-
         // ── ถ้าทำข้ามคืน (ทำเกินวัน) → ตรวจว่า "วันถัดไป" เป็นนักขัตฤกษ์/วันหยุดหรือไม่ ──
         let nextIsPublic = false, nextIsUserHoliday = false;
-        if (crossedMidnight) {
+        if (span.crossedMidnight) {
           const nextDate = addDaysStr(data.date, 1);
           const { data: phNext } = await supabase
             .from('public_holidays').select('date').eq('date', nextDate);
@@ -395,66 +338,21 @@ async function upsertWorkEntry(data) {
           }
         }
 
-        if (isPublicHolidayToday) {
-          // ── วันหยุดทางการ: ยังได้ค่าแรงปกติ + บวก OT (OT เริ่มคิดทันทีหลังเข้างาน) ──
-          //   8 ชม.แรก = 1 เท่า (ไม่หัก) ; ส่วนที่ทำโอเลย 8 ชม. = 3 เท่า (หักเศษ)
-          //   ถ้าทำข้ามเที่ยงคืนไปตกวันปกติ → ยังคิดเรตวันหยุดต่อจนเลิกงาน (ไม่ตัดที่เที่ยงคืน)
-          const ot1x = Math.min(netH, stdH);               // 8 ชม.แรก = 1 เท่า (ไม่หัก)
-          const rawOT = Math.max(0, netH - stdH);          // ส่วนที่ทำโอเลย 8 ชม.
-          const ot3x = deductOtHours(rawOT);
-          workingHour = Math.min(netH, stdH);              // ยังได้ค่าแรงปกติ (นับเป็นวันทำงาน)
-          otHour = ot1x + ot3x;
-          // คอลัมน์ _1 = ช่วงวันหยุด 8 ชม.แรก (เรต 1 เท่า) ; _3 = เลย 8 ชม. (เรต 3 เท่า)
-          ot1Hour = ot1x; ot1Earn = ot1x * 1 * baseHourly;
-          ot3Hour = ot3x; ot3Earn = ot3x * 3 * baseHourly;
-          ot15Hour = 0; ot15Earn = 0;
-          otEarningOverride = ot1Earn + ot3Earn;
-
-          if (hasShift) shiftEarning = shiftAllowance;
-        } else {
-          // ── วันปกติ ──
-          // อัตราของช่วง "หลังเที่ยงคืน" เมื่อทำข้ามคืน:
-          //   วันถัดไปนักขัตฤกษ์ → ×3 เสมอ
-          //   วันถัดไปวันหยุด(user) → ×3 ถ้าไม่มีกะ, ×1.5 ถ้ามีกะ
-          //   วันถัดไปวันปกติ → ×1.5 (ไม่แยกช่วง)
-          let afterRate = 1.5;
-          if (crossedMidnight) {
-            if (nextIsPublic) afterRate = 3;
-            else if (nextIsUserHoliday) afterRate = hasShift ? 1.5 : 3;
-          }
-
-          if (crossedMidnight && afterRate === 3) {
-            // ── แยกช่วงก่อน/หลังเที่ยงคืน — แต่ละช่วงหักเศษเวลาของตัวเอง ──
-            const beforeClock = 1440 - inMin;              // นาที(clock)ก่อนเที่ยงคืน
-            let beforeNet = Math.max(0, beforeClock - 60); // หักพักเที่ยง 1 ชม. จากช่วงก่อนเที่ยงคืน
-            let afterNet = oh * 60 + om;                   // นาที(clock)หลังเที่ยงคืน
-            const lunchLeft = 60 - Math.min(60, beforeClock);
-            if (lunchLeft > 0) afterNet = Math.max(0, afterNet - lunchLeft);
-            // ชั่วโมงทำงานปกติ (std) มาก่อน แล้วที่เหลือเป็น OT
-            let regLeft = stdH * 60;
-            const regBefore = Math.min(regLeft, beforeNet);
-            const otBeforeMin = beforeNet - regBefore;
-            regLeft -= regBefore;
-            const regAfter = Math.min(regLeft, afterNet);
-            const otAfterMin = afterNet - regAfter;
-            const otBeforeH = deductOtHours(otBeforeMin / 60);
-            const otAfterH = deductOtHours(otAfterMin / 60);
-            otHour = otBeforeH + otAfterH;
-            ot15Hour = otBeforeH; ot15Earn = otBeforeH * 1.5 * baseHourly; // ก่อนเที่ยงคืน ×1.5
-            ot3Hour = otAfterH; ot3Earn = otAfterH * 3 * baseHourly;       // หลังเที่ยงคืน ×3
-            otEarningOverride = ot15Earn + ot3Earn;
-          } else {
-            // ── OT ทั้งหมด ×1.5 (หักเศษครั้งเดียว) ──
-            const rawOT = Math.max(0, netH - stdH);
-            const netNormalOT = deductOtHours(rawOT);
-            otHour = netNormalOT;
-            ot15Hour = netNormalOT; ot15Earn = netNormalOT * 1.5 * baseHourly;
-            ot3Hour = 0; ot3Earn = 0;
-            otEarningOverride = ot15Earn;
-          }
-
-          if (hasShift) shiftEarning = shiftAllowance;
-        }
+        // กติกาคิดเงินอยู่ใน utils/payCalc.js (ใช้ร่วมกับ preview ฝั่งหน้าจอ)
+        const r = calcWorkDay({
+          clockIn: data.clock_in, clockOut: data.clock_out,
+          isPublicHolidayToday, nextIsPublic, nextIsUserHoliday,
+          stdH, baseHourly,
+          shiftAllowance, shiftStart, shiftEnd,
+          paymentType, dailyRate,
+        });
+        workingHour = r.workingHour;
+        otHour = r.otHour;
+        shiftEarning = r.shiftAllowance;
+        otEarningOverride = r.otEarning;
+        ot15Hour = r.ot15Hour; ot15Earn = r.ot15Earn;
+        ot1Hour = r.ot1Hour; ot1Earn = r.ot1Earn;
+        ot3Hour = r.ot3Hour; ot3Earn = r.ot3Earn;
       }
     }
 

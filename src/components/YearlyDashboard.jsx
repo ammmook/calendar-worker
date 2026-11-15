@@ -6,11 +6,8 @@ import {
     ArrowUpRight, Award, Moon, List, PieChart, LayoutGrid,
 } from 'lucide-react';
 import { getLang } from '../locales';
-import { WorkEntryAPI } from '../services/api';
 import { DonutChart, LegendRow } from './charts';
-import { fmt1, fmtB } from '../utils/format';
-
-import { OT_MODE } from './ProfilePage';
+import { fmt1, fmtB, yearOptions } from '../utils/format';
 
 // ── Design tokens (mirrors App.jsx / timeflow.css) ────────────────────────────
 const C = {
@@ -46,8 +43,8 @@ const OT_TIER_COLORS = ['#fcd34d', '#c29302', '#92700a'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function YearlyDashboard({
-    userEmail, entries, earningsSummary, holidays, salary, otRate, std,
-    otMode, leaveQuotas, lang,
+    entries, earningsSummary, holidays, salary, otRate,
+    leaveQuotas, lang,
     paymentType = 'monthly',
     dailyRate = 0,
     socialSecurity = 0,
@@ -57,39 +54,12 @@ export default function YearlyDashboard({
 }) {
     const t = getLang(lang || 'th');
     const today = useMemo(() => new Date(), []);
-    const [year, setYear] = useState(today.getFullYear());
+    // ปีที่แสดง = viewY จาก App (App โหลด earningsSummary ของ viewY ไว้แล้ว ไม่ต้อง fetch ซ้ำ)
+    const year = viewY;
     const [tooltip, setTooltip] = useState(null);   // { monthIdx, x, y }
     const [tab, setTab] = useState('summary'); // 'summary' | 'graph' | 'list'
     const chartRef = useRef(null);
-
-    const [localEarningsSummary, setLocalEarningsSummary] = useState(earningsSummary || { monthly: [], yearly: {} });
-    const [loadingYear, setLoadingYear] = useState(false);
-
-    // Sync local year with viewY when viewY changes from the header dropdown
-    React.useEffect(() => {
-        if (viewY && viewY !== year) {
-            setYear(viewY);
-        }
-    }, [viewY]);
-
-    React.useEffect(() => {
-        if (year === today.getFullYear() && earningsSummary?.yearly?.year_num === year) {
-            setLocalEarningsSummary(earningsSummary);
-            return;
-        }
-        let active = true;
-        setLoadingYear(true);
-        WorkEntryAPI.getEarningsSummary(userEmail, year).then(res => {
-            if (active && res.success && res.data) {
-                setLocalEarningsSummary(res.data);
-            }
-            if (active) setLoadingYear(false);
-        }).catch(err => {
-            console.error('Failed to fetch yearly earnings', err);
-            if (active) setLoadingYear(false);
-        });
-        return () => { active = false; };
-    }, [year, userEmail, earningsSummary]);
+    const localEarningsSummary = earningsSummary || { monthly: [], yearly: {} };
 
     // ── Define leave types with dynamic max values from props ──
     const LEAVE_TYPES = useMemo(() => [
@@ -116,7 +86,7 @@ export default function YearlyDashboard({
     // ── Compute per-month stats ────────────────────────────────────────────────
     const monthlyStats = useMemo(() => {
         return t.short_months.map((_, mIdx) => {
-            const beMonth = (localEarningsSummary.monthly || []).find(m => m.month_num === mIdx + 1);
+            const beMonth = (localEarningsSummary.monthly || []).find(m => m.month_num === mIdx + 1 && m.year_num === year);
 
             const regEarn = beMonth?.total_regular_earning || 0;
 
@@ -148,7 +118,7 @@ export default function YearlyDashboard({
                     : (regEarn + otEarn + shiftEarn),
             };
         });
-    }, [localEarningsSummary.monthly, t, paymentType, salary]);
+    }, [localEarningsSummary.monthly, t, year]);
 
     // ── Yearly totals ──────────────────────────────────────────────────────────
     const yearTotals = useMemo(() => ({
@@ -414,10 +384,7 @@ export default function YearlyDashboard({
                     <button
                         type="button"
                         aria-label={t.prev_month}
-                        onClick={() => {
-                            if (setViewY) setViewY(year - 1);
-                            else setYear(y => y - 1);
-                        }}
+                        onClick={() => setViewY(year - 1)}
                         className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all"
                     >
                         <ChevronLeft size={15} />
@@ -427,14 +394,12 @@ export default function YearlyDashboard({
                             value={year}
                             aria-label={t.year_label}
                             onChange={(e) => {
-                                const newY = Number(e.target.value);
-                                if (setViewY) setViewY(newY);
-                                else setYear(newY);
-                                if (showToast) showToast(t.loading_data);
+                                setViewY(Number(e.target.value));
+                                showToast?.(t.loading_data);
                             }}
                             className="appearance-none bg-transparent font-bold text-[15px] text-ink tabular-nums px-2 cursor-pointer outline-none text-center hover:text-primary"
                         >
-                            {Array.from({ length: 7 }, (_, i) => today.getFullYear() - 3 + i).map((y) => (
+                            {yearOptions(today, year).map((y) => (
                                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
                             ))}
                         </select>
@@ -442,10 +407,7 @@ export default function YearlyDashboard({
                     <button
                         type="button"
                         aria-label={t.next_month}
-                        onClick={() => {
-                            if (setViewY) setViewY(year + 1);
-                            else setYear(y => y + 1);
-                        }}
+                        onClick={() => setViewY(year + 1)}
                         className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all"
                     >
                         <ChevronRight size={15} />

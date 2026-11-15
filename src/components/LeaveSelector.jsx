@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Stethoscope, UmbrellaOff, Plane, Clock, Trash2, GraduationCap } from 'lucide-react';
 import { getLang } from '../locales';
 
 const LEAVE_TYPES = [
-  { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3' },
-  { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3' },
-  { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD' },
+  { key: 'sick', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3' },
+  { key: 'personal', icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3' },
+  { key: 'vacation', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD' },
 ];
 
-export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel, onDelete, lang = 'en', onWorkSelected = null }) {
+export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel, onDelete, lang = 'en' }) {
   const [mode, setMode] = useState('choice'); // 'choice' | 'leaveType'
+  const dialogRef = useRef(null);
+  const closeRef = useRef(onCancel);
+  useEffect(() => { closeRef.current = onCancel; });
 
   // Reset mode when opening
   useEffect(() => {
@@ -18,13 +21,33 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
     }
   }, [isOpen]);
 
+  // Escape ปิด + focus trap (วน Tab ภายใน dialog) + ย้าย focus เข้า dialog ตอนเปิด
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const prevFocus = document.activeElement;
+    const focusables = () => dialogRef.current?.querySelectorAll('button:not([disabled])') || [];
+    focusables()[0]?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape') { closeRef.current?.(); return; }
+      if (e.key !== 'Tab') return;
+      const items = focusables();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (!dialogRef.current?.contains(active) || (e.shiftKey && active === first)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+      else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      prevFocus?.focus?.();
+    };
+  }, [isOpen]);
+
   const handleSelectWork = () => {
+    // ไม่ปิดทันที — ให้ parent จัดการเอง
     onSelect(dateStr, { leave: null });
-    // Don't close immediately - let parent handle it
-    // If desktop and onWorkSelected callback, call it to show time inputs
-    if (onWorkSelected) {
-      onWorkSelected();
-    }
   };
 
   const handleSelectLeaveType = (type) => {
@@ -57,16 +80,19 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
 
   // ป้ายชื่อ + คำอธิบายตามภาษา (key ตรงกับ LEAVE_TYPES)
   const leaveLabel = { sick: t.sick_leave, personal: t.personal_leave, vacation: t.vacation_leave };
-  const leaveDesc = lang === 'th'
-    ? { sick: 'ลาเนื่องจากป่วย', personal: 'ลาธุระส่วนตัว', vacation: 'ลาพักผ่อนประจำปี' }
-    : { sick: 'Take a sick day', personal: 'Personal time off', vacation: 'Annual vacation leave' };
+  const leaveDesc = { sick: t.ls_sick_desc, personal: t.ls_personal_desc, vacation: t.ls_vacation_desc };
+  const title = mode === 'choice' ? t.ls_select_status : t.ls_select_leave_type;
 
   return (
-    <div 
-      className="fixed inset-0 z-[250] flex items-center xl:items-center items-end justify-center bg-black/40 p-0 xl:p-4 animate-[fadeIn_0.2s_ease_both]" 
+    <div
+      className="fixed inset-0 z-[250] flex items-end xl:items-center justify-center bg-black/40 p-0 xl:p-4 animate-[fadeIn_0.2s_ease_both]"
       onClick={handleClose}
     >
-      <div 
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="leave-selector-title"
         className="bg-white w-full xl:max-w-md xl:rounded-3xl rounded-t-[24px] shadow-xl overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)] xl:animate-[fadeUp_0.3s_ease_both]" 
         onClick={(e) => e.stopPropagation()}
       >
@@ -77,11 +103,10 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
 
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-line">
-          <h2 className="text-lg font-bold text-ink">
-            {mode === 'choice' ? (lang === 'th' ? 'เลือกสถานะ' : 'Select Status') : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select Leave Type')}
-          </h2>
+          <h2 id="leave-selector-title" className="text-lg font-bold text-ink">{title}</h2>
           <button
             onClick={handleClose}
+            aria-label={t.close}
             className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:bg-surface-alt transition-colors bg-transparent border-none cursor-pointer"
           >
             <X size={20} />
@@ -105,8 +130,8 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                   <Clock size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-ink">{lang === 'th' ? 'ทำงาน' : 'Working'}</div>
-                  <div className="text-xs text-muted">{lang === 'th' ? 'บันทึกเวลาทำงาน' : 'Record work time'}</div>
+                  <div className="font-semibold text-ink">{t.ls_working}</div>
+                  <div className="text-xs text-muted">{t.ls_working_desc}</div>
                 </div>
               </button>
 
@@ -123,8 +148,8 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                   <GraduationCap size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-ink">{lang === 'th' ? 'อบรม' : 'Training'}</div>
-                  <div className="text-xs text-muted">{lang === 'th' ? 'นอกสถานที่ / ดูงาน (ได้เงินปกติ)' : 'Off-site / study visit (regular pay)'}</div>
+                  <div className="font-semibold text-ink">{t.ls_training}</div>
+                  <div className="text-xs text-muted">{t.ls_training_desc}</div>
                 </div>
               </button>
 
@@ -141,11 +166,11 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                   <UmbrellaOff size={20} />
                 </div>
                 <div>
-                  <div className="font-semibold text-ink">{lang === 'th' ? 'ลางาน' : 'Taking Leave'}</div>
+                  <div className="font-semibold text-ink">{t.ls_leave}</div>
                   <div className="text-xs text-muted">
                     {isLeave && currentLeaveType
                       ? leaveLabel[currentLeaveType]
-                      : (lang === 'th' ? 'เลือกประเภทการลา' : 'Select leave type')
+                      : t.ls_select_leave_type
                     }
                   </div>
                 </div>
@@ -159,7 +184,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                     className="flex items-center gap-2 px-4 h-9 rounded-lg text-[13px] font-bold text-[#F43F5E] bg-[#FFF1F3] hover:bg-[#FEE2E2] transition-colors border-none cursor-pointer"
                   >
                     <Trash2 size={18} />
-                    <span>{lang === 'th' ? 'ลบข้อมูล' : 'Delete Entry'}</span>
+                    <span>{t.delete_entry}</span>
                   </button>
                 </div>
               )}
@@ -194,7 +219,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 onClick={() => setMode('choice')}
                 className="w-full mt-4 p-3 rounded-lg border border-line text-muted font-semibold text-sm hover:bg-surface-alt transition-colors cursor-pointer bg-white"
               >
-                {lang === 'th' ? 'กลับ' : 'Back'}
+                {t.ls_back}
               </button>
             </div>
           )}

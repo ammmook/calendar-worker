@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
     Wallet, Clock, CircleDollarSign,
     Stethoscope, UmbrellaOff, Plane,
@@ -13,19 +13,8 @@ import AnimatedWaitText from './AnimatedWaitText';
 /* ─────────────────────────────────────────────────────────────────────────────
    ProfilePage
    ─ Tab 1 "Personal": name, email, avatar (Google)
-   ─ Tab 2 "Work"    : salary, OT rate, std hours, leave quotas, OT mode
+   ─ Tab 2 "Work"    : เงินเดือน (OT rate คำนวณอัตโนมัติ), ประกันสังคม, เบี้ยกะ, โควตาลา
    ───────────────────────────────────────────────────────────────────────────── */
-
-// ── OT Calculation Mode ───────────────────────────────────────────────────────
-// MODE A: ต่อชั่วโมง — ทุก OT ชม. คิดเต็มตามอัตรา
-// MODE B: ชั่วโมงเต็ม — หักนาทีออกหากเกินค่าที่กำหนด
-//         e.g. ทำ OT 4 ชม. โดยที่ block=2 และหัก=30นาที → จะได้ 3.5 ชม.
-//         (หาก OT <= otBlockHours ให้คิดเต็ม, หาก > ให้หัก deductMins นาทีออก)
-
-export const OT_MODE = {
-    HOURLY: 'hourly',   // A: คิดต่อชั่วโมงทุกชม.
-    BLOCK: 'block',    // B: หักนาทีออกเมื่อเกิน block
-};
 
 const LEAVE_QUOTAS = [
     { key: 'sick', label: 'ลาป่วย', Icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', defaultMax: 0 },
@@ -55,7 +44,7 @@ export default function ProfilePage(props) {
     const [shiftEnd, setShiftEnd] = useState(props.shiftEnd);
     const [socialSecurity, setSocialSecurity] = useState(props.socialSecurity);
 
-    const handleSave = useCallback(async () => {
+    const handleSave = async () => {
         if (!user?.email || !profileReady) return;
         setIsSavingLocal(true);
         setSaveError('');
@@ -108,7 +97,7 @@ export default function ProfilePage(props) {
         } finally {
             setIsSavingLocal(false);
         }
-    }, [user?.email, profileReady, salary, leaveQuotas, shiftAllowance, shiftStart, shiftEnd, socialSecurity, props, t]);
+    };
 
     // อัตรา OT ต่อชม. (base) = เงินเดือน ÷ 30 ÷ 8 — แสดงแบบอ่านอย่างเดียว
     const computedOtRate = Number(salary) > 0 ? Number(salary) / 30 / 8 : 0;
@@ -156,7 +145,8 @@ export default function ProfilePage(props) {
                 )}
 
                 {/* ── Work Settings ── */}
-                <div className="flex flex-col gap-4 animate-[fadeUp_0.3s_ease_both]">
+                {/* fieldset disabled: ล็อกฟอร์มระหว่างโหลดโปรไฟล์ — กัน key={profileStatus} remount ทิ้งค่าที่กำลังพิมพ์ */}
+                <fieldset disabled={!profileReady} className="flex flex-col gap-4 min-w-0 border-0 p-0 m-0 animate-[fadeUp_0.3s_ease_both]">
 
                     {/* ── Section 1: Salary (รายเดือนอย่างเดียว) ── */}
                     <div className={cardCls}>
@@ -297,7 +287,7 @@ export default function ProfilePage(props) {
                         <p role="alert" className="text-[13px] font-medium text-[#B91C1C] text-center">{saveError}</p>
                     )}
 
-                </div>
+                </fieldset>
             </div>
         </div>
     );
