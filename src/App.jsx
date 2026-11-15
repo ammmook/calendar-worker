@@ -192,43 +192,28 @@ export default function App() {
     // The first load uses skeleton loading; subsequent reloads are silent
     console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
     try {
-      // Fetch all data concurrently to reduce wait time
-      const promises = [];
+      // โหลดเฉพาะ "ปีที่ดูอยู่" (entries + summary มาใน getEarningsSummary คำขอเดียว) — ไม่ดึงทั้งประวัติ
+      // วันหยุดของ user ชุดเล็กและไม่เปลี่ยนตามปี → โหลดเฉพาะครั้งแรก/บังคับ
       const needsFullLoad = forceReload || !initialLoadDoneRef.current;
 
-      if (needsFullLoad) {
-        promises.push(WorkEntryAPI.getByUser(user.email));
-        promises.push(HolidayAPI.get(user.email));
-      } else {
-        promises.push(Promise.resolve({ success: true, cached: true }));
-        promises.push(Promise.resolve({ success: true, cached: true }));
-      }
-      promises.push(WorkEntryAPI.getEarningsSummary(user.email, viewY));
-
-      const [res, holRes, earnRes] = await Promise.all(promises);
+      const [holRes, earnRes] = await Promise.all([
+        needsFullLoad ? HolidayAPI.get(user.email) : Promise.resolve({ success: true, cached: true }),
+        WorkEntryAPI.getEarningsSummary(user.email, viewY),
+      ]);
       if (reqId !== reqIdRef.current) return; // มีคำขอที่ใหม่กว่าแล้ว → ทิ้งผลนี้
 
       if (needsFullLoad) {
-        console.log('[TimeFlow] Work entries response:', res);
-        if (res.success && Array.isArray(res.data)) {
-          const converted = sheetEntriesToFrontend(res.data);
-          console.log('[TimeFlow] ✅ Entries loaded:', Object.keys(converted).length, 'dates');
-          setEntries(converted);
-        } else if (!res.cached) {
-          console.warn('[TimeFlow] No entries found or unexpected response:', res);
-          setEntries({});
-        }
-
         if (holRes.success && Array.isArray(holRes.data)) {
-          console.log('[TimeFlow] ✅ Holidays loaded:', holRes.data.length, 'days');
           setHolidays(new Set(holRes.data));
         } else if (!holRes.cached) {
           setHolidays(new Set());
         }
       }
-      
+
       if (earnRes.success && earnRes.data) {
-        setEarningsSummary(earnRes.data);
+        const { entries: yearEntries, ...summary } = earnRes.data;
+        setEntries(sheetEntriesToFrontend(yearEntries || []));
+        setEarningsSummary(summary);
       }
     } catch (err) {
       console.error('[TimeFlow] Failed to load data:', err);

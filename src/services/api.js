@@ -14,8 +14,15 @@
 
 import { supabase } from './supabaseClient';
 import { calcWorkDay, parseWorkSpan, addDaysStr } from '../utils/payCalc';
+import { isValidTimeValue } from '../components/timeUtils';
 
 // ── HELPERS ─────────────────────────────────────────────────────────────────
+
+/** แยก "YYYY-MM-DD" → { year, month(1-12) } ด้วยการ split สตริง (ไม่ผ่าน Date → ไม่โดน timezone เลื่อนวัน) */
+function parseYMD(dateStr) {
+  const [y, m] = String(dateStr).split('-').map(Number);
+  return { year: y, month: m };
+}
 
 /** สร้าง unique ID ด้วย timestamp + random (คงรูปแบบเดิมจากฝั่ง Apps Script) */
 function generateId(prefix) {
@@ -194,9 +201,9 @@ async function createWorkEntry(data) {
 
   // Auto-fill month_num / year_num จาก date ถ้ามี
   if (data.date && (!data.month_num || !data.year_num)) {
-    const d = new Date(data.date);
-    data.month_num = data.month_num || (d.getMonth() + 1);
-    data.year_num = data.year_num || d.getFullYear();
+    const { month, year } = parseYMD(data.date);
+    data.month_num = data.month_num || month;
+    data.year_num = data.year_num || year;
   }
 
   const row = pickWorkEntryColumns(data);
@@ -274,14 +281,35 @@ async function upsertWorkEntry(data) {
     return { success: false, error: 'user_email and date are required' };
   }
 
-  let monthNum = null, yearNum = null;
+  // ตรวจรูปแบบข้อมูลที่ชั้น API (ไม่พึ่ง UI อย่างเดียว) — กัน NaN ลง DB
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data.date))) {
+    return { success: false, error: 'date must be YYYY-MM-DD' };
+  }
+  if (data.clock_in && !isValidTimeValue(data.clock_in)) {
+    return { success: false, error: 'clock_in must be HH:mm' };
+  }
+  if (data.clock_out && !isValidTimeValue(data.clock_out)) {
+    return { success: false, error: 'clock_out must be HH:mm' };
+  }
 
-  // 1. คำนวณเงินโดยดึงข้อมูลจาก DB เท่านั้น
-  const { data: user, error: userErr } = await supabase
-    .from('user')
-    .select('*')
-    .eq('email', data.user_email)
-    .maybeSingle();
+  const { month: monthNum, year: yearNum } = parseYMD(data.date);
+
+  // 1. คำนวณเงินโดยดึงข้อมูลจาก DB เท่านั้น — query ที่ไม่ขึ้นต่อกันยิงพร้อมกัน (ลด round-trip)
+  const needsHolidayInfo = data.clock_in && data.clock_out && String(data.leave_type || '') !== 'training';
+  const nextDateStr = addDaysStr(data.date, 1);
+  const [
+    { data: user, error: userErr },
+    { data: phRows },
+    { data: uhRows },
+  ] = await Promise.all([
+    supabase.from('user').select('*').eq('email', data.user_email).maybeSingle(),
+    needsHolidayInfo
+      ? supabase.from('public_holidays').select('date').in('date', [data.date, nextDateStr])
+      : Promise.resolve({ data: [] }),
+    needsHolidayInfo
+      ? supabase.from('holidays').select('date').eq('email', data.user_email).eq('date', nextDateStr)
+      : Promise.resolve({ data: [] }),
+  ]);
   if (userErr) return { success: false, error: userErr.message };
   // ไม่มี user → ห้ามบันทึก (ไม่งั้นได้ entry ที่เงิน 0 และไม่มี summary)
   if (!user) return { success: false, error: 'User not found' };
@@ -321,22 +349,15 @@ async function upsertWorkEntry(data) {
 
       if (span.totalMins > 0) {
         // ── ตรวจว่าวันนี้เป็นวันหยุดทางการ (public holiday) หรือไม่ ──
-        const { data: phRows } = await supabase
-          .from('public_holidays').select('date').eq('date', data.date);
         const phSet = new Set((phRows || []).map((r) => normalizeHolidayDate(r.date)));
         const isPublicHolidayToday = phSet.has(data.date);
 
         // ── ถ้าทำข้ามคืน (ทำเกินวัน) → ตรวจว่า "วันถัดไป" เป็นนักขัตฤกษ์/วันหยุดหรือไม่ ──
         let nextIsPublic = false, nextIsUserHoliday = false;
         if (span.crossedMidnight) {
-          const nextDate = addDaysStr(data.date, 1);
-          const { data: phNext } = await supabase
-            .from('public_holidays').select('date').eq('date', nextDate);
-          nextIsPublic = (phNext || []).some((r) => normalizeHolidayDate(r.date) === nextDate);
+          nextIsPublic = phSet.has(nextDateStr);
           if (!nextIsPublic) {
-            const { data: hNext } = await supabase
-              .from('holidays').select('date').eq('email', data.user_email).eq('date', nextDate);
-            nextIsUserHoliday = (hNext || []).some((r) => normalizeHolidayDate(r.date) === nextDate);
+            nextIsUserHoliday = (uhRows || []).some((r) => normalizeHolidayDate(r.date) === nextDateStr);
           }
         }
 
@@ -382,10 +403,6 @@ async function upsertWorkEntry(data) {
     data.regular_earning = regularEarning;
     data.shift_allowance = shiftEarning;
     data.total_earning = totalEarning;
-
-    const d = new Date(data.date);
-    monthNum = d.getMonth() + 1;
-    yearNum = d.getFullYear();
   }
 
   // 2. upsert ด้วย unique (user_email, date) — atomic ไม่เกิด entry ซ้ำเมื่อกดเซฟรัว/สองแท็บ
@@ -715,7 +732,8 @@ async function getEarningsSummary(email, year) {
     total_ot_hour_3: 0, total_ot_earning_3: 0,
   };
 
-  return { success: true, data: { monthly, yearly: yearlyTotals, daily } };
+  // entries = work_entry ของปีนี้ (ดึงมาแล้วข้างบน) — ให้หน้าจอใช้ต่อ ไม่ต้องยิง query ซ้ำ/ไม่ต้องโหลดทั้งประวัติ
+  return { success: true, data: { monthly, yearly: yearlyTotals, daily, entries: entries || [] } };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

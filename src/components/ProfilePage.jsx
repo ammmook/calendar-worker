@@ -22,6 +22,10 @@ const LEAVE_QUOTAS = [
     { key: 'vacation', label: 'ลาพักร้อน', Icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', defaultMax: 0 },
 ];
 
+// แปลงค่าจากช่องตัวเลข → ไม่ติดลบ และไม่เกินเพดาน (ว่าง/ไม่ใช่ตัวเลข = 0)
+const toNum = (v, max) => (v === '' ? 0 : Math.min(max, Math.max(0, Number(v) || 0)));
+const MAX_MONEY = 10_000_000;
+
 // Shared classes
 const labelCls = 'block text-[10px] font-bold text-muted uppercase tracking-[0.08em] mb-1.5';
 const cardCls = 'bg-white border border-line rounded-2xl p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)]';
@@ -46,8 +50,13 @@ export default function ProfilePage(props) {
 
     const handleSave = async () => {
         if (!user?.email || !profileReady) return;
-        setIsSavingLocal(true);
         setSaveError('');
+        // เบี้ยกะ: ต้องมีเวลาเริ่มกะเมื่อกรอกเบี้ยกะหรือเวลาจบกะ (ไม่งั้นระบบไม่มีทางรู้ว่าวันไหนเข้ากะ)
+        if ((Number(shiftAllowance) > 0 || shiftEnd) && !shiftStart) {
+            setSaveError(t.shift_start_required);
+            return;
+        }
+        setIsSavingLocal(true);
         try {
             // รับเงินแบบรายเดือนอย่างเดียว
             const finalSalary = salary;
@@ -159,7 +168,7 @@ export default function ProfilePage(props) {
                                 <InputWithIcon Icon={Wallet} suffix={t.mo_unit} color="#10B981">
                                     <input
                                         type="number" min="0" value={salary || ''}
-                                        onChange={(e) => setSalary(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onChange={(e) => setSalary(toNum(e.target.value, MAX_MONEY))}
                                         onFocus={(e) => e.target.select()}
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-ink min-w-0"
                                     />
@@ -184,7 +193,7 @@ export default function ProfilePage(props) {
                             <InputWithIcon Icon={CircleDollarSign} suffix={t.mo_unit} color="#EF4444">
                                 <input
                                     type="number" min="0" value={socialSecurity || ''}
-                                    onChange={(e) => setSocialSecurity(e.target.value === '' ? 0 : Number(e.target.value))}
+                                    onChange={(e) => setSocialSecurity(toNum(e.target.value, MAX_MONEY))}
                                     onFocus={(e) => e.target.select()}
                                     className="flex-1 bg-transparent outline-none text-[13px] font-medium text-ink min-w-0"
                                 />
@@ -204,7 +213,7 @@ export default function ProfilePage(props) {
                                 <InputWithIcon Icon={CircleDollarSign} suffix={t.day_unit || 'day'} color="#10B981">
                                     <input
                                         type="number" min="0" value={shiftAllowance || ''}
-                                        onChange={(e) => setShiftAllowance(e.target.value === '' ? 0 : Number(e.target.value))}
+                                        onChange={(e) => setShiftAllowance(toNum(e.target.value, MAX_MONEY))}
                                         onFocus={(e) => e.target.select()}
                                         className="flex-1 bg-transparent outline-none text-[13px] font-medium text-ink min-w-0"
                                     />
@@ -252,7 +261,7 @@ export default function ProfilePage(props) {
                                         <div className="flex items-center gap-2 shrink-0">
                                             <input
                                                 type="number" min="0" max="365" value={quota || ''}
-                                                onChange={(e) => setLeaveQuotas(p => ({ ...p, [key]: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                                                onChange={(e) => setLeaveQuotas(p => ({ ...p, [key]: toNum(e.target.value, 365) }))}
                                                 onFocus={(e) => e.target.select()}
                                                 className="w-16 text-center bg-surface-alt border-[1.5px] border-line-strong rounded-[7px] py-1.5 text-[13px] font-bold outline-none focus:border-primary transition-colors"
                                                 style={{ color }}

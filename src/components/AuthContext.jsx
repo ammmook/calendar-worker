@@ -29,11 +29,17 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         let mounted = true;
 
-        supabase.auth.getSession().then(({ data }) => {
-            if (!mounted) return;
-            setUser(mapSupabaseUser(data.session?.user));
-            setLoading(false);
-        });
+        supabase.auth.getSession()
+            .then(({ data }) => {
+                if (!mounted) return;
+                setUser(mapSupabaseUser(data.session?.user));
+            })
+            .catch((err) => {
+                console.error('[TimeFlow] getSession failed:', err);
+                if (mounted) setUser(null);
+            })
+            // ไม่ว่าสำเร็จหรือล้ม ต้องเลิกค้างหน้า skeleton
+            .finally(() => { if (mounted) setLoading(false); });
 
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(mapSupabaseUser(session?.user));
