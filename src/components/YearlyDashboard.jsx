@@ -688,7 +688,8 @@ export default function YearlyDashboard({
                         <div className="p-4 flex flex-col gap-3 flex-1">
                             {LEAVE_TYPES.map((lt) => {
                                 const used = leaveData[lt.key] || 0;
-                                const pct = Math.min((used / lt.max) * 100, 100);
+                                // โควตา 0 (ยังไม่ได้ตั้ง) → 0/0 = NaN ทำให้ width ใช้ไม่ได้ ; ใช้เกินโควตา 0 วัน = เต็มแถบ
+                                const pct = lt.max > 0 ? Math.min((used / lt.max) * 100, 100) : (used > 0 ? 100 : 0);
                                 const LeaveIcon = lt.icon;
                                 return (
                                     <div key={lt.key} className="group">

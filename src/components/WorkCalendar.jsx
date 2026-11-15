@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, X, CalendarCheck, CalendarDays } from 'lucid
 import DayDetailForm from './DayDetailForm';
 import DayCell from './DayCell';
 import { dateKey, todayKey as todayKeyFn, yearOptions } from '../utils/format';
+import { isDesktopViewport } from '../utils/viewport';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // หน้า "ปฏิทินการทำงาน" — ปฏิทิน + panel/modal แก้ไขวัน (สกัดจาก App.jsx)
@@ -79,7 +80,7 @@ export default function WorkCalendar({
     if (!modalOpen) return undefined;
     closeBtnRef.current?.focus();
     const onKey = (e) => {
-      if (window.matchMedia('(min-width: 1280px)').matches) return; // desktop ไม่มี modal
+      if (isDesktopViewport()) return; // desktop ไม่มี modal
       if (e.key === 'Escape') { closeModalRef.current?.(); return; }
       if (e.key !== 'Tab') return;
       // focus trap: วน Tab อยู่ภายใน dialog ไม่หลุดไปปฏิทินด้านหลัง

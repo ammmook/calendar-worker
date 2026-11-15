@@ -22,6 +22,7 @@ import ProfilePage from './components/ProfilePage';
 import { isValidTimeValue } from './components/timeUtils';
 import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 import { todayKey, yearOptions } from './utils/format';
+import { isDesktopViewport } from './utils/viewport';
 import { calcWorkDay, parseWorkSpan, addDaysStr, baseHourlyRate } from './utils/payCalc';
 import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
 
@@ -434,8 +435,7 @@ export default function App() {
 
   const deleteSelectedEntry = () => {
     if (!selectedKey || !entries[selectedKey]) return;
-    const isDesktop = window.innerWidth >= 1280; // xl breakpoint
-    if (isDesktop) {
+    if (isDesktopViewport()) {
       Swal.fire({
         title: t.confirm_delete_title || 'Delete this entry?',
         text: t.confirm_delete || 'Are you sure you want to delete this entry?',
@@ -470,7 +470,7 @@ export default function App() {
     setShowLeaveSelector(false);
     setLeaveSelectorKey(null);
     
-    const isMobile = window.innerWidth < 1280;
+    const isMobile = !isDesktopViewport();
     if (!leaveData.leave) {
       // Check for profile completeness: salary/dailyRate and otRate must be configured
       const isRateIncomplete = paymentType === 'monthly' ? !salary : !dailyRate;
@@ -549,7 +549,7 @@ export default function App() {
     setShowLeaveSelector(false);
     setLeaveSelectorKey(null);
     // On mobile, also clear selectedKey when cancelling leave selector
-    if (window.innerWidth < 1280) setSelectedKey(null);
+    if (!isDesktopViewport()) setSelectedKey(null);
   };
 
   const handleDayClick = useCallback((dateKey) => {
