@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { CalendarDays, GraduationCap, Moon, Palmtree, Sun } from 'lucide-react';
 import { LEAVE_META } from './leaveMeta';
 import { fmt1, fmtB } from '../utils/format';
@@ -72,17 +72,23 @@ function DayCell({
   const longPressTimer = useRef(null);
   const isLongPress = useRef(false);
 
+  // วันนักขัตฤกษ์/วันลาจริง สลับวันหยุดไม่ได้ (เงื่อนไขเดียวกับปุ่มสลับด้านล่าง)
+  const canToggleHoliday = !(isLeave && leaveInfo && !isTrainingEntry) && !publicHol;
+
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
   const handleTouchStart = (e) => {
     isLongPress.current = false;
+    if (!canToggleHoliday) return;
     longPressTimer.current = setTimeout(() => {
       isLongPress.current = true;
       toggleHoliday(e, k);
       if (navigator.vibrate) navigator.vibrate(40);
     }, 600);
   };
-  const cancelLongPress = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  };
+  // เคลียร์ timer ตอน unmount กัน toggle หลังช่องหายไปแล้ว
+  useEffect(() => cancelLongPress, []);
 
   const handleClick = () => {
     // กดค้างสลับวันหยุดแล้ว → ข้าม click ที่ตามมา และรีเซ็ต flag เพื่อไม่ให้ค้างไปกลืนการกดครั้งถัดไป
@@ -195,7 +201,7 @@ function DayCell({
       </div>
 
       {/* ปุ่มสลับวันหยุด (วันหยุดทางการ/วันลาไม่มีปุ่มนี้) — อยู่นอก aria-hidden เพื่อให้ใช้ด้วยคีย์บอร์ดได้ */}
-      {!(isLeave && leaveInfo && !isTrainingEntry) && !publicHol && (
+      {canToggleHoliday && (
         <button
           type="button"
           title={isHol ? t.mark_workday : t.mark_holiday}

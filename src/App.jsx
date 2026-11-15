@@ -119,6 +119,22 @@ export default function App() {
   const [isDeletingEntry, setIsDeletingEntry] = useState(false);
   const [isSavingLeave, setIsSavingLeave] = useState(false);
 
+  // ── เปลี่ยนบัญชี/ออกจากระบบ → ล้างข้อมูลของบัญชีเก่าทั้งหมดก่อนโหลดของใหม่ ──
+  // (ต้องอยู่ก่อน effect โหลดโปรไฟล์/entries เพื่อให้ลำดับรันถูกต้อง)
+  const initialLoadDoneRef = useRef(false);
+  useEffect(() => {
+    initialLoadDoneRef.current = false;
+    setEntries({});
+    setHolidays(new Set());
+    setEarningsSummary({ monthly: [], yearly: {}, daily: {} });
+    setSelectedKey(null);
+    setSalary(0); setOtRate(0);
+    setLeaveQuotas({ sick: 0, personal: 0, vacation: 0 });
+    setSocialSecurity(0);
+    setShiftAllowance(0); setShiftStart(''); setShiftEnd('');
+    setDataLoaded(false);
+  }, [user?.email]);
+
   // ── Load user profile on login ──
   // 'loading' | 'ready' | 'error' — ProfilePage บันทึกได้ต่อเมื่อ 'ready' เท่านั้น
   // (กันฟอร์มที่ค่ายังเป็น 0 ไปเขียนทับโปรไฟล์จริง)
@@ -136,20 +152,23 @@ export default function App() {
 
         if (res.success && res.data) {
           const u = res.data;
-          if (u.salary_monthly) setSalary(Number(u.salary_monthly));
-          if (u.ot_hourly) setOtRate(Number(u.ot_hourly));
-          if (u.sick_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, sick: Number(u.sick_leave_day) }));
-          if (u.personal_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, personal: Number(u.personal_leave_day) }));
-          if (u.annual_leave_day !== undefined) setLeaveQuotas(q => ({ ...q, vacation: Number(u.annual_leave_day) }));
+          // ตั้งค่าตรงๆ (ไม่ใช้ truthy guard) เพื่อให้ค่าที่ว่าง/0 ใน DB ล้างค่าเก่าได้
+          setSalary(Number(u.salary_monthly) || 0);
+          setOtRate(Number(u.ot_hourly) || 0);
+          setLeaveQuotas({
+            sick: Number(u.sick_leave_day) || 0,
+            personal: Number(u.personal_leave_day) || 0,
+            vacation: Number(u.annual_leave_day) || 0,
+          });
 
           if (u.payment_type) setPaymentType(u.payment_type);
-          if (u.daily_rate) setDailyRate(Number(u.daily_rate));
-          if (u.social_security !== undefined && u.social_security !== null) setSocialSecurity(Number(u.social_security) || 0);
+          setDailyRate(Number(u.daily_rate) || 0);
+          setSocialSecurity(Number(u.social_security) || 0);
 
           // เบี้ยกะ — เก็บในตาราง user แล้ว
-          if (u.shift_allowance !== undefined && u.shift_allowance !== null) setShiftAllowance(Number(u.shift_allowance) || 0);
-          if (u.shift_start) setShiftStart(u.shift_start);
-          if (u.shift_end) setShiftEnd(u.shift_end);
+          setShiftAllowance(Number(u.shift_allowance) || 0);
+          setShiftStart(u.shift_start || '');
+          setShiftEnd(u.shift_end || '');
 
           console.log('[TimeFlow] ✅ User profile loaded');
           setProfileStatus('ready');
@@ -183,9 +202,11 @@ export default function App() {
   }, [user?.email]);
 
   // ── Load work entries and holidays from Google Sheets ──
-  const initialLoadDoneRef = useRef(false);
+  // reqIdRef: กัน response เก่า (เช่นสลับปีเร็วๆ) มาทับข้อมูลของคำขอล่าสุด
+  const reqIdRef = useRef(0);
   const loadEntries = useCallback(async (silent = false, forceReload = false) => {
     if (!user?.email) return;
+    const reqId = ++reqIdRef.current;
     if (!silent) setDataLoaded(false);
     // The first load uses skeleton loading; subsequent reloads are silent
     console.log('[TimeFlow] Loading work entries and holidays for:', user.email);
@@ -204,6 +225,7 @@ export default function App() {
       promises.push(WorkEntryAPI.getEarningsSummary(user.email, viewY));
 
       const [res, holRes, earnRes] = await Promise.all(promises);
+      if (reqId !== reqIdRef.current) return; // มีคำขอที่ใหม่กว่าแล้ว → ทิ้งผลนี้
 
       if (needsFullLoad) {
         console.log('[TimeFlow] Work entries response:', res);
@@ -230,13 +252,17 @@ export default function App() {
     } catch (err) {
       console.error('[TimeFlow] Failed to load data:', err);
     } finally {
-      initialLoadDoneRef.current = true;
-      setDataLoaded(true);
+      // เฉพาะคำขอล่าสุดเท่านั้นที่ปิดสถานะโหลด
+      if (reqId === reqIdRef.current) {
+        initialLoadDoneRef.current = true;
+        setDataLoaded(true);
+      }
     }
   }, [user?.email, viewY]);
 
+  // โหลดครั้งแรกใช้ skeleton ; เปลี่ยนปีหลังจากนั้นโหลดเงียบ ไม่ unmount ปฏิทิน (กันข้อความที่กำลังพิมพ์หาย)
   useEffect(() => {
-    loadEntries();
+    loadEntries(initialLoadDoneRef.current);
   }, [loadEntries]);
 
   // ── โหลดวันหยุดทางการ (global) ครั้งเดียวหลัง login ──
@@ -263,11 +289,11 @@ export default function App() {
 
   // เคลียร์ timer เดิมก่อนเสมอ ไม่งั้น toast ใหม่จะถูก timer ของอันเก่าปิดก่อนเวลา
   const toastTimer = useRef(null);
-  const showToast = (msg) => {
+  const showToast = useCallback((msg) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ show: true, msg });
     toastTimer.current = setTimeout(() => setToast({ show: false, msg: '' }), 2600);
-  };
+  }, []);
 
   // ── Sync selected entry → detail inputs ──
   const selEntry = selectedKey ? (entries[selectedKey] || {}) : {};
@@ -311,33 +337,46 @@ export default function App() {
   const otDisplayRate = Number(salary) > 0 ? (Number(salary) / 30 / (Number(std) || 8)) * 1.5 : otRate;
 
   // Toggle holiday for a date key
-  const toggleHoliday = useCallback(async (e, k) => {
-    e.stopPropagation();
-    
-    // Calculate the new state before putting it in setHolidays
-    const isNowHoliday = !holidays.has(k);
-    
-    // Update local state immediately for fast feedback
+  // อ่านค่าล่าสุดผ่าน ref เพื่อให้ callback ไม่เปลี่ยน identity ทุกครั้งที่ state เปลี่ยน (DayCell memo จึงได้ผล)
+  const holidaysRef = useRef(holidays);
+  holidaysRef.current = holidays;
+  const selectedKeyRef = useRef(selectedKey);
+  selectedKeyRef.current = selectedKey;
+  const tRef = useRef(t);
+  tRef.current = t;
+
+  const setHolidayLocal = useCallback((k, on) => {
     setHolidays((prev) => {
       const next = new Set(prev);
-      if (isNowHoliday) {
-        next.add(k);
-      } else {
-        next.delete(k);
-      }
+      if (on) next.add(k); else next.delete(k);
       return next;
     });
+  }, []);
+
+  const toggleHoliday = useCallback(async (e, k) => {
+    e.stopPropagation();
+
+    const isNowHoliday = !holidaysRef.current.has(k);
+
+    // อัปเดตทันทีเพื่อให้รู้สึกเร็ว (optimistic)
+    setHolidayLocal(k, isNowHoliday);
     vibrate(VIBE_HOLIDAY);
 
-    // Save to Google Apps Script backend
-    if (user?.email) {
-      try {
-        await HolidayAPI.toggle(user.email, k, isNowHoliday);
-      } catch (err) {
-        console.error('[TimeFlow] Failed to save holiday', err);
-      }
+    if (!user?.email) return;
+    let ok = false;
+    try {
+      const res = await HolidayAPI.toggle(user.email, k, isNowHoliday);
+      ok = !!res?.success;
+      if (!ok) console.error('[TimeFlow] Failed to save holiday', res?.error);
+    } catch (err) {
+      console.error('[TimeFlow] Failed to save holiday', err);
     }
-  }, [holidays, user?.email]);
+    // บันทึกไม่สำเร็จ → ย้อนค่า + แจ้งผู้ใช้
+    if (!ok) {
+      setHolidayLocal(k, !isNowHoliday);
+      showToast(tRef.current.holiday_save_failed);
+    }
+  }, [user?.email, setHolidayLocal, showToast]);
 
   const saveSelectedEntry = async () => {
     if (!isValidTimeValue(dIn) || (dOut && !isValidTimeValue(dOut)) || !selectedKey || !user?.email) return false;
@@ -493,20 +532,20 @@ export default function App() {
         showToast(lang === 'th' ? 'กรุณากรอกเวลา' : 'Please enter time');
       }
     } else {
-      // Leave recorded — save to Google Sheets
+      // Leave recorded — บันทึกลง DB (ไม่ส่ง note → ไม่เขียนทับโน้ตเดิมของวันนั้น)
+      let saved = !user?.email;
       if (user?.email) {
         setIsSavingLeave(true);
         try {
           const entryData = frontendEntryToSheet(
             dateStr,
             { in: '', out: '', leave: leaveData.leave },
-            user.email, std, salary, otRate,
-            otMode, otBlockHours, otDeductMins
+            user.email
           );
-          entryData.leave_type = leaveData.leave?.type || '';
-          await WorkEntryAPI.upsert(entryData);
-          // Save successful, update local state directly instead of full reload?
-          // For simplicity, we just force reload for now as user expects everything up-to-date
+          const res = await WorkEntryAPI.upsert(entryData);
+          saved = !!res?.success;
+          if (!saved) console.error('[TimeFlow] Leave save failed:', res?.error);
+          // force reload เพื่อให้ตัวเลขทุกอย่างตรงกับ DB (ทั้งกรณีสำเร็จและย้อนค่ากรณีล้มเหลว)
           await loadEntries(true, true);
         } catch (err) {
           console.error('[TimeFlow] Leave save error:', err);
@@ -514,10 +553,14 @@ export default function App() {
           setIsSavingLeave(false);
         }
       }
-      vibrate(VIBE_SUCCESS);
-      showToast(leaveData.leave?.type === 'training'
-        ? (lang === 'th' ? 'เพิ่มการอบรมแล้ว' : 'Training recorded')
-        : (lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded'));
+      if (saved) {
+        vibrate(VIBE_SUCCESS);
+        showToast(leaveData.leave?.type === 'training'
+          ? (lang === 'th' ? 'เพิ่มการอบรมแล้ว' : 'Training recorded')
+          : (lang === 'th' ? 'เพิ่มการลางานแล้ว' : 'Leave recorded'));
+      } else {
+        showToast(t.leave_save_failed);
+      }
       if (isMobile) setSelectedKey(null);
     }
   };
@@ -530,17 +573,17 @@ export default function App() {
   };
 
   const handleDayClick = useCallback((dateKey) => {
-    if (selectedKey === dateKey) {
+    if (selectedKeyRef.current === dateKey) {
       setSelectedKey(null);
     } else {
       setSelectedKey(dateKey);
       // ถ้าเป็นวันหยุด ไม่แสดง LeaveSelector
-      if (holidays.has(dateKey)) return;
+      if (holidaysRef.current.has(dateKey)) return;
       // Show LeaveSelector for both mobile and desktop
       setLeaveSelectorKey(dateKey);
       setShowLeaveSelector(true);
     }
-  }, [selectedKey, holidays]);
+  }, []);
 
   // Ensure bottom sheet closes if date is deselected
   useEffect(() => {

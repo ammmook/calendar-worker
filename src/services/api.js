@@ -1023,6 +1023,7 @@ export function frontendEntryToSheet(dateStr, entry, userEmail) {
     clock_in: entry.in || '',
     clock_out: entry.out || '',
     leave_type: entry.leave?.type || '',
-    note: entry.note || '',
+    // ไม่ส่ง note เมื่อผู้เรียกไม่ได้ระบุ (เช่น บันทึกวันลา) → ไม่เขียนทับ note เดิมใน DB
+    ...(entry.note !== undefined ? { note: entry.note || '' } : {}),
   };
 }
