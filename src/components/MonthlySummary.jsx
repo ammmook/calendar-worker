@@ -405,7 +405,8 @@ export default function MonthlySummary({
 
           {/* เป้าหมายรายได้ + พยากรณ์สิ้นเดือน — ซ่อนในเดือนที่ยังไม่เริ่ม */}
           {forecast.state !== 'future' && (
-            <GoalForecast f={forecast} goal={goal} setGoal={onGoalChange} otRate={otDisplayRate} t={t} />
+            <GoalForecast f={forecast} goal={goal} setGoal={onGoalChange} otRate={otDisplayRate} t={t}
+              month={`${t.months[viewM]} ${lang === 'th' ? viewY + 543 : viewY}`} />
           )}
           </div>
 

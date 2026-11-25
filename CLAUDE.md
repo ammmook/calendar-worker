@@ -55,13 +55,13 @@ npm run preview  # preview build
 
 ## ตาราง Supabase
 
-`user`, `work_entry`, `monthly_summary`, `yearly_summary`, `holidays`, `public_holidays`
+`user`, `work_entry`, `monthly_summary`, `yearly_summary`, `holidays`, `public_holidays`, `monthly_goal`
 
 > เดิมมี `salary_setting` และ `ot_setting` — **ยกเลิกทั้งคู่แล้ว** ข้อมูลย้ายมาเก็บตรงในตาราง `user`
 
 **คอลัมน์ระบุเจ้าของ (ใช้ทั้งใน api.js และ RLS policy):**
 - `user`, `holidays` → คอลัมน์ **`email`**
-- `work_entry`, `monthly_summary`, `yearly_summary` → คอลัมน์ **`user_email`**
+- `work_entry`, `monthly_summary`, `yearly_summary`, `monthly_goal` → คอลัมน์ **`user_email`**
 - `public_holidays` → ข้อมูลกลาง ไม่มีเจ้าของ (อ่านอย่างเดียวจากเว็บ)
 
 **RLS:** ✅ **เปิดแล้วทุกตาราง** (Supabase Auth แนบ JWT ให้ทุกคำขอ)
@@ -70,13 +70,14 @@ npm run preview  # preview build
 - ชื่อ policy: `"<table> own rows"` (ตาราง user ใช้ `"user own row"`) ; ตาราง `user` ต้อง quote `public."user"` เพราะเป็น reserved word
 - ถ้า insert/update พังด้วย `violates row-level security policy` = ค่า email/user_email ที่เขียนไม่ตรงกับ email ใน JWT
 
+- **ตาราง `monthly_goal`** (`user_email, year_num, month_num, goal`, PK ทั้ง 3 คอลัมน์แรก) = เป้ารายได้สุทธิ **แยกรายเดือน** — เดือนที่ไม่มีแถว = ยังไม่ตั้งเป้า (ไม่สืบทอดจากเดือนอื่น) ; ตั้ง/ลบผ่าน `GoalAPI` (`saveGoal` ใน App.jsx ส่งเดือนที่ดูอยู่) ; policy `"monthly_goal own rows"` ; ถ้ายังไม่รัน `monthly_goal_per_month_migration.sql` แอป fallback เก็บ localStorage (`utils/goalStorage.js`, key `timeflow_goals_<email>`) แล้วย้ายขึ้น DB ให้เองหลังรัน
 - `holidays` = วันหยุดที่ผู้ใช้กดเองรายคน (toggle) ; `public_holidays` = วันหยุดทางการ (global ทุกคน) มี `date`, `name_th`, `name_en` แสดงไอคอนปฏิทินสีแดง + ชื่อ (สลับภาษา) ที่มุมขวาช่องปฏิทิน + ตัวเลขวันที่/พื้นหลังเซลล์เป็นสีแดง
 
 - **ตาราง `user`** เก็บทุกอย่างตรง ๆ (ไม่มี foreign key ไปตารางอื่นแล้ว):
   - `salary` (numeric) = เงินเดือนรายเดือน ; `ot_hourly` = base OT/ชม. ที่คำนวณอัตโนมัติ (`salary ÷ 30 ÷ 8`)
   - โควตาลา: `sick_leave_day`, `personal_leave_day`, `annual_leave_day`
   - `social_security` = ยอดหักประกันสังคม/เดือน
-  - `monthly_goal` = เป้ารายได้สุทธิ/เดือน (0 = ยังไม่ตั้ง) ใช้ในการ์ดเป้าหมายหน้ารายเดือน — **บันทึกแยกจากหน้าโปรไฟล์** ผ่าน `saveGoal` ใน App.jsx (ส่งเฉพาะ `monthly_goal`) ; ถ้า DB ยังไม่มีคอลัมน์ (ยังไม่รัน `monthly_goal_migration.sql`) แอปจะ fallback ไปเก็บ localStorage (`utils/goalStorage.js`) และย้ายขึ้น DB ให้เองครั้งเดียวหลังรัน migration
+  - `monthly_goal` (คอลัมน์ใน `user`) = **เลิกใช้แล้ว** (เป้าเดียวแบบเก่า) — เป้าตอนนี้แยกรายเดือนในตาราง `monthly_goal`; ถ้ายังมีค่าเก่า แอปย้ายเข้าเดือนปัจจุบันให้ครั้งเดียวแล้วรีเซ็ตเป็น 0
   - เบี้ยกะ: `shift_allowance`, `shift_start`, `shift_end`
   - รองรับ **เฉพาะรายเดือน** — ฝั่ง api normalize ให้ `payment_type='monthly'`, `daily_rate=0` เสมอ (ไม่มีคอลัมน์ `salary_id`, `ot_setting_id`, `working_hour`, `work_days_per_week` แล้ว)
 - **`work_entry`** เก็บ OT แยกตามอัตรา: `ot_hour_15`/`ot_earning_15` (1.5x = วันปกติ), `ot_hour_1`/`ot_earning_1` (1x = วันหยุด 8 ชม.แรก), `ot_hour_3`/`ot_earning_3` (3x) — นอกเหนือจาก `ot_hour`/`ot_earning` (รวม)
@@ -128,7 +129,7 @@ npm run preview  # preview build
 - สีมาตรฐาน: ปกติ `#3B4FE4` (คราม), OT `#c29302` (เหลืองอำพัน), เบี้ยกะ `#E8730C` (ส้มอ่อน), รายได้ `#10B981` (เขียว)
 - **Auth/RLS:** ทุก query ต้องล็อกอินก่อน (JWT แนบ email) — ถ้าเปิด RLS แล้ว insert/update พังด้วย `violates row-level security policy` แปลว่าค่า `email`/`user_email` ที่เขียนไม่ตรงกับ email ใน JWT ; ตั้งค่า provider/redirect URL ที่ **Supabase Dashboard** (ไม่ใช่ในโค้ด)
 - **Haptic feedback:** กด save/update/delete สำเร็จ = `VIBE_SUCCESS` + `.shake-strong` (สั่นที่ toast) ; toggle วันหยุด = `VIBE_HOLIDAY` + `.shake-soft` (สั่นที่ช่องวัน) — CSS shake อยู่ใน `index.css` เป็น fallback ให้ iOS/Safari ที่ไม่มี `navigator.vibrate`
-- `updateUser` ส่งทุก key ที่ได้รับไปที่ DB — อย่าเอา `monthly_goal` ไปรวมใน payload บันทึกโปรไฟล์ (ถ้ายังไม่รัน migration จะ error ทำให้บันทึกโปรไฟล์พังทั้งก้อน)
+- `updateUser` ส่งทุก key ที่ได้รับไปที่ DB — อย่าเอา `monthly_goal` (คอลัมน์ `user` เก่า) ไปรวมใน payload บันทึกโปรไฟล์ (ถ้า DB ไม่มีคอลัมน์นี้จะ error ทำให้บันทึกโปรไฟล์พังทั้งก้อน)
 - อย่า commit/push เว้นแต่ผู้ใช้สั่ง; `.env` มี secret ห้าม commit
 
 ## แนวทางที่อยากให้ทำ

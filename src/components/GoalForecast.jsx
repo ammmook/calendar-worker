@@ -17,7 +17,7 @@ const GRAD = {
 };
 
 // การ์ดเป้าหมายรายได้ + พยากรณ์สิ้นเดือน (f มาจาก forecastMonth)
-export default function GoalForecast({ f, goal, setGoal, otRate, t, className = '' }) {
+export default function GoalForecast({ f, goal, setGoal, otRate, t, month = '', className = '' }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -55,7 +55,7 @@ export default function GoalForecast({ f, goal, setGoal, otRate, t, className = 
           <div className="min-w-0">
             <h3 className="text-[15px] font-bold text-ink leading-tight">{t.goal_title}</h3>
             {goal > 0 && !editing && (
-              <p className="text-[12px] text-muted leading-tight mt-0.5">{fill(t.goal_per_month, { amount: fmtB(goal) })}</p>
+              <p className="text-[12px] text-muted leading-tight mt-0.5">{fill(t.goal_per_month, { amount: fmtB(goal), month })}</p>
             )}
           </div>
         </div>
@@ -76,7 +76,7 @@ export default function GoalForecast({ f, goal, setGoal, otRate, t, className = 
           )}
           <form onSubmit={save} className="flex flex-wrap items-end gap-2">
             <label className="flex-1 min-w-[170px]">
-              <span className="block text-[11px] font-semibold text-muted mb-1">{t.goal_input_label}</span>
+              <span className="block text-[11px] font-semibold text-muted mb-1">{fill(t.goal_input_label, { month })}</span>
               <input
                 type="number" inputMode="numeric" min="0" step="100" value={draft}
                 onChange={(e) => setDraft(e.target.value)}

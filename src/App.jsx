@@ -23,9 +23,9 @@ import { useAuth } from './components/AuthContext';
 import LoginPage from './components/LoginPage';
 import ProfilePage from './components/ProfilePage';
 import { isValidTimeValue } from './components/timeUtils';
-import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
+import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, GoalAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 import { todayKey, yearOptions } from './utils/format';
-import { readLocalGoal, writeLocalGoal, clearLocalGoal } from './utils/goalStorage';
+import { goalKey, readLocalGoals, writeLocalGoal, clearLocalGoals, takeLegacyLocalGoal } from './utils/goalStorage';
 import { isDesktopViewport } from './utils/viewport';
 import { calcWorkDay, parseWorkSpan, addDaysStr, baseHourlyRate } from './utils/payCalc';
 import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
@@ -100,9 +100,9 @@ export default function App() {
   const [socialSecurity, setSocialSecurity] = useState(0);
   const [profileStatus, setProfileStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
 
-  // ── เป้ารายได้สุทธิต่อเดือน — เก็บใน user.monthly_goal (0 = ยังไม่ตั้ง) ──
-  const [monthlyGoal, setMonthlyGoal] = useState(0);
-  const goalInDbRef = useRef(true); // false = DB ยังไม่มีคอลัมน์ monthly_goal (ยังไม่ได้รัน migration) → ใช้ localStorage แทน
+  // ── เป้ารายได้สุทธิ "แยกรายเดือน" — ตาราง monthly_goal { 'YYYY-MM': goal } (ไม่มี = ยังไม่ตั้งเป้าเดือนนั้น) ──
+  const [goals, setGoals] = useState({});
+  const goalsInDbRef = useRef(true); // false = DB ยังไม่มีตาราง monthly_goal (ยังไม่ได้รัน migration) → ใช้ localStorage แทน
 
   const [dIn, setDIn] = useState('');
   const [dNote, setDNote] = useState('');
@@ -131,7 +131,7 @@ export default function App() {
     setSalary(0); setOtRate(0);
     setLeaveQuotas({ sick: 0, personal: 0, vacation: 0 });
     setSocialSecurity(0);
-    setMonthlyGoal(0);
+    setGoals({});
     setShiftAllowance(0); setShiftStart(''); setShiftEnd('');
     setDataLoaded(false);
   }, [user?.email]);
@@ -144,6 +144,43 @@ export default function App() {
     let cancelled = false;
     setProfileStatus('loading');
     devLog('[TimeFlow] Loading user profile for:', user.email);
+
+    // เป้ารายเดือน (legacyGoal = เป้าเดียวแบบเก่าใน user.monthly_goal → ย้ายเข้าเดือนปัจจุบันครั้งเดียว)
+    const loadGoals = async (legacyGoal) => {
+      const nowKey = goalKey(today.getFullYear(), today.getMonth());
+      const gr = await GoalAPI.get(user.email);
+      if (cancelled) return;
+      if (gr.success) {
+        goalsInDbRef.current = true;
+        const merged = { ...gr.data };
+        const pending = [];
+        // ของที่เคยเก็บในเครื่อง (ตอนยังไม่มีตาราง) → ย้ายขึ้น DB เฉพาะเดือนที่ DB ยังไม่มี
+        const local = readLocalGoals(user.email);
+        const legacyLocal = takeLegacyLocalGoal(user.email);
+        if (legacyLocal > 0 && !(nowKey in local)) local[nowKey] = legacyLocal;
+        Object.entries(local).forEach(([k, v]) => {
+          if (!(k in merged)) { merged[k] = v; pending.push(GoalAPI.set(user.email, k, v)); }
+        });
+        if (legacyGoal > 0 && Object.keys(merged).length === 0) {
+          merged[nowKey] = legacyGoal;
+          pending.push(GoalAPI.set(user.email, nowKey, legacyGoal));
+        }
+        if (legacyGoal > 0) pending.push(UserAPI.update({ email: user.email, monthly_goal: 0 }));
+        setGoals(merged);
+        if (pending.length) {
+          const results = await Promise.all(pending);
+          if (results.every((r) => r?.success)) clearLocalGoals(user.email);
+        }
+      } else if (gr.missing) {
+        goalsInDbRef.current = false;
+        const local = readLocalGoals(user.email);
+        const legacy = takeLegacyLocalGoal(user.email) || legacyGoal;
+        if (legacy > 0 && Object.keys(local).length === 0) { local[nowKey] = legacy; writeLocalGoal(user.email, nowKey, legacy); }
+        setGoals(local);
+      } else {
+        console.error('[TimeFlow] Failed to load goals:', gr.error);
+      }
+    };
 
     (async () => {
       try {
@@ -164,24 +201,8 @@ export default function App() {
 
           setSocialSecurity(Number(u.social_security) || 0);
 
-          // เป้ารายได้: select('*') ไม่คืนคอลัมน์ที่ไม่มี → undefined = ยังไม่ได้รัน migration
-          if (u.monthly_goal === undefined) {
-            goalInDbRef.current = false;
-            setMonthlyGoal(readLocalGoal(user.email));
-          } else {
-            goalInDbRef.current = true;
-            const dbGoal = Number(u.monthly_goal) || 0;
-            const localGoal = readLocalGoal(user.email);
-            if (dbGoal === 0 && localGoal > 0) {
-              // ย้ายเป้าที่เคยเก็บในเครื่องขึ้น DB ครั้งเดียว แล้วล้างค่าในเครื่องเมื่อบันทึกสำเร็จ
-              setMonthlyGoal(localGoal);
-              UserAPI.update({ email: user.email, monthly_goal: localGoal })
-                .then((r) => { if (r?.success) clearLocalGoal(user.email); });
-            } else {
-              setMonthlyGoal(dbGoal);
-              if (localGoal > 0) clearLocalGoal(user.email); // DB เป็นต้นทางแล้ว ทิ้งค่าเก่าในเครื่อง
-            }
-          }
+          // เป้ารายเดือน: โหลดทั้งตาราง (เล็ก) ครั้งเดียว แล้วอ่านตามเดือนที่ดู
+          loadGoals(Number(u.monthly_goal) || 0);
 
           // เบี้ยกะ — เก็บในตาราง user แล้ว
           setShiftAllowance(Number(u.shift_allowance) || 0);
@@ -215,7 +236,7 @@ export default function App() {
     })();
 
     return () => { cancelled = true; };
-  }, [user?.email]);
+  }, [user?.email, today]);
 
   // ── Load work entries and holidays from Google Sheets ──
   // reqIdRef: กัน response เก่า (เช่นสลับปีเร็วๆ) มาทับข้อมูลของคำขอล่าสุด
@@ -296,20 +317,22 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast({ show: false, msg: '' }), 2600);
   }, []);
 
-  // ── บันทึกเป้ารายได้ลง DB (ล้มเหลว → คืนค่าเดิม + แจ้งเตือน) ──
-  const saveGoal = useCallback(async (value) => {
+  // ── บันทึกเป้ารายได้ของ "เดือนที่ดูอยู่" ลง DB (ล้มเหลว → คืนค่าเดิม + แจ้งเตือน) ──
+  const saveGoal = useCallback(async (value, year, month0) => {
     const n = Math.max(0, Math.round(Number(value) || 0));
-    const prev = monthlyGoal;
-    setMonthlyGoal(n);
+    const key = goalKey(year, month0);
+    const prev = goals[key] || 0;
+    const apply = (v) => setGoals((g) => { const next = { ...g }; if (v > 0) next[key] = v; else delete next[key]; return next; });
+    apply(n);
     if (!user?.email) return;
-    if (!goalInDbRef.current) { writeLocalGoal(user.email, n); return; }
-    const res = await UserAPI.update({ email: user.email, monthly_goal: n });
+    if (!goalsInDbRef.current) { writeLocalGoal(user.email, key, n); return; }
+    const res = await GoalAPI.set(user.email, key, n);
     if (!res?.success) {
       console.error('[TimeFlow] Failed to save goal:', res?.error);
-      setMonthlyGoal(prev);
+      apply(prev);
       showToast(t.goal_save_failed);
     }
-  }, [monthlyGoal, user?.email, showToast, t]);
+  }, [goals, user?.email, showToast, t]);
 
   // ── Sync selected entry → detail inputs ──
   const selEntry = selectedKey ? (entries[selectedKey] || {}) : {};
@@ -838,8 +861,8 @@ export default function App() {
                   otRate={otRate}
                   std={std}
                   socialSecurity={socialSecurity}
-                  goal={monthlyGoal}
-                  onGoalChange={saveGoal}
+                  goal={goals[goalKey(viewY, viewM)] || 0}
+                  onGoalChange={(v) => saveGoal(v, viewY, viewM)}
                   lang={lang}
                   t={t}
                   viewY={viewY}

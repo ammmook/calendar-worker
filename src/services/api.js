@@ -767,6 +767,48 @@ export const HolidayAPI = {
   toggle: wrap('toggleHoliday', toggleHoliday),
 };
 
+/** เป้ารายได้รายเดือน — คืน { 'YYYY-MM': goal } ; ตารางยังไม่ถูกสร้าง → { success:false, missing:true } */
+async function getMonthlyGoals(email) {
+  if (!email) return { success: false, error: 'email is required' };
+  const { data, error } = await supabase
+    .from('monthly_goal')
+    .select('year_num, month_num, goal')
+    .eq('user_email', email);
+  if (error) {
+    const missing = error.code === '42P01' || error.code === 'PGRST205' || /monthly_goal/i.test(error.message || '');
+    return { success: false, missing, error: error.message };
+  }
+  const map = {};
+  (data || []).forEach((r) => {
+    const g = Number(r.goal) || 0;
+    if (g > 0) map[`${r.year_num}-${String(r.month_num).padStart(2, '0')}`] = g;
+  });
+  return { success: true, data: map };
+}
+
+/** ตั้งเป้าของเดือน key = 'YYYY-MM' ; goal <= 0 = ลบเป้าของเดือนนั้น */
+async function setMonthlyGoal(email, key, goal) {
+  const m = /^(\d{4})-(\d{2})$/.exec(key || '');
+  if (!email || !m) return { success: false, error: 'email and month are required' };
+  const year_num = Number(m[1]);
+  const month_num = Number(m[2]);
+  if (!(goal > 0)) {
+    const { error } = await supabase.from('monthly_goal').delete()
+      .eq('user_email', email).eq('year_num', year_num).eq('month_num', month_num);
+    return error ? { success: false, error: error.message } : { success: true };
+  }
+  const { error } = await supabase.from('monthly_goal').upsert(
+    { user_email: email, year_num, month_num, goal, updated_at: new Date().toISOString() },
+    { onConflict: 'user_email,year_num,month_num' }
+  );
+  return error ? { success: false, error: error.message } : { success: true };
+}
+
+export const GoalAPI = {
+  get: wrap('getMonthlyGoals', getMonthlyGoals),
+  set: wrap('setMonthlyGoal', setMonthlyGoal),
+};
+
 export const PublicHolidayAPI = {
   get: wrap('getPublicHolidays', getPublicHolidays),
 };
