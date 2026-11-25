@@ -45,7 +45,7 @@ export default function ConfirmDialog({ open, tone = 'warning', title, text, con
   return (
     <div
       data-confirm-dialog
-      className="fixed inset-0 z-[250] bg-ink/40 flex items-end xl:items-center justify-center xl:p-4 overscroll-contain animate-[fadeIn_0.2s_ease_both]"
+      className="fixed inset-0 z-[250] bg-black/40 flex items-end xl:items-center justify-center xl:p-4 overscroll-contain animate-[fadeIn_0.2s_ease_both]"
       onClick={onCancel}
     >
       <div
@@ -53,7 +53,7 @@ export default function ConfirmDialog({ open, tone = 'warning', title, text, con
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-text"
-        className="bg-white w-full xl:max-w-sm rounded-t-[24px] xl:rounded-3xl shadow-xl flex flex-col overflow-hidden
+        className="bg-surface w-full xl:max-w-sm rounded-t-[24px] xl:rounded-3xl shadow-xl flex flex-col overflow-hidden
           animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)] xl:animate-[zoomIn_0.2s_ease_both]"
         onClick={(e) => e.stopPropagation()}
       >

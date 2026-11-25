@@ -28,7 +28,7 @@ const MAX_MONEY = 10_000_000;
 
 // Shared classes
 const labelCls = 'block text-[10px] font-bold text-muted uppercase tracking-[0.08em] mb-1.5';
-const cardCls = 'bg-white border border-line rounded-2xl p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)]';
+const cardCls = 'bg-surface border border-line rounded-2xl p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)]';
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ProfilePage(props) {
@@ -111,7 +111,7 @@ export default function ProfilePage(props) {
         <div className="min-h-screen bg-surface-alt font-sans">
 
             {/* ── TOP BAR ── */}
-            <header className="sticky top-0 z-50 w-full h-[60px] bg-white border-b border-line flex items-center gap-3 px-6">
+            <header className="sticky top-0 z-50 w-full h-[60px] bg-surface border-b border-line flex items-center gap-3 px-6">
                 <button
                     onClick={props.onBack}
                     className="w-8 h-8 rounded-lg bg-surface-alt border border-line grid place-items-center text-muted cursor-pointer hover:bg-primary-soft hover:border-primary hover:text-primary transition"
@@ -124,7 +124,7 @@ export default function ProfilePage(props) {
             <div className="max-w-[680px] mx-auto px-4 py-8 flex flex-col gap-6 animate-[fadeUp_0.4s_ease_both]">
 
                 {/* ── Profile Info ── */}
-                <div className="bg-white border border-line rounded-2xl p-4 shadow-[0_1px_3px_rgba(17,24,39,0.06)] flex items-center gap-4">
+                <div className="bg-surface border border-line rounded-2xl p-4 shadow-[0_1px_3px_rgba(17,24,39,0.06)] flex items-center gap-4">
                     <img
                         src={user?.picture}
                         alt={user?.name}
@@ -139,12 +139,12 @@ export default function ProfilePage(props) {
 
                 {/* สถานะโหลดโปรไฟล์ — ยังไม่พร้อมจะบันทึกไม่ได้ */}
                 {props.profileStatus === 'loading' && (
-                    <div role="status" className="rounded-xl border border-line bg-white px-4 py-3 text-[13px] text-muted">
+                    <div role="status" className="rounded-xl border border-line bg-surface px-4 py-3 text-[13px] text-muted">
                         {t.profile_loading}
                     </div>
                 )}
                 {props.profileStatus === 'error' && (
-                    <div role="alert" className="rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-[13px] text-[#B91C1C]">
+                    <div role="alert" className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-[13px] text-danger">
                         {t.profile_load_failed}
                     </div>
                 )}
@@ -289,7 +289,7 @@ export default function ProfilePage(props) {
                     </button>
 
                     {saveError && (
-                        <p role="alert" className="text-[13px] font-medium text-[#B91C1C] text-center">{saveError}</p>
+                        <p role="alert" className="text-[13px] font-medium text-danger text-center">{saveError}</p>
                     )}
 
                 </fieldset>
@@ -302,7 +302,7 @@ export default function ProfilePage(props) {
 function InputWithIcon({ Icon, suffix, color, children }) {
     return (
         <div className="flex items-center bg-surface-alt border-[1.5px] border-line-strong rounded-[8px] overflow-hidden focus-within:border-primary transition-colors">
-            <div className="px-2.5 h-[38px] flex items-center justify-center bg-white border-r border-line shrink-0">
+            <div className="px-2.5 h-[38px] flex items-center justify-center bg-surface border-r border-line shrink-0">
                 <Icon size={13} style={{ color }} />
             </div>
             <div className="flex-1 flex items-center px-2.5 h-[38px] min-w-0">

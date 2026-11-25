@@ -93,7 +93,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
         role="dialog"
         aria-modal="true"
         aria-labelledby="leave-selector-title"
-        className="bg-white w-full xl:max-w-md xl:rounded-3xl rounded-t-[24px] shadow-xl overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)] xl:animate-[fadeUp_0.3s_ease_both]" 
+        className="bg-surface w-full xl:max-w-md xl:rounded-3xl rounded-t-[24px] shadow-xl overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)] xl:animate-[fadeUp_0.3s_ease_both]" 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Mobile handle */}
@@ -126,7 +126,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                     : 'border-line hover:border-line-strong hover:bg-surface-alt'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isWork ? 'bg-primary text-white' : 'bg-[#F0F1F9] text-muted'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isWork ? 'bg-primary text-white' : 'bg-surface-alt text-muted'}`}>
                   <Clock size={20} />
                 </div>
                 <div>
@@ -140,11 +140,11 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 onClick={handleSelectTraining}
                 className={`w-full p-4 rounded-xl border-2 transition text-left flex items-center gap-3 cursor-pointer
                   ${isTraining
-                    ? 'border-ink bg-[#F3F4F6] shadow-sm'
+                    ? 'border-ink bg-surface-alt shadow-sm'
                     : 'border-line hover:border-line-strong hover:bg-surface-alt'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isTraining ? 'bg-ink text-white' : 'bg-[#F0F1F9] text-muted'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isTraining ? 'bg-ink text-surface' : 'bg-surface-alt text-muted'}`}>
                   <GraduationCap size={20} />
                 </div>
                 <div>
@@ -162,7 +162,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                     : 'border-line hover:border-line-strong hover:bg-surface-alt'
                   }`}
               >
-                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isLeave ? 'bg-[#8B5CF6] text-white' : 'bg-[#F0F1F9] text-muted'}`}>
+                <div className={`w-10 h-10 rounded-lg grid place-items-center shrink-0 ${isLeave ? 'bg-[#8B5CF6] text-white' : 'bg-surface-alt text-muted'}`}>
                   <UmbrellaOff size={20} />
                 </div>
                 <div>
@@ -181,7 +181,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 <div className="flex justify-end pt-1">
                   <button
                     onClick={() => onDelete && onDelete()}
-                    className="flex items-center gap-2 px-4 h-9 rounded-lg text-[13px] font-bold text-[#F43F5E] bg-[#FFF1F3] hover:bg-[#FEE2E2] transition-colors border-none cursor-pointer"
+                    className="flex items-center gap-2 px-4 h-9 rounded-lg text-[13px] font-bold text-danger bg-danger-soft hover:bg-danger/15 transition-colors border-none cursor-pointer"
                   >
                     <Trash2 size={18} />
                     <span>{t.delete_entry}</span>
@@ -217,7 +217,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Back Button */}
               <button
                 onClick={() => setMode('choice')}
-                className="w-full mt-4 p-3 rounded-lg border border-line text-muted font-semibold text-sm hover:bg-surface-alt transition-colors cursor-pointer bg-white"
+                className="w-full mt-4 p-3 rounded-lg border border-line text-muted font-semibold text-sm hover:bg-surface-alt transition-colors cursor-pointer bg-surface"
               >
                 {t.ls_back}
               </button>

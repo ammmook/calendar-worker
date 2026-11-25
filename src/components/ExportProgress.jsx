@@ -25,17 +25,17 @@ export default function ExportProgress({ job, t, onClose, onRetry }) {
     <div
       role="status"
       aria-live="polite"
-      className="fixed z-[60] left-4 right-4 sm:left-auto sm:right-6 sm:w-[380px] bottom-[max(1rem,env(safe-area-inset-bottom))] sm:bottom-6
+      className="fixed z-[60] left-4 right-4 sm:left-auto sm:right-6 sm:w-[380px] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] sm:bottom-6
         animate-[popIn_0.5s_cubic-bezier(0.22,1,0.36,1)_both]"
     >
-      <div className="relative bg-white border border-line rounded-[26px] shadow-[0_18px_44px_rgba(17,24,39,0.20)] py-3.5 pl-5 pr-4 flex items-center gap-3.5">
+      <div className="relative bg-surface border border-line rounded-[26px] shadow-[0_18px_44px_rgba(17,24,39,0.20)] py-3.5 pl-5 pr-4 flex items-center gap-3.5">
         {/* รูปตัวอย่าง + ปุ่ม X กลมซ้อนมุม */}
         <div className="relative shrink-0">
           <button
             type="button"
             onClick={onClose}
             aria-label={t.export_close}
-            className="absolute -top-2.5 -left-2.5 z-10 w-6 h-6 rounded-full bg-white border border-line-strong shadow-[0_2px_6px_rgba(17,24,39,0.18)]
+            className="absolute -top-2.5 -left-2.5 z-10 w-6 h-6 rounded-full bg-surface border border-line-strong shadow-[0_2px_6px_rgba(17,24,39,0.18)]
               grid place-items-center text-ink cursor-pointer transition-transform hover:scale-110 active:scale-95"
           >
             <X size={13} strokeWidth={2.6} />
@@ -67,7 +67,7 @@ export default function ExportProgress({ job, t, onClose, onRetry }) {
             </div>
           ) : (
             <>
-              <div className="mt-2 h-3 rounded-full bg-[#E8EAEF] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(job.progress)}>
+              <div className="mt-2 h-3 rounded-full bg-line overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(job.progress)}>
                 <div
                   className={`relative h-full rounded-full overflow-hidden transition-[width] duration-300 ease-out ${done ? 'bg-income' : 'water-fill'}`}
                   style={{ width: `${job.progress}%` }}
@@ -76,7 +76,7 @@ export default function ExportProgress({ job, t, onClose, onRetry }) {
                   {!done && <Bubbles count={10} rise={20} size={[3, 5]} />}
                 </div>
               </div>
-              <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${done ? 'font-semibold text-[#047857]' : 'text-muted'}`}>
+              <div className={`mt-1.5 flex items-center gap-1.5 text-[12px] ${done ? 'font-semibold text-income-ink' : 'text-muted'}`}>
                 {done && <Check size={14} strokeWidth={2.6} className="animate-[popIn_0.4s_cubic-bezier(0.22,1,0.36,1)_both]" />}
                 {done ? t.export_ready : t.export_working}
               </div>

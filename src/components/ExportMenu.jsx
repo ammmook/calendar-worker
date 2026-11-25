@@ -126,9 +126,9 @@ export default function ExportMenu({ getStatement, disabled, t, variant = 'dropd
   const triggerCls = isSheet
     ? `w-10 h-10 rounded-full grid place-items-center bg-white/25 text-white cursor-pointer transition
        hover:bg-white/35 active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed`
-    : `flex items-center gap-1.5 h-10 px-3 rounded-xl bg-white border border-line shadow-[0_1px_3px_rgba(17,24,39,0.06)]
+    : `flex items-center gap-1.5 h-10 px-3 rounded-xl bg-surface border border-line shadow-[0_1px_3px_rgba(17,24,39,0.06)]
        text-ink-2 text-[12px] font-semibold cursor-pointer transition hover:bg-primary-soft hover:text-primary
-       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-ink-2`;
+       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-surface disabled:hover:text-ink-2`;
 
   return (
     <div className="relative" ref={rootRef}>
@@ -149,7 +149,7 @@ export default function ExportMenu({ getStatement, disabled, t, variant = 'dropd
       {open && !isSheet && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 z-30 w-[19rem] bg-white border border-line rounded-2xl
+          className="absolute right-0 mt-2 z-30 w-[19rem] bg-surface border border-line rounded-2xl
             shadow-[0_12px_32px_rgba(17,24,39,0.14)] p-1.5 animate-[fadeIn_0.15s_ease_both]"
         >
           {itemButtons}
@@ -158,11 +158,11 @@ export default function ExportMenu({ getStatement, disabled, t, variant = 'dropd
 
       {open && isSheet && createPortal(
         <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-ink/40 animate-[fadeIn_0.2s_ease_both]" onClick={() => setOpen(false)} />
+          <div className="absolute inset-0 bg-black/40 animate-[fadeIn_0.2s_ease_both]" onClick={() => setOpen(false)} />
           <div
             role="menu"
             aria-label={t.export_btn}
-            className="absolute inset-x-0 bottom-0 bg-white rounded-t-3xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]
+            className="absolute inset-x-0 bottom-0 bg-surface rounded-t-3xl px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]
               shadow-[0_-12px_32px_rgba(17,24,39,0.18)] animate-[slideUpSheet_0.3s_cubic-bezier(0.22,1,0.36,1)_both]"
           >
             <div className="mx-auto w-10 h-1 rounded-full bg-line-strong mb-3" />

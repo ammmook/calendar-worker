@@ -262,7 +262,7 @@ export default function LoginPage() {
                     </div>
 
                     {/* White card */}
-                    <div className="bg-white rounded-3xl border border-line
+                    <div className="bg-surface rounded-3xl border border-line
             shadow-[0_8px_40px_rgba(17,24,39,0.08)] p-7 anim-shimmer">
 
                         {/* Mobile heading inside card */}
@@ -273,7 +273,7 @@ export default function LoginPage() {
 
                         {/* Error */}
                         {error && (
-                            <div className="bg-[#FFF1F3] border border-[#FECDD3] text-[#9F1239] text-[12px] font-medium rounded-xl px-3.5 py-2.5 mb-5 animate-[fadeUp_0.3s_ease_both]">
+                            <div className="bg-danger-soft border border-danger/30 text-danger text-[12px] font-medium rounded-xl px-3.5 py-2.5 mb-5 animate-[fadeUp_0.3s_ease_both]">
                                 {error}
                             </div>
                         )}
@@ -283,7 +283,7 @@ export default function LoginPage() {
                             onClick={handleGoogleClick}
                             disabled={isInteractionDisabled}
                             className="w-full flex items-center justify-center gap-3 px-5 py-3.5
-                rounded-[14px] border-[1.5px] border-line-strong bg-white
+                rounded-[14px] border-[1.5px] border-line-strong bg-surface
                 text-ink-2 font-semibold text-[14px] cursor-pointer
                 transition duration-200
                 hover:border-primary hover:shadow-[0_4px_18px_rgba(59,79,228,0.16)]
@@ -311,14 +311,14 @@ export default function LoginPage() {
 
 
 
-                        <p className="text-center text-[11px] text-[#C4C9D4] mt-5 leading-relaxed">
+                        <p className="text-center text-[11px] text-faint mt-5 leading-relaxed">
                             By signing in you agree to our{' '}
                             <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Privacy Policy</a>
                         </p>
                     </div>
 
                     {/* Version */}
-                    <p className="text-center text-[11px] text-[#C4C9D4] mt-5">
+                    <p className="text-center text-[11px] text-faint mt-5">
                         TimeFlow v2.0 · {new Date().getFullYear()}
                     </p>
                 </div>

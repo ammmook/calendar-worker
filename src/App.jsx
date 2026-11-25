@@ -8,11 +8,12 @@ import {
   CalendarDays, CheckCircle2, BarChart2,
   LogOut, UserCircle2, ChevronDown, X, Trash2,
   Stethoscope, UmbrellaOff, AlertCircle, Loader2,
-  Moon, GraduationCap,
+  Moon, GraduationCap, Monitor,
 } from 'lucide-react';
 import useConfirm from './components/useConfirm';
 import SelectField from './components/SelectField';
 import SegmentedControl from './components/SegmentedControl';
+import { withViewTransition } from './utils/viewTransition';
 import YearlyDashboard from './components/YearlyDashboard';
 import WorkCalendar from './components/WorkCalendar';
 import MonthlySummary from './components/MonthlySummary';
@@ -59,6 +60,16 @@ export default function App() {
   });
   const t = getLang(lang);
 
+  // ธีมสี: 'light' | 'dark' | 'system' (system = ไม่ตั้ง data-theme ให้ CSS ตามค่าระบบเอง)
+  const [theme, setTheme] = useState(() => {
+    try { const v = localStorage.getItem('timeflow_theme'); return v === 'light' || v === 'dark' ? v : 'system'; } catch { return 'system'; }
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'system') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', theme);
+    try { if (theme === 'system') localStorage.removeItem('timeflow_theme'); else localStorage.setItem('timeflow_theme', theme); } catch { /* storage ถูกบล็อก — ข้าม */ }
+  }, [theme]);
+
   // Persist language to localStorage
   useEffect(() => {
     try { localStorage.setItem('timeflow_lang', lang); } catch { /* storage ถูกบล็อก — ข้าม */ }
@@ -99,6 +110,8 @@ export default function App() {
   const [toast, setToast] = useState({ show: false, msg: '' });
   const [view, setView] = useState('calendar'); // 'calendar' | 'dashboard'
   const [dashTab, setDashTab] = useState('monthly'); // แท็บย่อยใน dashboard: 'monthly' | 'yearly'
+  const changeView = useCallback((v) => withViewTransition(() => setView(v)), []);
+  const changeDashTab = useCallback((v) => withViewTransition(() => setDashTab(v)), []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirm, confirmDialog] = useConfirm();
   const [isSavingEntry, setIsSavingEntry] = useState(false);
@@ -591,7 +604,7 @@ export default function App() {
 
   // ── Shared utility classes ──
   const labelCls = 'text-[10px] font-bold text-muted uppercase tracking-[0.08em] block mb-1';
-  const inputCls = 'w-full min-w-0 block bg-surface-alt border-[1.5px] border-line-strong rounded-[6px] text-ink text-sm font-medium px-1 sm:px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer transition-colors focus:border-primary focus:bg-white box-border';
+  const inputCls = 'w-full min-w-0 block bg-surface-alt border-[1.5px] border-line-strong rounded-[6px] text-ink text-sm font-medium px-1 sm:px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer transition-colors focus:border-primary focus:bg-surface box-border';
 
   // ── Auth guard — show login if not signed in ──────────────────────────────
   if (authLoading) {
@@ -622,12 +635,12 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-ink-2 font-sans antialiased selection:bg-primary-soft">
+    <div className="min-h-screen bg-surface text-ink-2 font-sans antialiased selection:bg-primary-soft">
       
       {/* ════════════════════════════════════════════
           TOPBAR
       ════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-50 w-full h-[60px] bg-white border-b border-line flex items-center justify-between px-6">
+      <header className="sticky top-0 z-50 w-full h-[60px] bg-surface/85 backdrop-blur border-b border-line flex items-center justify-between px-6">
 
         {/* Logo */}
         <div className="flex items-center gap-2.5">
@@ -662,22 +675,24 @@ export default function App() {
 
           <button
             onClick={goToday}
-            className="px-3.5 py-[7px] rounded-[10px] bg-white border-[1.5px] border-line-strong text-ink-2 text-[13px] font-medium cursor-pointer shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:text-primary hover:bg-primary-soft hover:-translate-y-px"
+            className="px-3.5 py-[7px] rounded-[10px] bg-surface border-[1.5px] border-line-strong text-ink-2 text-[13px] font-medium cursor-pointer shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:text-primary hover:bg-primary-soft hover:-translate-y-px"
           >
             {t.today}
           </button>
         </div>
 
-        {/* Tab toggle (always visible) — Work Calendar | Dashboard */}
+        {/* Tab toggle — แท็บเล็ต (มือถือใช้ bottom bar, xl ใช้ sidebar) */}
+        <div className="hidden sm:block xl:hidden">
         <SegmentedControl
           collapseLabel
           value={view}
-          onChange={setView}
+          onChange={changeView}
           items={[
             { id: 'calendar', Icon: CalendarDays, label: t.work_calendar },
             { id: 'dashboard', Icon: LayoutDashboard, label: t.dashboard },
           ]}
         />
+        </div>
 
         {/* Language Toggle & User Menu */}
         <div className="flex items-center gap-2">
@@ -685,7 +700,7 @@ export default function App() {
             type="button"
             onClick={() => setLang(l => l === 'en' ? 'th' : 'en')}
             aria-label={t.switch_language}
-            className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white border-2 border-line text-[11px] font-bold text-muted cursor-pointer transition hover:border-primary-mid hover:text-primary"
+            className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-surface border-2 border-line text-[11px] font-bold text-muted cursor-pointer transition hover:border-primary-mid hover:text-primary"
           >
             {lang.toUpperCase()}
           </button>
@@ -694,6 +709,8 @@ export default function App() {
           <UserMenu
             user={user}
             t={t}
+            theme={theme}
+            onTheme={setTheme}
             onProfile={() => setPage('profile')}
             onSignOut={signOut}
           />
@@ -706,13 +723,13 @@ export default function App() {
       <div className="flex min-h-[calc(100vh-60px)]">
 
         {/* ── SIDEBAR ─────────────────────────────── */}
-        <aside className="hidden xl:flex flex-col w-[220px] shrink-0 bg-white border-r border-line sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto p-4 gap-1">
+        <aside className="hidden xl:flex flex-col w-[220px] shrink-0 bg-surface border-r border-line sticky top-[60px] h-[calc(100vh-60px)] overflow-y-auto p-4 gap-1">
 
           {/* Nav: Work Calendar / Dashboard */}
           <div className="text-[10px] font-bold text-muted uppercase tracking-[0.1em] px-3 pt-3 pb-2">{t.menu}</div>
           <button
             type="button"
-            onClick={() => setView('calendar')}
+            onClick={() => changeView('calendar')}
             aria-current={view === 'calendar' ? 'page' : undefined}
             className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition
               ${view === 'calendar' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-alt hover:text-ink-2'}`}
@@ -722,7 +739,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => setView('dashboard')}
+            onClick={() => changeView('dashboard')}
             aria-current={view === 'dashboard' ? 'page' : undefined}
             className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition
               ${view === 'dashboard' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-alt hover:text-ink-2'}`}
@@ -736,7 +753,7 @@ export default function App() {
             <div className="mt-1 ml-3 pl-3 border-l border-line flex flex-col gap-1">
               <button
                 type="button"
-                onClick={() => setDashTab('monthly')}
+                onClick={() => changeDashTab('monthly')}
                 aria-current={dashTab === 'monthly' ? 'page' : undefined}
                 className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition
                   ${dashTab === 'monthly' ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
@@ -746,7 +763,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setDashTab('yearly')}
+                onClick={() => changeDashTab('yearly')}
                 aria-current={dashTab === 'yearly' ? 'page' : undefined}
                 className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition
                   ${dashTab === 'yearly' ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
@@ -759,7 +776,7 @@ export default function App() {
         </aside>
 
         {/* ── MAIN ─────────────────────────────────── */}
-        <main className="flex-1 min-w-0 flex flex-col gap-6 p-6 overflow-y-auto">
+        <main className="flex-1 min-w-0 flex flex-col gap-6 p-6 max-sm:pb-28 overflow-y-auto">
 
           {/* ══ CALENDAR VIEW (ปฏิทินการทำงาน) ══ */}
           {view === 'calendar' && !dataLoaded && (
@@ -800,7 +817,7 @@ export default function App() {
               <SegmentedControl
                 fill
                 value={dashTab}
-                onChange={setDashTab}
+                onChange={changeDashTab}
                 items={[
                   { id: 'monthly', Icon: LayoutDashboard, label: t.monthly },
                   { id: 'yearly', Icon: BarChart2, label: t.annual },
@@ -875,17 +892,37 @@ export default function App() {
         lang={lang}
       />
 
+      {/* Bottom tab bar (มือถือ) */}
+      <nav aria-label={t.menu} className="sm:hidden fixed bottom-0 inset-x-0 z-40 grid grid-cols-2 bg-surface/90 backdrop-blur border-t border-line pb-[env(safe-area-inset-bottom)]">
+        {[
+          { id: 'calendar', Icon: CalendarDays, label: t.work_calendar },
+          { id: 'dashboard', Icon: LayoutDashboard, label: t.dashboard },
+        ].map(({ id, Icon, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => changeView(id)}
+            aria-current={view === id ? 'page' : undefined}
+            className={`flex flex-col items-center justify-center gap-0.5 h-14 text-[11px] font-semibold cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/25
+              ${view === id ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
+          >
+            <Icon size={20} aria-hidden="true" />
+            {label}
+          </button>
+        ))}
+      </nav>
+
       {confirmDialog}
 
       {/* Toast */}
-      <div role="status" aria-live="polite" className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300
+      <div role="status" aria-live="polite" className={`fixed bottom-24 sm:bottom-6 right-6 bg-ink text-surface text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300
         ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <CheckCircle2 size={14} className="text-income" />
         {toast.msg}
       </div>
 
       {/* Saving Toast */}
-      <div className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300
+      <div className={`fixed bottom-24 sm:bottom-6 right-6 bg-ink text-surface text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300
         ${(isSavingEntry || isDeletingEntry || isSavingLeave) && !toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <Loader2 size={14} className="text-primary animate-spin" />
         {lang === 'th' ? 'กำลังบันทึกและคำนวณเงิน...' : 'Saving and calculating...'}
@@ -896,7 +933,7 @@ export default function App() {
 }
 
 // ── UserMenu ──────────────────────────────────────────────────────────────────
-function UserMenu({ user, t, onProfile, onSignOut }) {
+function UserMenu({ user, t, theme, onTheme, onProfile, onSignOut }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
 
@@ -916,7 +953,7 @@ function UserMenu({ user, t, onProfile, onSignOut }) {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-[1.5px] border-line bg-white cursor-pointer transition hover:border-primary-mid hover:shadow-[0_2px_8px_rgba(17,24,39,0.08)] select-none"
+        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-[1.5px] border-line bg-surface cursor-pointer transition hover:border-primary-mid hover:shadow-[0_2px_8px_rgba(17,24,39,0.08)] select-none"
       >
         {/* Avatar image */}
         {user?.picture ? (
@@ -940,10 +977,10 @@ function UserMenu({ user, t, onProfile, onSignOut }) {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-[240px] bg-white border border-line rounded-2xl shadow-[0_8px_32px_rgba(17,24,39,0.12)] z-[999] overflow-hidden animate-[fadeUp_0.2s_ease_both]">
+        <div className="absolute right-0 top-[calc(100%+8px)] w-[240px] bg-surface border border-line rounded-2xl shadow-[0_8px_32px_rgba(17,24,39,0.12)] z-[999] overflow-hidden animate-[fadeUp_0.2s_ease_both]">
 
           {/* User info header */}
-          <div className="px-4 py-3.5 border-b border-[#F3F4F8]">
+          <div className="px-4 py-3.5 border-b border-line">
             <div className="flex items-center gap-3">
               {user?.picture ? (
                 <img src={user.picture} alt="" className="w-9 h-9 rounded-xl object-cover" />
@@ -969,7 +1006,31 @@ function UserMenu({ user, t, onProfile, onSignOut }) {
             />
           </div>
 
-          <div className="border-t border-[#F3F4F8] py-1.5">
+          <div className="border-t border-line px-4 py-3">
+            <div className="text-[11px] font-semibold text-muted mb-2">{t?.theme_label || 'Appearance'}</div>
+            <div role="radiogroup" aria-label={t?.theme_label || 'Appearance'} className="grid grid-cols-3 gap-1 bg-surface-alt border border-line rounded-[10px] p-1">
+              {[
+                { id: 'light', Icon: Sun, label: t?.theme_light || 'Light' },
+                { id: 'dark', Icon: Moon, label: t?.theme_dark || 'Dark' },
+                { id: 'system', Icon: Monitor, label: t?.theme_system || 'System' },
+              ].map(({ id, Icon, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={theme === id}
+                  onClick={() => onTheme(id)}
+                  className={`flex flex-col items-center gap-1 py-1.5 rounded-[7px] text-[11px] font-semibold cursor-pointer transition focus-visible:ring-2 focus-visible:ring-primary/25
+                    ${theme === id ? 'bg-surface text-primary shadow-[0_1px_3px_rgba(17,24,39,0.12)]' : 'text-muted hover:text-ink-2'}`}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-line py-1.5">
             <MenuItem
               Icon={LogOut}
               label={t?.logout || "Sign Out"}
@@ -989,12 +1050,12 @@ function MenuItem({ Icon, label, sub, danger, onClick }) {
       onClick={onClick}
       className={`w-full flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors
         ${danger
-          ? 'text-[#F43F5E] hover:bg-[#FFF1F3]'
+          ? 'text-danger hover:bg-[#FFF1F3]'
           : 'text-ink-2 hover:bg-surface-alt'}`}
     >
       <div className={`w-7 h-7 rounded-[7px] grid place-items-center shrink-0
-        ${danger ? 'bg-[#FFF1F3]' : 'bg-surface-alt'}`}>
-        <Icon size={14} className={danger ? 'text-[#F43F5E]' : 'text-muted'} />
+        ${danger ? 'bg-danger-soft' : 'bg-surface-alt'}`}>
+        <Icon size={14} className={danger ? 'text-danger' : 'text-muted'} />
       </div>
       <div className="min-w-0">
         <div className="text-[12px] font-semibold">{label}</div>

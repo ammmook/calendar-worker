@@ -36,7 +36,7 @@ function SkeletonStatCards() {
       {STAT_VARIANTS.map(({ stripe, icon, Icon }, i) => (
         <div
           key={i}
-          className="relative overflow-hidden rounded-2xl border border-line p-4 sm:p-6 bg-white shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
+          className="relative overflow-hidden rounded-2xl border border-line p-4 sm:p-6 bg-surface shadow-[0_1px_3px_rgba(17,24,39,0.06)]"
           style={{ animationDelay: `${i * 0.06}s` }}
         >
           <span className={`absolute top-0 left-4 sm:left-6 right-4 sm:right-6 h-[3px] rounded-b-[4px] opacity-60 ${stripe}`} />

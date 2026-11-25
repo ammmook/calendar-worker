@@ -13,7 +13,7 @@ export function DonutChart({ segments, centerLabel, centerValue, size = 200, thi
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
           {total <= 0 ? (
-            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#F3F4F8" strokeWidth={thickness} />
+            <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--color-surface-alt)" strokeWidth={thickness} />
           ) : (
             segments.map((seg, i) => {
               const v = Math.max(0, seg.value);

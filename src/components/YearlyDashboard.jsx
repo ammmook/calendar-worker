@@ -194,11 +194,11 @@ export default function YearlyDashboard({
                             <g key={i}>
                                 <line
                                     x1={CHART_PAD.left} y1={y} x2={800 - CHART_PAD.right} y2={y}
-                                    stroke="#E8EAEF" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 3'}
+                                    stroke="var(--color-line)" strokeWidth="1" strokeDasharray={i === 0 ? '0' : '4 3'}
                                 />
                                 <text
                                     x={CHART_PAD.left - 6} y={y + 4}
-                                    textAnchor="end" fill="#9CA3AF"
+                                    textAnchor="end" fill="var(--color-faint)"
                                     style={{ fontSize: 9, fontFamily: 'Google Sans, sans-serif' }}
                                 >
                                     {val >= 1000 ? `${Math.round(val / 1000)}k` : Math.round(val)}
@@ -236,7 +236,7 @@ export default function YearlyDashboard({
                                     <rect
                                         x={x - 4} y={CHART_PAD.top}
                                         width={bW + 8} height={CHART_H - CHART_PAD.top - CHART_PAD.bottom}
-                                        fill="#EEF0FD"
+                                        fill="var(--color-primary-soft)"
                                     />
                                 )}
 
@@ -275,14 +275,14 @@ export default function YearlyDashboard({
                                     <rect
                                         x={x} y={baseY - 3}
                                         width={bW} height={3}
-                                        fill="#E8EAEF"
+                                        fill="var(--color-line)"
                                     />
                                 )}
 
                                 {/* Month label */}
                                 <text
                                     x={x + bW / 2} y={CHART_H - CHART_PAD.bottom + 14}
-                                    textAnchor="middle" fill={isActive ? 'var(--color-primary)' : '#9CA3AF'}
+                                    textAnchor="middle" fill={isActive ? 'var(--color-primary)' : 'var(--color-faint)'}
                                     style={{ fontSize: 9, fontWeight: isActive ? 700 : 400, fontFamily: 'Google Sans, sans-serif', transition: 'fill 0.15s' }}
                                 >
                                     {m.month}
@@ -308,7 +308,7 @@ export default function YearlyDashboard({
 
                     return (
                         <div
-                            className="absolute pointer-events-none z-20 bg-white border border-line rounded-xl shadow-[0_8px_28px_rgba(17,24,39,0.12)] p-3.5"
+                            className="absolute pointer-events-none z-20 bg-surface border border-line rounded-xl shadow-[0_8px_28px_rgba(17,24,39,0.12)] p-3.5"
                             style={{ left: tx, top: ty, width: TW }}
                         >
                             <div className="flex items-center justify-between mb-2.5">
@@ -316,13 +316,13 @@ export default function YearlyDashboard({
                                 <span className="text-[10px] font-semibold text-muted">{m.daysWorked} {t.table_days}</span>
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <TooltipRow label={t.total} value={fmtB(m.totalEarn)} color="#111827" bold />
+                                <TooltipRow label={t.total} value={fmtB(m.totalEarn)} color="var(--color-ink)" bold />
                                 <div className="border-t border-line my-0.5" />
                                 <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="var(--color-primary)" />
                                 <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="var(--color-ot)" />
                                 <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="var(--color-shift)" />
                                 <div className="border-t border-line my-0.5" />
-                                <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="#9CA3AF" />
+                                <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="var(--color-faint)" />
                             </div>
                         </div>
                     );
@@ -341,7 +341,7 @@ export default function YearlyDashboard({
                 <SegmentedControl items={tabs} value={tab} onChange={setTab} />
 
                 {/* Year picker */}
-                <div className="flex items-center gap-2 bg-white border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
+                <div className="flex items-center gap-2 bg-surface border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
                     <button
                         type="button"
                         aria-label={t.prev_month}
@@ -383,7 +383,7 @@ export default function YearlyDashboard({
                         <div>
                             <div className="text-[15px] font-bold text-ink">{t.monthly_breakdown}</div>
                             {socialSecurity > 0 && (
-                                <div className="text-[11px] font-medium text-[#F43F5E] mt-1">
+                                <div className="text-[11px] font-medium text-danger mt-1">
                                     {t.social_security_monthly_note} {fmtB(socialSecurity)}
                                 </div>
                             )}
@@ -407,7 +407,7 @@ export default function YearlyDashboard({
                                     return (
                                         <tr
                                             key={i}
-                                            className={`border-b border-[#F3F4F8] transition-colors hover:bg-surface-alt cursor-default
+                                            className={`border-b border-line transition-colors hover:bg-surface-alt cursor-default
                         ${isCurr ? 'bg-primary-soft/40' : ''}`}
                                         >
                                             <td className="px-2 sm:px-4 py-2.5">
@@ -674,7 +674,7 @@ export default function YearlyDashboard({
                                             </div>
                                         </div>
                                         {/* Progress bar */}
-                                        <div className="h-[5px] bg-[#F3F4F8] rounded-full overflow-hidden">
+                                        <div className="h-[5px] bg-surface-alt rounded-full overflow-hidden">
                                             <div
                                                 className="h-full rounded-full transition-[width,stroke-dasharray,stroke-dashoffset] duration-500"
                                                 style={{ width: `${pct}%`, background: lt.color, opacity: 0.75 }}
@@ -710,7 +710,7 @@ export default function YearlyDashboard({
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function AnnualCard({ Icon, label, value, sub, iconCls, valCls, stripe }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-line bg-white p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong">
+        <div className="relative overflow-hidden rounded-2xl border border-line bg-surface p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong">
             <span className={`absolute top-0 left-5 right-5 h-[3px] rounded-b-[4px] opacity-60 ${stripe}`} />
             <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] grid place-items-center mb-3 ${iconCls}`}>
                 <Icon size={14} strokeWidth={2} className="sm:hidden" />
@@ -736,7 +736,7 @@ function TooltipRow({ label, value, color, bold }) {
     return (
         <div className="flex items-center justify-between">
             <span className="text-[11px] text-muted">{label}</span>
-            <span className="text-[12px] font-bold" style={{ color: color || '#111827', fontWeight: bold ? 800 : 700 }}>
+            <span className="text-[12px] font-bold" style={{ color: color || 'var(--color-ink)', fontWeight: bold ? 800 : 700 }}>
                 {value}
             </span>
         </div>

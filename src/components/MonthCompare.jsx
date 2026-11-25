@@ -45,7 +45,7 @@ function Delta({ m, t }) {
   const text = m.pct === null ? t.cmp_new : `${Math.round(Math.abs(m.pct))}%`;
   return (
     <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold rounded-full px-2 py-0.5 tabular-nums
-      ${up ? 'text-[#047857] bg-income-soft' : 'text-muted bg-surface-alt'}`}>
+      ${up ? 'text-income-ink bg-income-soft' : 'text-muted bg-surface-alt'}`}>
       <Icon size={12} strokeWidth={2.4} />{text}
     </span>
   );

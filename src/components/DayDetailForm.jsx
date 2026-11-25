@@ -93,7 +93,7 @@ export default function DayDetailForm({
               className={`${v.delBtn} rounded-[10px] border-none transition flex items-center justify-center shrink-0
                 ${isDeletingEntry
                   ? 'bg-line text-muted cursor-not-allowed'
-                  : 'bg-[#FFF1F3] text-[#F43F5E] cursor-pointer hover:bg-[#FEE2E2]'}`}
+                  : 'bg-danger-soft text-danger cursor-pointer hover:bg-danger/15'}`}
             >
               {isDeletingEntry ? <AnimatedWaitText /> : <Trash2 size={v.delIcon} />}
             </button>
@@ -196,7 +196,7 @@ export default function DayDetailForm({
         disabled={isSelectedHoliday}
         placeholder={t.note_placeholder}
         aria-label={t.note}
-        className="w-full min-w-0 resize-none rounded-[10px] border border-line bg-white px-3 py-2 text-[13px] text-ink placeholder:text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus:border-primary disabled:bg-line transition"
+        className="w-full min-w-0 resize-none rounded-[10px] border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-muted outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus:border-primary disabled:bg-line transition"
       />
 
       {/* Save / Update / Delete */}

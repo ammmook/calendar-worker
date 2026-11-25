@@ -229,9 +229,9 @@ export default function WorkCalendar({
           { color: 'bg-primary-soft border border-primary-mid', label: t.regular_day_legend },
           { color: 'bg-ot-soft border border-ot-line', label: t.ot_day_legend },
           { color: 'bg-holiday-user/15 border border-holiday-user/40', label: t.holiday_legend },
-          { color: 'bg-[#FEECEC] border border-danger', label: t.public_holiday_legend },
+          { color: 'bg-danger-soft border border-danger', label: t.public_holiday_legend },
           { color: 'bg-today-soft border-2 border-today', label: t.today },
-          { color: 'bg-white border-2 border-primary', label: t.selected_legend },
+          { color: 'bg-surface border-2 border-primary', label: t.selected_legend },
         ].map(({ color, label }) => (
           <div key={label} className="flex items-center gap-1.5 text-[12px] text-muted font-medium">
             <div className={`w-2.5 h-2.5 rounded-[3px] shrink-0 ${color}`} />
@@ -243,7 +243,7 @@ export default function WorkCalendar({
       {/* Mobile Modal for Date Details */}
       {modalOpen && (
         <div
-          className="xl:hidden fixed inset-0 z-[200] bg-ink/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
+          className="xl:hidden fixed inset-0 z-[200] bg-black/40 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease_both]"
           onClick={closeModal}
         >
           <div
@@ -251,7 +251,7 @@ export default function WorkCalendar({
             role="dialog"
             aria-modal="true"
             aria-labelledby="day-modal-title"
-            className="bg-white rounded-[20px] w-full max-w-[340px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden max-h-[90vh] scale-100 animate-[zoomIn_0.2s_ease_both]"
+            className="bg-surface rounded-[20px] w-full max-w-[340px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden max-h-[90vh] scale-100 animate-[zoomIn_0.2s_ease_both]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-line">
@@ -263,7 +263,7 @@ export default function WorkCalendar({
                   </span>
                 )}
               </div>
-              <button ref={closeBtnRef} type="button" aria-label={t.close} onClick={() => setSelectedKey(null)} className="w-10 h-10 grid place-items-center rounded-lg text-muted hover:bg-[#F3F4F8] hover:text-ink cursor-pointer transition-colors bg-transparent border-none">
+              <button ref={closeBtnRef} type="button" aria-label={t.close} onClick={() => setSelectedKey(null)} className="w-10 h-10 grid place-items-center rounded-lg text-muted hover:bg-surface-alt hover:text-ink cursor-pointer transition-colors bg-transparent border-none">
                 <X size={18} />
               </button>
             </div>

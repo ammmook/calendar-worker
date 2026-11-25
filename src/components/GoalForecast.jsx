@@ -6,14 +6,14 @@ import Bubbles from './Bubbles';
 import { useInView } from './useMotion';
 
 // ลายทแยงแทนช่วง "คาดการณ์" — ต่างจากยอดจริงที่เป็นสีทึบ (ขนาด tile 10px เพื่อให้เลื่อนวนได้เนียน)
-const STRIPE = 'rgba(59,79,228,0.38)';
+const STRIPE = 'rgba(99,102,241,0.34)';
 const FORECAST_STRIPES = `linear-gradient(135deg, ${STRIPE} 25%, transparent 25%, transparent 50%, ${STRIPE} 50%, ${STRIPE} 75%, transparent 75%, transparent)`;
 
 // ไล่สีของแต่ละส่วน (ยังคงโทนสีตามความหมาย: คราม=เงินเดือน เหลือง=OT ส้ม=เบี้ยกะ)
 const GRAD = {
-  base: 'linear-gradient(90deg, #3B4FE4 0%, #6A5AEF 65%, #8B5CF6 100%)',
-  ot: 'linear-gradient(90deg, #BA8A00 0%, #E3B52C 100%)',
-  shift: 'linear-gradient(90deg, #E8730C 0%, #F7A24F 100%)',
+  base: 'linear-gradient(90deg, #4C5CF0 0%, #7461F2 55%, #A78BFA 100%)',
+  ot: 'linear-gradient(90deg, #F2A200 0%, #FFC83D 60%, #FFE08A 100%)',
+  shift: 'linear-gradient(90deg, #F2650A 0%, #FF9A4D 100%)',
 };
 
 // การ์ดเป้าหมายรายได้ + พยากรณ์สิ้นเดือน (f มาจาก forecastMonth)
@@ -81,7 +81,7 @@ export default function GoalForecast({ f, goal, setGoal, otRate, t, className = 
                 type="number" inputMode="numeric" min="0" step="100" value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="30000"
-                className="w-full bg-white border-[1.5px] border-line-strong rounded-[10px] text-[14px] font-medium px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus:border-primary"
+                className="w-full bg-surface border-[1.5px] border-line-strong rounded-[10px] text-[14px] font-medium px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus:border-primary"
               />
             </label>
             <button type="submit"
@@ -95,7 +95,7 @@ export default function GoalForecast({ f, goal, setGoal, otRate, t, className = 
                   {t.goal_cancel}
                 </button>
                 <button type="button" onClick={remove}
-                  className="h-10 px-3 rounded-[10px] text-danger text-[13px] font-semibold cursor-pointer hover:bg-[#FEF2F2] transition-colors">
+                  className="h-10 px-3 rounded-[10px] text-danger text-[13px] font-semibold cursor-pointer hover:bg-danger-soft transition-colors">
                   {t.goal_remove}
                 </button>
               </>
@@ -141,10 +141,10 @@ function GoalBody({ f, goal, otRate, t }) {
   }
 
   const legend = [
-    { key: 'base', label: t.goal_base, value: baseNow, style: { background: 'var(--color-primary)' } },
-    { key: 'ot', label: t.ot_earnings, value: f.ot, style: { background: 'var(--color-ot)' } },
-    { key: 'shift', label: t.shift_earnings, value: f.shift, style: { background: 'var(--color-shift)' } },
-    { key: 'fc', label: t.goal_forecast_more, value: forecastExtra, style: { backgroundImage: FORECAST_STRIPES, backgroundSize: '6px 6px', outline: '1px solid rgba(59,79,228,0.35)' } },
+    { key: 'base', label: t.goal_base, value: baseNow, style: { backgroundImage: GRAD.base } },
+    { key: 'ot', label: t.ot_earnings, value: f.ot, style: { backgroundImage: GRAD.ot } },
+    { key: 'shift', label: t.shift_earnings, value: f.shift, style: { backgroundImage: GRAD.shift } },
+    { key: 'fc', label: t.goal_forecast_more, value: forecastExtra, style: { backgroundImage: FORECAST_STRIPES, backgroundSize: '6px 6px', outline: '1px solid rgba(99,102,241,0.4)' } },
   ].filter((x) => x.value > 0);
 
   return (
@@ -165,15 +165,15 @@ function GoalBody({ f, goal, otRate, t }) {
           ลายทแยงที่เลื่อนช้า ๆ = ที่คาดว่าจะได้เพิ่ม ขีดดำ = เป้า */}
       <div
         ref={barRef}
-        className="relative h-6 rounded-full bg-[#F3F4F8] mt-4"
+        className="relative h-6 rounded-full bg-surface-alt mt-4 shadow-[inset_0_1px_2px_rgba(17,24,39,0.12)]"
         role="img"
         aria-label={`${t.goal_title}: ${pctText}`}
       >
         <div className="absolute inset-0 overflow-hidden rounded-full">
           <div className="flex h-full">
-            <div className="h-full shrink-0 transition-[width] duration-[900ms] ease-out" style={{ width: sw(baseNow), backgroundImage: GRAD.base }} />
-            <div className="h-full shrink-0 transition-[width] duration-[900ms] ease-out" style={{ width: sw(f.ot), backgroundImage: GRAD.ot }} />
-            <div className="h-full shrink-0 transition-[width] duration-[900ms] ease-out" style={{ width: sw(f.shift), backgroundImage: GRAD.shift }} />
+            <div className="h-full shrink-0 transition-[width] duration-[900ms] ease-out" style={{ boxShadow: 'inset -1.5px 0 0 rgba(255,255,255,0.7)', width: sw(baseNow), backgroundImage: GRAD.base }} />
+            <div className="h-full shrink-0 transition-[width] duration-[900ms] ease-out" style={{ boxShadow: 'inset -1.5px 0 0 rgba(255,255,255,0.7)', width: sw(f.ot), backgroundImage: GRAD.ot }} />
+            <div className="h-full shrink-0 transition-[width] duration-[900ms] ease-out" style={{ boxShadow: 'inset -1.5px 0 0 rgba(255,255,255,0.7)', width: sw(f.shift), backgroundImage: GRAD.shift }} />
             <div
               className="h-full shrink-0 transition-[width] duration-[900ms] ease-out"
               style={{
@@ -182,6 +182,8 @@ function GoalBody({ f, goal, otRate, t }) {
               }}
             />
           </div>
+          {/* ประกายด้านบนให้แถบดูนูนเหมือนหลอดแก้ว */}
+          <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent pointer-events-none" aria-hidden="true" />
           {/* ฟองลอยจากล่างขึ้นบน — ขอบกว้างเท่ากับส่วนที่เติมแล้ว */}
           <div className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-[900ms] ease-out pointer-events-none" style={{ width: sw(f.current) }}>
             <Bubbles count={Math.max(8, Math.round(f.progress * 30))} rise={36} size={[4, 8]} />
@@ -203,7 +205,7 @@ function GoalBody({ f, goal, otRate, t }) {
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3.5 text-[11px] text-muted">
         {legend.map((x) => (
           <li key={x.key} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={x.style} />
+            <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.25)]" style={x.style} />
             {x.label} <span className="font-semibold text-ink-2 tabular-nums">{fmtB(x.value)}</span>
           </li>
         ))}
@@ -230,7 +232,7 @@ function GoalBody({ f, goal, otRate, t }) {
 
       {message && (
         <p className={`mt-4 rounded-xl px-3.5 py-3 text-[13px] font-semibold leading-snug
-          ${good ? 'bg-income-soft text-[#047857]' : 'bg-surface-alt text-ink-2'}`}>
+          ${good ? 'bg-income-soft text-income-ink' : 'bg-surface-alt text-ink-2'}`}>
           {message}
         </p>
       )}

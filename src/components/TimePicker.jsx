@@ -79,7 +79,7 @@ export default function TimePicker({
     <div
       role="group"
       aria-label={label}
-      className={`${className} focus-within:border-primary focus-within:bg-white flex items-center gap-0.5 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'}`}
+      className={`${className} focus-within:border-primary focus-within:bg-surface flex items-center gap-0.5 ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'}`}
     >
       <input
         type="text"

@@ -119,7 +119,7 @@ export default function MonthlySummary({
               </SelectField>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-white border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
+          <div className="flex items-center gap-1.5 bg-surface border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">
             <button type="button" onClick={goToday}
               className="flex items-center gap-1.5 h-10 sm:h-8 px-2.5 rounded-lg text-muted text-[12px] font-semibold hover:bg-primary-soft hover:text-primary cursor-pointer transition">
               <CalendarCheck size={13} /> {t.today}
@@ -168,7 +168,7 @@ export default function MonthlySummary({
 
               // สีขอบซ้าย + กล่องเลขวันตามประเภทวัน (นักขัตฤกษ์ > วันหยุด > OT > กะ)
               const accent = publicHol
-                ? { border: 'border-l-danger', box: 'bg-[#FEECEC] text-danger', hover: 'hover:bg-[#FEF2F2]' }
+                ? { border: 'border-l-danger', box: 'bg-danger-soft text-danger', hover: 'hover:bg-danger-soft' }
                 : isHol
                   ? { border: 'border-l-holiday-user', box: 'bg-holiday-user/15 text-holiday-user', hover: 'hover:bg-holiday-user/5' }
                   : hasOT
@@ -176,7 +176,7 @@ export default function MonthlySummary({
                     : hasShift
                       ? { border: 'border-l-[#FDBA74]', box: 'bg-shift-soft text-shift', hover: 'hover:bg-shift-soft' }
                       : isEmpty
-                        ? { border: 'border-l-transparent', box: 'bg-[#F3F4F6] text-[#C0C5CE]', hover: 'hover:bg-surface-alt' }
+                        ? { border: 'border-l-transparent', box: 'bg-surface-alt text-faint', hover: 'hover:bg-surface-alt' }
                         : { border: 'border-l-transparent', box: 'bg-surface-alt text-ink-2', hover: 'hover:bg-surface-alt' };
               const hasAccent = publicHol || isHol || hasOT || hasShift;
 
@@ -198,7 +198,7 @@ export default function MonthlySummary({
 
                   {/* Middle info */}
                   <div className="min-w-0">
-                    <div className={`text-[11px] font-semibold ${isEmpty ? 'text-[#C0C5CE]' : 'text-muted'}`}>{t.days_short[dw]}</div>
+                    <div className={`text-[11px] font-semibold ${isEmpty ? 'text-faint' : 'text-muted'}`}>{t.days_short[dw]}</div>
                     {publicHol ? (
                       <div className="text-[10px] font-bold text-danger truncate flex items-center gap-1" title={publicHolName}>
                         <CalendarDays size={10} className="shrink-0" /> {publicHolName || t.public_holiday_legend}
@@ -220,7 +220,7 @@ export default function MonthlySummary({
                     ) : isHol ? (
                       <div className="text-[10px] font-medium text-holiday-user">{t.holiday_legend}</div>
                     ) : (
-                      <div className="text-[10px] text-[#C0C5CE]">{t.no_work_day}</div>
+                      <div className="text-[10px] text-faint">{t.no_work_day}</div>
                     )}
                   </div>
 
@@ -421,19 +421,19 @@ export default function MonthlySummary({
 // ─── SummaryCard ──────────────────────────────────────────────────────────────
 const variantStyles = {
   amber: {
-    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    wrap: 'bg-surface border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
     stripe: 'bg-ot-bar', icon: 'bg-ot-soft text-ot', val: 'text-ot',
   },
   indigo: {
-    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    wrap: 'bg-surface border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
     stripe: 'bg-primary', icon: 'bg-primary-soft text-primary', val: 'text-primary',
   },
   green: {
-    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    wrap: 'bg-surface border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
     stripe: 'bg-income', icon: 'bg-income-soft text-income', val: 'text-income',
   },
   orange: {
-    wrap: 'bg-white border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
+    wrap: 'bg-surface border-line hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong',
     stripe: 'bg-[#FDBA74]', icon: 'bg-shift-soft text-shift', val: 'text-shift',
   },
 };
