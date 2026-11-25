@@ -21,3 +21,7 @@ export const yearOptions = (today, viewY) => {
   const to = Math.max(base + 2, viewY);
   return Array.from({ length: to - from + 1 }, (_, i) => from + i);
 };
+
+/** แทนที่ {ชื่อ} ในข้อความแปลด้วยค่าที่ส่งมา เช่น fill('OT {pct}%', { pct: 18 }) */
+export const fill = (str, vars = {}) =>
+  String(str).replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));

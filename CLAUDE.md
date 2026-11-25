@@ -43,6 +43,7 @@ npm run preview  # preview build
 | `src/components/WorkCalendar.jsx` | หน้า **Work Calendar** (`view='calendar'`) = ปฏิทิน + panel/modal แก้ไขวัน + ปุ่ม Today + `DayCell` (รับ props จาก App) |
 | `src/components/MonthlySummary.jsx` | แท็บ **รายเดือน** (`dashTab='monthly'`) — มี **3 แท็บย่อยในตัว** (`tab` state): **สรุปรายได้** (การ์ด 5 ใบ + OT แยกอัตราแบบแถว) / **กราฟ** (โดนัทรายได้+OT) / **รายการ** (Work Log ครบทุกวัน) ; เริ่มที่ 'summary' |
 | `src/components/YearlyDashboard.jsx` | แท็บ **รายปี** (`dashTab='yearly'`) — มี **3 แท็บย่อย** เหมือนรายเดือน: **สรุปรายได้** (KPI + OT แถว + สรุปการลา) / **กราฟ** (โดนัท + กราฟแท่งแนวโน้มล่างสุด) / **รายการ** (Monthly Breakdown) |
+| `src/components/GoalForecast.jsx` / `MonthCompare.jsx` / `ExportMenu.jsx` | การ์ดบนแท็บสรุปรายได้รายเดือน: เป้า+พยากรณ์สิ้นเดือน / เทียบเดือนก่อน+insight / ส่งออก PNG-PDF-CSV (ตรรกะอยู่ `utils/insights.js`, `utils/exportReport.js` — แสดงผลล้วน ไม่แตะสูตรคิดเงิน) |
 | `src/components/charts.jsx` | `DonutChart` + `LegendRow` ใช้ร่วมกันทั้งหน้ารายเดือน/รายปี |
 | `src/components/SkeletonLoader.jsx` | skeleton แยกตามหน้า: `SkeletonCalendarView` / `SkeletonMonthly` / `SkeletonYearly` / `SkeletonAuthLoading` |
 | `src/components/AuthContext.jsx` | Supabase Auth (Google) — `useAuth()` คืน `{user, loading, error, signInWithGoogle, signOut}` |
@@ -75,6 +76,7 @@ npm run preview  # preview build
   - `salary` (numeric) = เงินเดือนรายเดือน ; `ot_hourly` = base OT/ชม. ที่คำนวณอัตโนมัติ (`salary ÷ 30 ÷ 8`)
   - โควตาลา: `sick_leave_day`, `personal_leave_day`, `annual_leave_day`
   - `social_security` = ยอดหักประกันสังคม/เดือน
+  - `monthly_goal` = เป้ารายได้สุทธิ/เดือน (0 = ยังไม่ตั้ง) ใช้ในการ์ดเป้าหมายหน้ารายเดือน — **บันทึกแยกจากหน้าโปรไฟล์** ผ่าน `saveGoal` ใน App.jsx (ส่งเฉพาะ `monthly_goal`) ; ถ้า DB ยังไม่มีคอลัมน์ (ยังไม่รัน `monthly_goal_migration.sql`) แอปจะ fallback ไปเก็บ localStorage (`utils/goalStorage.js`) และย้ายขึ้น DB ให้เองครั้งเดียวหลังรัน migration
   - เบี้ยกะ: `shift_allowance`, `shift_start`, `shift_end`
   - รองรับ **เฉพาะรายเดือน** — ฝั่ง api normalize ให้ `payment_type='monthly'`, `daily_rate=0` เสมอ (ไม่มีคอลัมน์ `salary_id`, `ot_setting_id`, `working_hour`, `work_days_per_week` แล้ว)
 - **`work_entry`** เก็บ OT แยกตามอัตรา: `ot_hour_15`/`ot_earning_15` (1.5x = วันปกติ), `ot_hour_1`/`ot_earning_1` (1x = วันหยุด 8 ชม.แรก), `ot_hour_3`/`ot_earning_3` (3x) — นอกเหนือจาก `ot_hour`/`ot_earning` (รวม)
@@ -126,6 +128,7 @@ npm run preview  # preview build
 - สีมาตรฐาน: ปกติ `#3B4FE4` (คราม), OT `#c29302` (เหลืองอำพัน), เบี้ยกะ `#E8730C` (ส้มอ่อน), รายได้ `#10B981` (เขียว)
 - **Auth/RLS:** ทุก query ต้องล็อกอินก่อน (JWT แนบ email) — ถ้าเปิด RLS แล้ว insert/update พังด้วย `violates row-level security policy` แปลว่าค่า `email`/`user_email` ที่เขียนไม่ตรงกับ email ใน JWT ; ตั้งค่า provider/redirect URL ที่ **Supabase Dashboard** (ไม่ใช่ในโค้ด)
 - **Haptic feedback:** กด save/update/delete สำเร็จ = `VIBE_SUCCESS` + `.shake-strong` (สั่นที่ toast) ; toggle วันหยุด = `VIBE_HOLIDAY` + `.shake-soft` (สั่นที่ช่องวัน) — CSS shake อยู่ใน `index.css` เป็น fallback ให้ iOS/Safari ที่ไม่มี `navigator.vibrate`
+- `updateUser` ส่งทุก key ที่ได้รับไปที่ DB — อย่าเอา `monthly_goal` ไปรวมใน payload บันทึกโปรไฟล์ (ถ้ายังไม่รัน migration จะ error ทำให้บันทึกโปรไฟล์พังทั้งก้อน)
 - อย่า commit/push เว้นแต่ผู้ใช้สั่ง; `.env` มี secret ห้าม commit
 
 ## แนวทางที่อยากให้ทำ

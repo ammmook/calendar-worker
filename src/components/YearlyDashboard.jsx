@@ -9,34 +9,11 @@ import { getLang } from '../locales';
 import { DonutChart, LegendRow } from './charts';
 import { fmt1, fmtB, yearOptions } from '../utils/format';
 
-// ── Design tokens (mirrors App.jsx / timeflow.css) ────────────────────────────
-const C = {
-    indigo: '#3B4FE4',
-    indigoLt: '#EEF0FD',
-    indigoMid: '#C7CCFA',
-    indigoDk: '#2A3BC0',
-    amber: '#c29302',
-    amberLt: '#fffdef',
-    amberBar: '#fbde3a',
-    green: '#10B981',
-    greenLt: '#ECFDF5',
-    ink1: '#111827',
-    ink2: '#374151',
-    ink3: '#6B7280',
-    ink4: '#9CA3AF',
-    border: '#E8EAEF',
-    borderDk: '#D1D5E0',
-    bg: '#F8F9FB',
-    surface: '#FFFFFF',
-    holiday: 'rgba(153,142,217,0.15)',
-    holidayBdr: 'rgba(153,142,217,0.4)',
-};
-
 const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // OT tier colors (สำหรับโดนัทกราฟ) — เฉดอำพัน
-const OT_TIER_COLORS = ['#fcd34d', '#c29302', '#92700a'];
+const OT_TIER_COLORS = ['#fcd34d', 'var(--color-ot)', '#92700a'];
 
 
 // Weekend rest days removed due to custom monthly logic not matching daily work log
@@ -63,7 +40,7 @@ export default function YearlyDashboard({
     const LEAVE_TYPES = useMemo(() => [
         { key: 'sick', label: 'Sick Leave', icon: Stethoscope, color: '#F43F5E', bg: '#FFF1F3', max: leaveQuotas?.sick || 0 },
         { key: 'personal', label: 'Personal Leave', icon: UmbrellaOff, color: '#F472B6', bg: '#FCE7F3', max: leaveQuotas?.personal || 0 },
-        { key: 'vacation', label: 'Annual Leave', icon: Plane, color: '#3B4FE4', bg: '#EEF0FD', max: leaveQuotas?.vacation || 0 },
+        { key: 'vacation', label: 'Annual Leave', icon: Plane, color: 'var(--color-primary)', bg: '#EEF0FD', max: leaveQuotas?.vacation || 0 },
     ], [leaveQuotas]);
 
     // ── Calculate leave data from entries ──
@@ -181,7 +158,7 @@ export default function YearlyDashboard({
 
     // ── Bar chart (แนวโน้มรายได้) — reuse ในแท็บ Graph ──
     const barChart = (
-        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+        <div className="card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                 <div>
                     <div className="text-[15px] font-bold text-ink">{t.monthly_earnings_title} {year}</div>
@@ -189,7 +166,7 @@ export default function YearlyDashboard({
                 </div>
                 {/* Legend */}
                 <div className="hidden sm:flex items-center gap-4">
-                    <LegendDot color="#3B4FE4" label={t.regular} />
+                    <LegendDot color="var(--color-primary)" label={t.regular} />
                     <LegendDot color="#fbde3a" label={t.overtime} />
                     <LegendDot color="#FDBA74" label={t.shift_short} />
                 </div>
@@ -267,7 +244,7 @@ export default function YearlyDashboard({
                                     <rect
                                         x={x} y={baseY - regH}
                                         width={bW} height={regH}
-                                        fill={isActive ? '#3B4FE4' : '#C7CCFA'}
+                                        fill={isActive ? 'var(--color-primary)' : '#C7CCFA'}
                                         style={{ transition: 'fill 0.15s' }}
                                     />
                                 )}
@@ -304,7 +281,7 @@ export default function YearlyDashboard({
                                 {/* Month label */}
                                 <text
                                     x={x + bW / 2} y={CHART_H - CHART_PAD.bottom + 14}
-                                    textAnchor="middle" fill={isActive ? '#3B4FE4' : '#9CA3AF'}
+                                    textAnchor="middle" fill={isActive ? 'var(--color-primary)' : '#9CA3AF'}
                                     style={{ fontSize: 9, fontWeight: isActive ? 700 : 400, fontFamily: 'Google Sans, sans-serif', transition: 'fill 0.15s' }}
                                 >
                                     {m.month}
@@ -340,9 +317,9 @@ export default function YearlyDashboard({
                             <div className="flex flex-col gap-1.5">
                                 <TooltipRow label={t.total} value={fmtB(m.totalEarn)} color="#111827" bold />
                                 <div className="border-t border-line my-0.5" />
-                                <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="#3B4FE4" />
-                                <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="#c29302" />
-                                <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="#E8730C" />
+                                <TooltipRow label={t.regular} value={fmtB(m.regEarn)} color="var(--color-primary)" />
+                                <TooltipRow label={t.ot_earnings} value={fmtB(m.otEarn)} color="var(--color-ot)" />
+                                <TooltipRow label={t.shift_earnings} value={fmtB(m.shiftEarn)} color="var(--color-shift)" />
                                 <div className="border-t border-line my-0.5" />
                                 <TooltipRow label={t.total_ot_hours} value={`${fmt1(m.otHours)}h`} color="#9CA3AF" />
                             </div>
@@ -367,7 +344,7 @@ export default function YearlyDashboard({
                             type="button"
                             onClick={() => setTab(id)}
                             aria-pressed={tab === id}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition-all
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition
                                 ${tab === id
                                     ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
                                     : 'text-muted hover:text-ink-2'}`}
@@ -384,7 +361,7 @@ export default function YearlyDashboard({
                         type="button"
                         aria-label={t.prev_month}
                         onClick={() => setViewY(year - 1)}
-                        className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all"
+                        className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition"
                     >
                         <ChevronLeft size={15} />
                     </button>
@@ -396,7 +373,7 @@ export default function YearlyDashboard({
                                 setViewY(Number(e.target.value));
                                 showToast?.(t.loading_data);
                             }}
-                            className="appearance-none bg-transparent font-bold text-[15px] text-ink tabular-nums px-2 cursor-pointer outline-none text-center hover:text-primary"
+                            className="appearance-none bg-transparent font-bold text-[15px] text-ink tabular-nums px-2 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 text-center hover:text-primary"
                         >
                             {yearOptions(today, year).map((y) => (
                                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
@@ -407,7 +384,7 @@ export default function YearlyDashboard({
                         type="button"
                         aria-label={t.next_month}
                         onClick={() => setViewY(year + 1)}
-                        className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition-all"
+                        className="w-8 h-8 rounded-lg grid place-items-center text-muted hover:bg-primary-soft hover:text-primary cursor-pointer transition"
                     >
                         <ChevronRight size={15} />
                     </button>
@@ -416,7 +393,7 @@ export default function YearlyDashboard({
 
             {/* ══════════════ TAB: LIST (รายละเอียดรายเดือน) ══════════════ */}
             {tab === 'list' && (
-                <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.35s_ease_both]">
+                <div className="card overflow-hidden animate-[fadeUp_0.35s_ease_both]">
                     <div className="flex items-start justify-between px-5 py-4 border-b border-line">
                         <div>
                             <div className="text-[15px] font-bold text-ink">{t.monthly_breakdown}</div>
@@ -497,7 +474,7 @@ export default function YearlyDashboard({
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
                         {/* Income breakdown donut */}
-                        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                        <div className="card overflow-hidden flex flex-col">
                             <div className="px-5 py-4 border-b border-line text-[15px] font-bold text-ink">
                                 {t.income_breakdown}
                             </div>
@@ -508,15 +485,15 @@ export default function YearlyDashboard({
                                     centerLabel={t.gross_income}
                                     centerValue={fmtB(grossEarn)}
                                     segments={[
-                                        { label: t.regular_earnings, value: yearTotals.totalRegEarn, color: '#3B4FE4' },
-                                        { label: t.ot_earnings, value: yearTotals.totalOTEarn, color: '#c29302' },
-                                        { label: t.shift_earnings, value: yearTotals.totalShiftEarn, color: '#E8730C' },
+                                        { label: t.regular_earnings, value: yearTotals.totalRegEarn, color: 'var(--color-primary)' },
+                                        { label: t.ot_earnings, value: yearTotals.totalOTEarn, color: 'var(--color-ot)' },
+                                        { label: t.shift_earnings, value: yearTotals.totalShiftEarn, color: 'var(--color-shift)' },
                                     ]}
                                 />
                                 <div className="w-full flex flex-col gap-2">
-                                    <LegendRow color="#3B4FE4" label={t.regular_earnings} value={fmtB(yearTotals.totalRegEarn)} total={grossEarn} raw={yearTotals.totalRegEarn} />
-                                    <LegendRow color="#c29302" label={t.ot_earnings} value={fmtB(yearTotals.totalOTEarn)} total={grossEarn} raw={yearTotals.totalOTEarn} />
-                                    <LegendRow color="#E8730C" label={t.shift_earnings} value={fmtB(yearTotals.totalShiftEarn)} total={grossEarn} raw={yearTotals.totalShiftEarn} />
+                                    <LegendRow color="var(--color-primary)" label={t.regular_earnings} value={fmtB(yearTotals.totalRegEarn)} total={grossEarn} raw={yearTotals.totalRegEarn} />
+                                    <LegendRow color="var(--color-ot)" label={t.ot_earnings} value={fmtB(yearTotals.totalOTEarn)} total={grossEarn} raw={yearTotals.totalOTEarn} />
+                                    <LegendRow color="var(--color-shift)" label={t.shift_earnings} value={fmtB(yearTotals.totalShiftEarn)} total={grossEarn} raw={yearTotals.totalShiftEarn} />
                                 </div>
                                 <div className="w-full mt-1 pt-4 border-t border-line flex flex-col gap-2">
                                     <div className="flex items-center justify-between text-[13px]">
@@ -536,7 +513,7 @@ export default function YearlyDashboard({
                         </div>
 
                         {/* OT breakdown donut */}
-                        <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                        <div className="card overflow-hidden flex flex-col">
                             <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                                 <span className="text-[15px] font-bold text-ink">{t.ot_breakdown}</span>
                                 <span className="text-[11px] text-muted">{fmt1(yearTotals.totalOTHrs)}h</span>
@@ -627,7 +604,7 @@ export default function YearlyDashboard({
                         />
 
                         {/* Total annual */}
-                        <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition-all hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
+                        <div className="col-span-2 lg:col-span-1 relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#A5AEFC] to-[#8995F4] p-4 sm:p-5 shadow-[0_8px_24px_rgba(137,149,244,0.3)] cursor-default transition hover:-translate-y-1 hover:shadow-[0_12px_32px_rgba(137,149,244,0.4)]">
                             <div className="flex items-center gap-2 mb-3">
                                 <div className="w-8 h-8 rounded-[8px] bg-white/25 grid place-items-center">
                                     <CircleDollarSign size={15} className="text-white" />
@@ -650,7 +627,7 @@ export default function YearlyDashboard({
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
 
                     {/* OT by rate — แสดงเป็นแถวชิดๆ (ไม่ใช่แถบชาร์จพลัง) */}
-                    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                    <div className="card overflow-hidden flex flex-col">
                         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                             <div className="text-[15px] font-bold text-ink">{t.ot_by_rate}</div>
                             <div className="text-[11px] text-muted">{fmt1(yearTotals.totalOTHrs)}h · {fmtB(yearTotals.totalOTEarn)}</div>
@@ -681,7 +658,7 @@ export default function YearlyDashboard({
                     </div>
 
                     {/* Leave Summary */}
-                    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden flex flex-col">
+                    <div className="card overflow-hidden flex flex-col">
                         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
                             <div className="text-[15px] font-bold text-ink">{t.leave_summary}</div>
                             <div className="text-[11px] text-muted">{totalLeave} {t.leave_used}</div>
@@ -714,7 +691,7 @@ export default function YearlyDashboard({
                                         {/* Progress bar */}
                                         <div className="h-[5px] bg-[#F3F4F8] rounded-full overflow-hidden">
                                             <div
-                                                className="h-full rounded-full transition-all duration-500"
+                                                className="h-full rounded-full transition-[width,stroke-dasharray,stroke-dashoffset] duration-500"
                                                 style={{ width: `${pct}%`, background: lt.color, opacity: 0.75 }}
                                             />
                                         </div>
@@ -748,7 +725,7 @@ export default function YearlyDashboard({
 // ── Sub-components ─────────────────────────────────────────────────────────────
 function AnnualCard({ Icon, label, value, sub, iconCls, valCls, stripe }) {
     return (
-        <div className="relative overflow-hidden rounded-2xl border border-line bg-white p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong">
+        <div className="relative overflow-hidden rounded-2xl border border-line bg-white p-4 sm:p-5 shadow-[0_1px_3px_rgba(17,24,39,0.06)] cursor-default transition hover:-translate-y-[3px] hover:shadow-[0_8px_28px_rgba(17,24,39,0.10)] hover:border-line-strong">
             <span className={`absolute top-0 left-5 right-5 h-[3px] rounded-b-[4px] opacity-60 ${stripe}`} />
             <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] grid place-items-center mb-3 ${iconCls}`}>
                 <Icon size={14} strokeWidth={2} className="sm:hidden" />

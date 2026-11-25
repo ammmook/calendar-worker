@@ -120,7 +120,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Work Option */}
               <button
                 onClick={handleSelectWork}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
+                className={`w-full p-4 rounded-xl border-2 transition text-left flex items-center gap-3 cursor-pointer
                   ${isWork
                     ? 'border-primary bg-primary-soft shadow-sm'
                     : 'border-line hover:border-line-strong hover:bg-surface-alt'
@@ -138,7 +138,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Training Option (อบรม) */}
               <button
                 onClick={handleSelectTraining}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
+                className={`w-full p-4 rounded-xl border-2 transition text-left flex items-center gap-3 cursor-pointer
                   ${isTraining
                     ? 'border-ink bg-[#F3F4F6] shadow-sm'
                     : 'border-line hover:border-line-strong hover:bg-surface-alt'
@@ -156,7 +156,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
               {/* Leave Option */}
               <button
                 onClick={() => setMode('leaveType')}
-                className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer
+                className={`w-full p-4 rounded-xl border-2 transition text-left flex items-center gap-3 cursor-pointer
                   ${isLeave
                     ? 'border-[#8B5CF6] bg-[#F5F3FF] shadow-sm'
                     : 'border-line hover:border-line-strong hover:bg-surface-alt'
@@ -195,7 +195,7 @@ export function LeaveSelector({ isOpen, dateStr, currentData, onSelect, onCancel
                 <button
                   key={leave.key}
                   onClick={() => handleSelectLeaveType(leave.key)}
-                  className="w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-3 cursor-pointer"
+                  className="w-full p-4 rounded-xl border-2 transition text-left flex items-center gap-3 cursor-pointer"
                   style={{
                     borderColor: currentLeaveType === leave.key ? leave.color : '#E8EAEF',
                     backgroundColor: currentLeaveType === leave.key ? leave.bg : 'transparent'

@@ -118,7 +118,7 @@ export default function WorkCalendar({
         <div className="flex sm:hidden items-center gap-2 flex-wrap">
           <div className="relative">
             <select value={viewM} onChange={(e) => setViewM(Number(e.target.value))} aria-label={t.month_label}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-primary">
+              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 hover:border-primary">
               {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
             </select>
             <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
@@ -128,7 +128,7 @@ export default function WorkCalendar({
                 setViewY(Number(e.target.value));
                 showToast(t.loading_data);
             }}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none hover:border-primary">
+              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 hover:border-primary">
               {yearOptions(today, viewY).map((y) => (
                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
               ))}
@@ -139,23 +139,23 @@ export default function WorkCalendar({
       </div>
 
       {/* ── CALENDAR ── */}
-      <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden animate-[fadeUp_0.4s_0.16s_ease_both] order-2 xl:order-3">
+      <div className="card overflow-hidden animate-[fadeUp_0.4s_0.16s_ease_both] order-2 xl:order-3">
 
         {/* Calendar header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
           <span className="text-[17px] font-bold text-ink">{t.months[viewM]} {lang === 'th' ? viewY + 543 : viewY}</span>
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={goTodayAndSelect}
-              className="flex items-center gap-1.5 h-10 sm:h-[30px] px-3 rounded-lg bg-surface-alt border border-line text-muted text-[12px] font-semibold cursor-pointer transition-all hover:bg-primary-soft hover:border-primary hover:text-primary">
+              className="flex items-center gap-1.5 h-10 sm:h-[30px] px-3 rounded-lg bg-surface-alt border border-line text-muted text-[12px] font-semibold cursor-pointer transition hover:bg-primary-soft hover:border-primary hover:text-primary">
               <CalendarCheck size={13} />
               {t.today}
             </button>
             <button type="button" onClick={prevMonth} aria-label={t.prev_month}
-              className="w-10 h-10 sm:w-[30px] sm:h-[30px] rounded-lg bg-surface-alt border border-line text-muted grid place-items-center cursor-pointer transition-all hover:bg-primary-soft hover:border-primary hover:text-primary">
+              className="w-10 h-10 sm:w-[30px] sm:h-[30px] rounded-lg bg-surface-alt border border-line text-muted grid place-items-center cursor-pointer transition hover:bg-primary-soft hover:border-primary hover:text-primary">
               <ChevronLeft size={15} />
             </button>
             <button type="button" onClick={nextMonth} aria-label={t.next_month}
-              className="w-10 h-10 sm:w-[30px] sm:h-[30px] rounded-lg bg-surface-alt border border-line text-muted grid place-items-center cursor-pointer transition-all hover:bg-primary-soft hover:border-primary hover:text-primary">
+              className="w-10 h-10 sm:w-[30px] sm:h-[30px] rounded-lg bg-surface-alt border border-line text-muted grid place-items-center cursor-pointer transition hover:bg-primary-soft hover:border-primary hover:text-primary">
               <ChevronRight size={15} />
             </button>
           </div>
@@ -218,7 +218,7 @@ export default function WorkCalendar({
 
           {/* Day detail card (desktop) */}
           {selectedKey && (
-            <div className="hidden xl:flex flex-col bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden shrink-0">
+            <div className="hidden xl:flex flex-col card overflow-hidden shrink-0">
             <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-line">
               <span className="text-sm font-bold text-ink">{selLabel}</span>
               {isTodaySelected && (
@@ -244,7 +244,7 @@ export default function WorkCalendar({
         {[
           { color: 'bg-primary-soft border border-primary-mid', label: t.regular_day_legend },
           { color: 'bg-ot-soft border border-ot-line', label: t.ot_day_legend },
-          { color: 'bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]', label: t.holiday_legend },
+          { color: 'bg-holiday-user/15 border border-holiday-user/40', label: t.holiday_legend },
           { color: 'bg-[#FEECEC] border border-danger', label: t.public_holiday_legend },
           { color: 'bg-today-soft border-2 border-today', label: t.today },
           { color: 'bg-white border-2 border-primary', label: t.selected_legend },

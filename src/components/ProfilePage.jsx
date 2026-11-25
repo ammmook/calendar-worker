@@ -114,7 +114,7 @@ export default function ProfilePage(props) {
             <header className="sticky top-0 z-50 w-full h-[60px] bg-white border-b border-line flex items-center gap-3 px-6">
                 <button
                     onClick={props.onBack}
-                    className="w-8 h-8 rounded-lg bg-surface-alt border border-line grid place-items-center text-muted cursor-pointer hover:bg-primary-soft hover:border-primary hover:text-primary transition-all"
+                    className="w-8 h-8 rounded-lg bg-surface-alt border border-line grid place-items-center text-muted cursor-pointer hover:bg-primary-soft hover:border-primary hover:text-primary transition"
                 >
                     <ChevronLeft size={16} />
                 </button>
@@ -259,7 +259,7 @@ export default function ProfilePage(props) {
                                                 type="number" min="0" max="365" value={quota || ''}
                                                 onChange={(e) => setLeaveQuotas(p => ({ ...p, [key]: toNum(e.target.value, 365) }))}
                                                 onFocus={(e) => e.target.select()}
-                                                className="w-16 text-center bg-surface-alt border-[1.5px] border-line-strong rounded-[7px] py-1.5 text-[13px] font-bold outline-none focus:border-primary transition-colors"
+                                                className="w-16 text-center bg-surface-alt border-[1.5px] border-line-strong rounded-[7px] py-1.5 text-[13px] font-bold outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus:border-primary transition-colors"
                                                 style={{ color }}
                                             />
                                             <span className="text-[11px] text-muted">{t.days_per_year}</span>
@@ -274,7 +274,7 @@ export default function ProfilePage(props) {
                     <button
                         onClick={handleSave}
                         disabled={isSavingLocal || !profileReady}
-                        className={`relative overflow-hidden flex items-center justify-center gap-2 w-full py-3 rounded-[12px] text-white text-[14px] font-bold border-none transition-all
+                        className={`relative overflow-hidden flex items-center justify-center gap-2 w-full py-3 rounded-[12px] text-white text-[14px] font-bold border-none transition
                               ${!profileReady ? 'bg-line-strong cursor-not-allowed' : isSavingLocal ? 'bg-[#7B8CED] cursor-wait text-transparent' : 'bg-primary cursor-pointer hover:bg-primary-dark hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(59,79,228,0.32)]'}`}
                     >
                         <div className={`flex items-center gap-2 transition-opacity ${isSavingLocal ? 'opacity-0' : 'opacity-100'}`}>

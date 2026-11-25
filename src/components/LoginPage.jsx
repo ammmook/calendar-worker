@@ -285,7 +285,7 @@ export default function LoginPage() {
                             className="w-full flex items-center justify-center gap-3 px-5 py-3.5
                 rounded-[14px] border-[1.5px] border-line-strong bg-white
                 text-ink-2 font-semibold text-[14px] cursor-pointer
-                transition-all duration-200
+                transition duration-200
                 hover:border-primary hover:shadow-[0_4px_18px_rgba(59,79,228,0.16)]
                 hover:-translate-y-0.5 active:translate-y-0 active:shadow-none
                 disabled:opacity-50 disabled:cursor-not-allowed

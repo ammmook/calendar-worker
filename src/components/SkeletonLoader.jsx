@@ -86,7 +86,7 @@ function SkeletonTabsHeader() {
 /* ─── OT by rate card skeleton (แถวชิดๆ 3 อัตรา) ──────────────────────── */
 function SkeletonOtRows() {
   return (
-    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+    <div className="card overflow-hidden">
       <div className="flex items-center justify-between px-5 py-4 border-b border-line">
         <SkeletonBlock className="h-[15px] w-32 rounded-md" />
         <SkeletonBlock className="h-[11px] w-24 rounded" />
@@ -136,7 +136,7 @@ export function SkeletonYearly() {
       <SkeletonOtRows />
 
       {/* Leave summary card */}
-      <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-line">
           <SkeletonBlock className="h-[15px] w-28 rounded-md" />
           <SkeletonBlock className="h-[11px] w-16 rounded" />
@@ -167,7 +167,7 @@ export function SkeletonYearly() {
 /* ─── Skeleton Calendar card ──────────────────────────────────────────── */
 function SkeletonCalendarCard({ daysShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] }) {
   return (
-    <div className="bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+    <div className="card overflow-hidden">
       {/* Calendar header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-line">
         <SkeletonBlock className="h-[17px] w-28 rounded-md" />
@@ -206,7 +206,7 @@ function SkeletonCalendarCard({ daysShort = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] 
 /* ─── Skeleton Right Panel (day detail placeholder) ──────────────────── */
 function SkeletonDayDetail() {
   return (
-    <div className="hidden xl:flex flex-col bg-white border border-line rounded-2xl shadow-[0_1px_3px_rgba(17,24,39,0.06)] overflow-hidden">
+    <div className="hidden xl:flex flex-col card overflow-hidden">
       <div className="flex items-center justify-between px-[18px] py-3.5 border-b border-line">
         <SkeletonBlock className="h-3.5 w-28 rounded-md" />
         <SkeletonBlock className="h-4 w-10 rounded-full" />

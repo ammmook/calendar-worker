@@ -22,6 +22,7 @@ import ProfilePage from './components/ProfilePage';
 import { isValidTimeValue } from './components/timeUtils';
 import { UserAPI, WorkEntryAPI, HolidayAPI, PublicHolidayAPI, sheetEntriesToFrontend, frontendEntryToSheet } from './services/api';
 import { todayKey, yearOptions } from './utils/format';
+import { readLocalGoal, writeLocalGoal, clearLocalGoal } from './utils/goalStorage';
 import { isDesktopViewport } from './utils/viewport';
 import { calcWorkDay, parseWorkSpan, addDaysStr, baseHourlyRate } from './utils/payCalc';
 import { SkeletonCalendarView, SkeletonMonthly, SkeletonYearly, SkeletonAuthLoading } from './components/SkeletonLoader';
@@ -86,6 +87,10 @@ export default function App() {
   const [socialSecurity, setSocialSecurity] = useState(0);
   const [profileStatus, setProfileStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
 
+  // ── เป้ารายได้สุทธิต่อเดือน — เก็บใน user.monthly_goal (0 = ยังไม่ตั้ง) ──
+  const [monthlyGoal, setMonthlyGoal] = useState(0);
+  const goalInDbRef = useRef(true); // false = DB ยังไม่มีคอลัมน์ monthly_goal (ยังไม่ได้รัน migration) → ใช้ localStorage แทน
+
   const [dIn, setDIn] = useState('');
   const [dNote, setDNote] = useState('');
   const [dOut, setDOut] = useState('');
@@ -111,6 +116,7 @@ export default function App() {
     setSalary(0); setOtRate(0);
     setLeaveQuotas({ sick: 0, personal: 0, vacation: 0 });
     setSocialSecurity(0);
+    setMonthlyGoal(0);
     setShiftAllowance(0); setShiftStart(''); setShiftEnd('');
     setDataLoaded(false);
   }, [user?.email]);
@@ -142,6 +148,25 @@ export default function App() {
           });
 
           setSocialSecurity(Number(u.social_security) || 0);
+
+          // เป้ารายได้: select('*') ไม่คืนคอลัมน์ที่ไม่มี → undefined = ยังไม่ได้รัน migration
+          if (u.monthly_goal === undefined) {
+            goalInDbRef.current = false;
+            setMonthlyGoal(readLocalGoal(user.email));
+          } else {
+            goalInDbRef.current = true;
+            const dbGoal = Number(u.monthly_goal) || 0;
+            const localGoal = readLocalGoal(user.email);
+            if (dbGoal === 0 && localGoal > 0) {
+              // ย้ายเป้าที่เคยเก็บในเครื่องขึ้น DB ครั้งเดียว แล้วล้างค่าในเครื่องเมื่อบันทึกสำเร็จ
+              setMonthlyGoal(localGoal);
+              UserAPI.update({ email: user.email, monthly_goal: localGoal })
+                .then((r) => { if (r?.success) clearLocalGoal(user.email); });
+            } else {
+              setMonthlyGoal(dbGoal);
+              if (localGoal > 0) clearLocalGoal(user.email); // DB เป็นต้นทางแล้ว ทิ้งค่าเก่าในเครื่อง
+            }
+          }
 
           // เบี้ยกะ — เก็บในตาราง user แล้ว
           setShiftAllowance(Number(u.shift_allowance) || 0);
@@ -255,6 +280,21 @@ export default function App() {
     setToast({ show: true, msg });
     toastTimer.current = setTimeout(() => setToast({ show: false, msg: '' }), 2600);
   }, []);
+
+  // ── บันทึกเป้ารายได้ลง DB (ล้มเหลว → คืนค่าเดิม + แจ้งเตือน) ──
+  const saveGoal = useCallback(async (value) => {
+    const n = Math.max(0, Math.round(Number(value) || 0));
+    const prev = monthlyGoal;
+    setMonthlyGoal(n);
+    if (!user?.email) return;
+    if (!goalInDbRef.current) { writeLocalGoal(user.email, n); return; }
+    const res = await UserAPI.update({ email: user.email, monthly_goal: n });
+    if (!res?.success) {
+      console.error('[TimeFlow] Failed to save goal:', res?.error);
+      setMonthlyGoal(prev);
+      showToast(t.goal_save_failed);
+    }
+  }, [monthlyGoal, user?.email, showToast, t]);
 
   // ── Sync selected entry → detail inputs ──
   const selEntry = selectedKey ? (entries[selectedKey] || {}) : {};
@@ -583,7 +623,7 @@ export default function App() {
 
   // ── Shared utility classes ──
   const labelCls = 'text-[10px] font-bold text-muted uppercase tracking-[0.08em] block mb-1';
-  const inputCls = 'w-full min-w-0 block bg-surface-alt border-[1.5px] border-line-strong rounded-[6px] text-ink text-sm font-medium px-1 sm:px-3 py-2 outline-none cursor-pointer transition-colors focus:border-primary focus:bg-white box-border';
+  const inputCls = 'w-full min-w-0 block bg-surface-alt border-[1.5px] border-line-strong rounded-[6px] text-ink text-sm font-medium px-1 sm:px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary/25 cursor-pointer transition-colors focus:border-primary focus:bg-white box-border';
 
   // ── Auth guard — show login if not signed in ──────────────────────────────
   if (authLoading) {
@@ -638,7 +678,7 @@ export default function App() {
               value={viewM}
               aria-label={t.month_label}
               onChange={(e) => setViewM(Number(e.target.value))}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
+              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
             >
               {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
             </select>
@@ -653,7 +693,7 @@ export default function App() {
                 setViewY(Number(e.target.value));
                 showToast(t.loading_data);
               }}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
+              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
             >
               {yearOptions(today, viewY).map((y) => (
                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
@@ -664,7 +704,7 @@ export default function App() {
 
           <button
             onClick={goToday}
-            className="px-3.5 py-[7px] rounded-[10px] bg-white border-[1.5px] border-line-strong text-ink-2 text-[13px] font-medium cursor-pointer shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition-all hover:border-primary hover:text-primary hover:bg-primary-soft hover:-translate-y-px"
+            className="px-3.5 py-[7px] rounded-[10px] bg-white border-[1.5px] border-line-strong text-ink-2 text-[13px] font-medium cursor-pointer shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:text-primary hover:bg-primary-soft hover:-translate-y-px"
           >
             {t.today}
           </button>
@@ -682,7 +722,7 @@ export default function App() {
               onClick={() => setView(id)}
               aria-label={label}
               aria-pressed={view === id}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-[7px] text-[12px] font-semibold cursor-pointer transition-all
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-[7px] text-[12px] font-semibold cursor-pointer transition
                 ${view === id
                   ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
                   : 'text-muted hover:text-ink-2'}`}
@@ -699,7 +739,7 @@ export default function App() {
             type="button"
             onClick={() => setLang(l => l === 'en' ? 'th' : 'en')}
             aria-label={t.switch_language}
-            className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white border-2 border-line text-[11px] font-bold text-muted cursor-pointer transition-all hover:border-primary-mid hover:text-primary"
+            className="flex items-center justify-center w-10 h-10 sm:w-8 sm:h-8 rounded-full bg-white border-2 border-line text-[11px] font-bold text-muted cursor-pointer transition hover:border-primary-mid hover:text-primary"
           >
             {lang.toUpperCase()}
           </button>
@@ -728,7 +768,7 @@ export default function App() {
             type="button"
             onClick={() => setView('calendar')}
             aria-current={view === 'calendar' ? 'page' : undefined}
-            className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
+            className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition
               ${view === 'calendar' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-alt hover:text-ink-2'}`}
           >
             <CalendarDays size={15} />
@@ -738,7 +778,7 @@ export default function App() {
             type="button"
             onClick={() => setView('dashboard')}
             aria-current={view === 'dashboard' ? 'page' : undefined}
-            className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition-all
+            className={`w-full text-left border-none bg-transparent flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-sm font-semibold cursor-pointer transition
               ${view === 'dashboard' ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-alt hover:text-ink-2'}`}
           >
             <LayoutDashboard size={15} />
@@ -752,7 +792,7 @@ export default function App() {
                 type="button"
                 onClick={() => setDashTab('monthly')}
                 aria-current={dashTab === 'monthly' ? 'page' : undefined}
-                className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
+                className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition
                   ${dashTab === 'monthly' ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'monthly' ? 'bg-primary' : 'bg-line-strong'}`} />
@@ -762,7 +802,7 @@ export default function App() {
                 type="button"
                 onClick={() => setDashTab('yearly')}
                 aria-current={dashTab === 'yearly' ? 'page' : undefined}
-                className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition-all
+                className={`w-full text-left border-none bg-transparent flex items-center gap-2 px-3 py-2 rounded-[8px] text-[13px] font-semibold cursor-pointer transition
                   ${dashTab === 'yearly' ? 'text-primary' : 'text-muted hover:text-ink-2'}`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${dashTab === 'yearly' ? 'bg-primary' : 'bg-line-strong'}`} />
@@ -821,7 +861,7 @@ export default function App() {
                     type="button"
                     onClick={() => setDashTab(id)}
                     aria-pressed={dashTab === id}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-[9px] text-[13px] font-semibold cursor-pointer transition-all
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-[9px] text-[13px] font-semibold cursor-pointer transition
                       ${dashTab === id
                         ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
                         : 'text-muted hover:text-ink-2'}`}
@@ -846,6 +886,8 @@ export default function App() {
                   otRate={otRate}
                   std={std}
                   socialSecurity={socialSecurity}
+                  goal={monthlyGoal}
+                  onGoalChange={saveGoal}
                   lang={lang}
                   t={t}
                   viewY={viewY}
@@ -910,7 +952,7 @@ export default function App() {
               <div className="flex w-full gap-3 mt-2">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3.5 rounded-[12px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition-all cursor-pointer hover:bg-line"
+                  className="flex-1 py-3.5 rounded-[12px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition cursor-pointer hover:bg-line"
                 >
                   {t.cancel || 'Cancel'}
                 </button>
@@ -919,7 +961,7 @@ export default function App() {
                     performDelete();
                     setShowDeleteConfirm(false);
                   }}
-                  className="flex-1 py-3.5 rounded-[12px] bg-danger text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-[#DC2828] shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
+                  className="flex-1 py-3.5 rounded-[12px] bg-danger text-white text-[15px] font-bold border-none transition cursor-pointer hover:bg-[#DC2828] shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
                 >
                   {t.confirm_yes || 'Yes, delete it'}
                 </button>
@@ -969,7 +1011,7 @@ export default function App() {
               <div className="flex w-full gap-3 mt-2">
                 <button
                   onClick={() => setShowProfileIncomplete(false)}
-                  className="flex-1 py-3.5 rounded-[14px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition-all cursor-pointer hover:bg-line"
+                  className="flex-1 py-3.5 rounded-[14px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition cursor-pointer hover:bg-line"
                 >
                   {t.cancel || 'Cancel'}
                 </button>
@@ -978,7 +1020,7 @@ export default function App() {
                     setShowProfileIncomplete(false);
                     setPage('profile');
                   }}
-                  className="flex-1 py-3.5 rounded-[14px] bg-primary text-white text-[15px] font-bold border-none transition-all cursor-pointer hover:bg-primary-dark shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
+                  className="flex-1 py-3.5 rounded-[14px] bg-primary text-white text-[15px] font-bold border-none transition cursor-pointer hover:bg-primary-dark shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
                 >
                   {t.go_to_profile}
                 </button>
@@ -990,14 +1032,14 @@ export default function App() {
 
 
       {/* Toast */}
-      <div role="status" aria-live="polite" className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
+      <div role="status" aria-live="polite" className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300
         ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <CheckCircle2 size={14} className="text-income" />
         {toast.msg}
       </div>
 
       {/* Saving Toast */}
-      <div className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition-all duration-300
+      <div className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[299] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300
         ${(isSavingEntry || isDeletingEntry || isSavingLeave) && !toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <Loader2 size={14} className="text-primary animate-spin" />
         {lang === 'th' ? 'กำลังบันทึกและคำนวณเงิน...' : 'Saving and calculating...'}
@@ -1028,7 +1070,7 @@ function UserMenu({ user, t, onProfile, onSignOut }) {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-[1.5px] border-line bg-white cursor-pointer transition-all hover:border-primary-mid hover:shadow-[0_2px_8px_rgba(17,24,39,0.08)] select-none"
+        className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full border-[1.5px] border-line bg-white cursor-pointer transition hover:border-primary-mid hover:shadow-[0_2px_8px_rgba(17,24,39,0.08)] select-none"
       >
         {/* Avatar image */}
         {user?.picture ? (

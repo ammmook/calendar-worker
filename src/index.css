@@ -31,6 +31,19 @@
   --color-today: #6fa3cb;         /* วันนี้ */
   --color-today-soft: #f0f5fa;
   --color-today-ink: #2F6F9F;     /* วันนี้แบบตัวหนังสือ (contrast ผ่าน AA) */
+  --color-holiday-user: #998ed9;  /* วันหยุดที่ผู้ใช้กดเอง (ม่วง) */
+  --color-income-ink: #047857;    /* รายได้แบบตัวหนังสือเล็ก (contrast ผ่าน AA) */
+
+  /* เงาการ์ดมาตรฐาน — ใช้ผ่าน shadow-card หรือคลาส card */
+  --shadow-card: 0 1px 3px rgba(17, 24, 39, 0.06);
+}
+
+/* การ์ดมาตรฐานของทั้งแอป (พื้นขาว + ขอบบาง + มุมโค้ง + เงาเบา) */
+@utility card {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-card);
 }
 
 @layer base {
@@ -76,6 +89,11 @@
   to {
     opacity: 1;
   }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes modalIn {
@@ -439,4 +457,40 @@ input[type=time]::-webkit-calendar-picker-indicator {
  100% {
   box-shadow: 0.5em 1em rgba(61, 184, 143, 0.75), -0.5em -1em rgba(233, 169, 32, 0.75);
  }
+}
+/* ── Motion: สรุปรายเดือน ── */
+/* ลายทแยงของช่วงคาดการณ์เลื่อนช้า ๆ — บอกว่าเป็นค่าที่ "กำลังจะเกิด" ไม่ใช่ยอดจริง */
+@keyframes stripeMarch {
+  from { background-position: 0 0; }
+  to { background-position: 10px 0; }
+}
+
+/* ── การ์ดความคืบหน้าการส่งออก (ลอยมุมจอ) ── */
+/* เด้งเข้ามาแบบหยดน้ำ: พุ่งเกินนิดหน่อยแล้วคืนตัว */
+@keyframes popIn {
+  0% { opacity: 0; transform: translateY(24px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes gradientFlow {
+  from { background-position: 0 0; }
+  to { background-position: -200% 0; }
+}
+
+/* แถบเติมของการ์ดส่งออก: ไล่สีเลื่อนวน (ฟองอยู่ใน <Bubbles />) */
+.water-fill {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(90deg, #3B4FE4, #8B5CF6, #C084FC, #8B5CF6, #3B4FE4);
+  background-size: 200% 100%;
+  animation: gradientFlow 2.4s linear infinite;
+}
+
+
+/* ฟองลอยจากล่างขึ้นบน แกว่งซ้ายขวาเล็กน้อย แล้วจางหายตอนถึงขอบบน */
+@keyframes bubbleRise {
+  0% { transform: translate(0, 0) scale(0.5); opacity: 0; }
+  20% { opacity: 0.95; }
+  100% { transform: translate(var(--dx, 0), var(--rise, -30px)) scale(1); opacity: 0; }
 }

@@ -29,7 +29,7 @@ function DayCell({
   const isPublicHolIdle = !!publicHol && !hasEntry;
 
   const baseBg = isHol
-    ? 'bg-[rgba(153,142,217,0.15)]'
+    ? 'bg-holiday-user/15'
     : isPublicHolIdle
       ? 'bg-[rgba(239,68,68,0.07)]'
       : hasOT
@@ -141,7 +141,7 @@ function DayCell({
           </div>
         ) : (
           isHol && (
-            <div className="sm:hidden absolute top-[5px] right-[5px] w-5 h-5 rounded-[4px] grid place-items-center text-[#998ed9] bg-[rgba(153,142,217,0.15)] border border-[rgba(153,142,217,0.4)]">
+            <div className="sm:hidden absolute top-[5px] right-[5px] w-5 h-5 rounded-[4px] grid place-items-center text-holiday-user bg-holiday-user/15 border border-holiday-user/40">
               <CornerIcon size={11} strokeWidth={2.5} />
             </div>
           )
@@ -204,7 +204,7 @@ function DayCell({
             'transition-opacity duration-150',
             'focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-primary',
             isHol
-              ? 'opacity-100 text-[#998ed9] bg-[rgba(153,142,217,0.15)] hover:bg-[rgba(153,142,217,0.25)] border border-[rgba(153,142,217,0.4)]'
+              ? 'opacity-100 text-holiday-user bg-holiday-user/15 hover:bg-holiday-user/25 border border-holiday-user/40'
               : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 text-ot bg-ot-soft hover:bg-ot-line border border-ot-line',
           ].join(' ')}
         >

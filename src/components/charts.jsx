@@ -26,7 +26,7 @@ export function DonutChart({ segments, centerLabel, centerValue, size = 200, thi
                   fill="none" stroke={seg.color} strokeWidth={thickness}
                   strokeDasharray={`${len} ${circ - len}`}
                   strokeDashoffset={-offset}
-                  className="transition-all duration-500"
+                  className="transition-[width,stroke-dasharray,stroke-dashoffset] duration-500"
                 />
               );
               offset += len;
