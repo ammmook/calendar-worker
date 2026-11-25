@@ -9,6 +9,8 @@ import { LEAVE_META } from './leaveMeta';
 import { fmt1, fmtB, dateKey, todayKey as todayKeyFn, yearOptions } from '../utils/format';
 import { forecastMonth, compareMonths, buildInsights } from '../utils/insights';
 import { buildStatement } from '../utils/exportReport';
+import SelectField from './SelectField';
+import SegmentedControl from './SegmentedControl';
 import GoalForecast from './GoalForecast';
 import MonthCompare from './MonthCompare';
 import ExportMenu from './ExportMenu';
@@ -101,44 +103,20 @@ export default function MonthlySummary({
       {/* ── Header: tabs (แทน title) + month nav ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         {/* Sub-tabs */}
-        <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1">
-          {tabs.map(({ id, Icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              aria-pressed={tab === id}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition
-                ${tab === id
-                  ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                  : 'text-muted hover:text-ink-2'}`}
-            >
-              <Icon size={14} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl items={tabs} value={tab} onChange={setTab} />
 
         {/* Month nav + Today */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Mobile month/year selects */}
           <div className="flex sm:hidden items-center gap-2">
-            <div className="relative">
-              <select value={viewM} aria-label={t.month_label} onChange={(e) => setViewM(Number(e.target.value))}
-                className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 hover:border-primary">
+            <SelectField value={viewM} label={t.month_label} onChange={(e) => setViewM(Number(e.target.value))}>
                 {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
-            </div>
-            <div className="relative">
-              <select value={viewY} aria-label={t.year_label} onChange={(e) => { setViewY(Number(e.target.value)); showToast(t.loading_data); }}
-                className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 hover:border-primary">
+              </SelectField>
+            <SelectField value={viewY} label={t.year_label} onChange={(e) => { setViewY(Number(e.target.value)); showToast(t.loading_data); }}>
                 {yearOptions(today, viewY).map((y) => (
                   <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
                 ))}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
-            </div>
+              </SelectField>
           </div>
 
           <div className="flex items-center gap-1.5 bg-white border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">

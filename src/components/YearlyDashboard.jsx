@@ -5,6 +5,7 @@ import {
     CalendarDays, ChevronLeft, ChevronRight, Info,
     ArrowUpRight, Award, Moon, List, PieChart, LayoutGrid,
 } from 'lucide-react';
+import SegmentedControl from './SegmentedControl';
 import { getLang } from '../locales';
 import { DonutChart, LegendRow } from './charts';
 import { fmt1, fmtB, yearOptions } from '../utils/format';
@@ -337,23 +338,7 @@ export default function YearlyDashboard({
             {/* ── Page header: tabs (แทน title) + year picker ── */}
             <div className="flex items-center justify-between flex-wrap gap-3">
                 {/* Sub-tabs */}
-                <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1">
-                    {tabs.map(({ id, Icon, label }) => (
-                        <button
-                            key={id}
-                            type="button"
-                            onClick={() => setTab(id)}
-                            aria-pressed={tab === id}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-[9px] text-[12px] font-semibold cursor-pointer transition
-                                ${tab === id
-                                    ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                                    : 'text-muted hover:text-ink-2'}`}
-                        >
-                            <Icon size={14} />
-                            <span>{label}</span>
-                        </button>
-                    ))}
-                </div>
+                <SegmentedControl items={tabs} value={tab} onChange={setTab} />
 
                 {/* Year picker */}
                 <div className="flex items-center gap-2 bg-white border border-line rounded-xl px-1 py-1 shadow-[0_1px_3px_rgba(17,24,39,0.06)]">

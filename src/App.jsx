@@ -10,7 +10,9 @@ import {
   Stethoscope, UmbrellaOff, AlertCircle, Loader2,
   Moon, GraduationCap,
 } from 'lucide-react';
-import Swal from 'sweetalert2';
+import useConfirm from './components/useConfirm';
+import SelectField from './components/SelectField';
+import SegmentedControl from './components/SegmentedControl';
 import YearlyDashboard from './components/YearlyDashboard';
 import WorkCalendar from './components/WorkCalendar';
 import MonthlySummary from './components/MonthlySummary';
@@ -98,7 +100,7 @@ export default function App() {
   const [view, setView] = useState('calendar'); // 'calendar' | 'dashboard'
   const [dashTab, setDashTab] = useState('monthly'); // แท็บย่อยใน dashboard: 'monthly' | 'yearly'
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showProfileIncomplete, setShowProfileIncomplete] = useState(false);
+  const [confirm, confirmDialog] = useConfirm();
   const [isSavingEntry, setIsSavingEntry] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isDeletingEntry, setIsDeletingEntry] = useState(false);
@@ -422,35 +424,18 @@ export default function App() {
     }
   };
 
-  const deleteSelectedEntry = () => {
+  const deleteSelectedEntry = async () => {
     if (!selectedKey || !entries[selectedKey]) return;
-    if (isDesktopViewport()) {
-      Swal.fire({
-        title: t.confirm_delete_title || 'Delete this entry?',
-        text: t.confirm_delete || 'Are you sure you want to delete this entry?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#EF4444',
-        cancelButtonColor: '#9CA3AF',
-        confirmButtonText: t.confirm_yes || 'Yes, delete it',
-        cancelButtonText: t.cancel || 'Cancel',
-        reverseButtons: true,
-        customClass: {
-          container: 'font-sans',
-          popup: 'rounded-2xl',
-          confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
-          cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
-          title: 'text-[18px] text-ink',
-          htmlContainer: 'text-[14px] text-muted'
-        }
-      }).then((result) => {
-        if (result.isConfirmed) {
-          performDelete();
-        }
-      });
-    } else {
-      setShowDeleteConfirm(true);
-    }
+    setShowDeleteConfirm(true); // ซ่อน modal วันบนมือถือระหว่างรอยืนยัน
+    const ok = await confirm({
+      tone: 'danger',
+      title: t.confirm_delete_title || 'Delete this entry?',
+      text: t.confirm_delete || 'Are you sure you want to delete this entry?',
+      confirmLabel: t.confirm_yes || 'Yes, delete it',
+      cancelLabel: t.cancel || 'Cancel',
+    });
+    setShowDeleteConfirm(false);
+    if (ok) performDelete();
   };
 
   // ── Leave Selector Handlers ──
@@ -463,31 +448,14 @@ export default function App() {
     if (!leaveData.leave) {
       // Check for profile completeness: salary and otRate must be configured
       if (!salary || !otRate) {
-        if (isMobile) {
-          setShowProfileIncomplete(true);
-          setSelectedKey(null);
-        } else {
-          Swal.fire({
-            title: t.profile_incomplete_title || 'Profile Incomplete',
-            text: t.profile_incomplete_msg || 'Please complete your salary and OT rate in the profile page first.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3B4FE4',
-            cancelButtonColor: '#9CA3AF',
-            confirmButtonText: t.go_to_profile || 'Go to Profile',
-            cancelButtonText: t.cancel || 'Cancel',
-            customClass: {
-              container: 'font-sans',
-              popup: 'rounded-2xl',
-              confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
-              cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
-            }
-          }).then((result) => {
-            if (result.isConfirmed) {
-              setPage('profile');
-            }
-          });
-        }
+        if (isMobile) setSelectedKey(null);
+        confirm({
+          tone: 'warning',
+          title: t.profile_incomplete_title || 'Profile Incomplete',
+          text: t.profile_incomplete_msg || 'Please complete your salary and OT rate in the profile page first.',
+          confirmLabel: t.go_to_profile || 'Go to Profile',
+          cancelLabel: t.cancel || 'Cancel',
+        }).then((ok) => { if (ok) setPage('profile'); });
         return;
       }
 
@@ -673,34 +641,24 @@ export default function App() {
         <div className="hidden sm:flex items-center gap-2">
           <span className="text-xs font-semibold text-muted mr-1">{t.period}</span>
 
-          <div className="relative">
-            <select
+          <SelectField
               value={viewM}
-              aria-label={t.month_label}
-              onChange={(e) => setViewM(Number(e.target.value))}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
-            >
+              label={t.month_label}
+              onChange={(e) => setViewM(Number(e.target.value))}>
               {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
-          </div>
+            </SelectField>
 
-          <div className="relative">
-            <select
+          <SelectField
               value={viewY}
-              aria-label={t.year_label}
+              label={t.year_label}
               onChange={(e) => {
                 setViewY(Number(e.target.value));
                 showToast(t.loading_data);
-              }}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-ink text-[13px] font-medium pl-3 pr-7 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 shadow-[0_1px_3px_rgba(17,24,39,0.06)] transition hover:border-primary hover:shadow-[0_0_0_3px_#EEF0FD] focus:border-primary focus:shadow-[0_0_0_3px_#EEF0FD]"
-            >
+              }}>
               {yearOptions(today, viewY).map((y) => (
                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
               ))}
-            </select>
-            <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
-          </div>
+            </SelectField>
 
           <button
             onClick={goToday}
@@ -711,27 +669,15 @@ export default function App() {
         </div>
 
         {/* Tab toggle (always visible) — Work Calendar | Dashboard */}
-        <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[10px] p-1">
-          {[
+        <SegmentedControl
+          collapseLabel
+          value={view}
+          onChange={setView}
+          items={[
             { id: 'calendar', Icon: CalendarDays, label: t.work_calendar },
             { id: 'dashboard', Icon: LayoutDashboard, label: t.dashboard },
-          ].map(({ id, Icon, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setView(id)}
-              aria-label={label}
-              aria-pressed={view === id}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-[7px] text-[12px] font-semibold cursor-pointer transition
-                ${view === id
-                  ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                  : 'text-muted hover:text-ink-2'}`}
-            >
-              <Icon size={13} />
-              <span className="hidden sm:inline">{label}</span>
-            </button>
-          ))}
-        </div>
+          ]}
+        />
 
         {/* Language Toggle & User Menu */}
         <div className="flex items-center gap-2">
@@ -833,7 +779,7 @@ export default function App() {
               dNote={dNote} setDNote={setDNote}
               saveSelectedEntry={saveSelectedEntry} deleteSelectedEntry={deleteSelectedEntry}
               isSavingEntry={isSavingEntry} isDeletingEntry={isDeletingEntry}
-              showLeaveSelector={showLeaveSelector} showDeleteConfirm={showDeleteConfirm}
+              showLeaveSelector={showLeaveSelector} showDeleteConfirm={showDeleteConfirm} confirm={confirm}
               selEntry={selEntry} selLabel={selLabel}
               isTodaySelected={isTodaySelected} isSelectedHoliday={isSelectedHoliday}
               previewCalc={previewCalc}
@@ -851,26 +797,15 @@ export default function App() {
             <div className="flex flex-col gap-6 w-full">
 
               {/* Sub-tab toggle (mobile-first: เต็มความกว้างบนมือถือ) */}
-              <div className="flex items-center gap-1 bg-surface-alt border border-line rounded-[12px] p-1 w-full sm:w-auto sm:self-start">
-                {[
+              <SegmentedControl
+                fill
+                value={dashTab}
+                onChange={setDashTab}
+                items={[
                   { id: 'monthly', Icon: LayoutDashboard, label: t.monthly },
                   { id: 'yearly', Icon: BarChart2, label: t.annual },
-                ].map(({ id, Icon, label }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setDashTab(id)}
-                    aria-pressed={dashTab === id}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-[9px] text-[13px] font-semibold cursor-pointer transition
-                      ${dashTab === id
-                        ? 'bg-white text-primary shadow-[0_1px_3px_rgba(17,24,39,0.08)]'
-                        : 'text-muted hover:text-ink-2'}`}
-                  >
-                    <Icon size={14} />
-                    {label}
-                  </button>
-                ))}
-              </div>
+                ]}
+              />
 
               {/* รายเดือน */}
               {dashTab === 'monthly' && !dataLoaded && (
@@ -927,50 +862,6 @@ export default function App() {
         </main>
       </div>
 
-      {/* Mobile Delete Confirmation Bottom Sheet */}
-      {showDeleteConfirm && (
-        <div 
-          className="xl:hidden fixed inset-0 z-[250] bg-black/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
-          <div 
-            className="bg-white w-full rounded-t-[24px] shadow-xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 bg-line rounded-full"></div>
-            </div>
-
-            <div className="flex flex-col items-center justify-center p-6 pb-10 gap-4">
-              <div className="w-14 h-14 bg-[#FEF2F2] rounded-full flex items-center justify-center mb-1 text-danger">
-                <Trash2 size={24} />
-              </div>
-              <h3 className="text-[17px] font-bold text-ink text-center leading-tight">{t.confirm_delete_title || 'Delete this entry?'}</h3>
-              <p className="text-[14px] text-muted text-center mb-2 px-2 leading-relaxed">{t.confirm_delete || 'Are you sure you want to delete this entry?'}</p>
-              
-              <div className="flex w-full gap-3 mt-2">
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 py-3.5 rounded-[12px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition cursor-pointer hover:bg-line"
-                >
-                  {t.cancel || 'Cancel'}
-                </button>
-                <button
-                  onClick={() => {
-                    performDelete();
-                    setShowDeleteConfirm(false);
-                  }}
-                  className="flex-1 py-3.5 rounded-[12px] bg-danger text-white text-[15px] font-bold border-none transition cursor-pointer hover:bg-[#DC2828] shadow-[0_4px_14px_rgba(239,68,68,0.25)]"
-                >
-                  {t.confirm_yes || 'Yes, delete it'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <LeaveSelector
         isOpen={showLeaveSelector}
         dateStr={leaveSelectorKey}
@@ -984,52 +875,7 @@ export default function App() {
         lang={lang}
       />
 
-      {/* Mobile Profile Incomplete Warning Bottom Sheet */}
-      {showProfileIncomplete && (
-        <div 
-          className="xl:hidden fixed inset-0 z-[250] bg-black/40 flex items-end justify-center animate-[fadeIn_0.2s_ease_both]"
-          onClick={() => setShowProfileIncomplete(false)}
-        >
-          <div 
-            className="bg-white w-full rounded-t-[24px] shadow-xl flex flex-col overflow-hidden animate-[slideUpSheet_0.3s_cubic-bezier(0.16,1,0.3,1)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 bg-line rounded-full"></div>
-            </div>
-
-            <div className="flex flex-col items-center justify-center p-6 pb-10 gap-4">
-              <div className="w-16 h-16 bg-[#FFFBEB] rounded-full flex items-center justify-center mb-1 text-[#F59E0B]">
-                <AlertCircle size={32} />
-              </div>
-              <div className="text-center space-y-1 px-4">
-                <h3 className="text-[18px] font-bold text-ink leading-tight">{t.profile_incomplete_title}</h3>
-                <p className="text-[14px] text-muted leading-relaxed">{t.profile_incomplete_msg}</p>
-              </div>
-              
-              <div className="flex w-full gap-3 mt-2">
-                <button
-                  onClick={() => setShowProfileIncomplete(false)}
-                  className="flex-1 py-3.5 rounded-[14px] bg-surface-alt text-muted text-[15px] font-bold border border-line transition cursor-pointer hover:bg-line"
-                >
-                  {t.cancel || 'Cancel'}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowProfileIncomplete(false);
-                    setPage('profile');
-                  }}
-                  className="flex-1 py-3.5 rounded-[14px] bg-primary text-white text-[15px] font-bold border-none transition cursor-pointer hover:bg-primary-dark shadow-[0_4px_14px_rgba(59,79,228,0.25)]"
-                >
-                  {t.go_to_profile}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {confirmDialog}
 
       {/* Toast */}
       <div role="status" aria-live="polite" className={`fixed bottom-6 right-6 bg-ink text-white text-[13px] font-medium px-4 py-3 rounded-[10px] z-[300] shadow-[0_8px_28px_rgba(17,24,39,0.1)] flex items-center gap-2 pointer-events-none transition duration-300

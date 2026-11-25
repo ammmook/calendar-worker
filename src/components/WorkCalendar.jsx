@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import Swal from 'sweetalert2';
 import { ChevronLeft, ChevronRight, X, CalendarCheck, CalendarDays } from 'lucide-react';
+import SelectField from './SelectField';
 import DayDetailForm from './DayDetailForm';
 import DayCell from './DayCell';
 import { dateKey, todayKey as todayKeyFn, yearOptions } from '../utils/format';
@@ -18,7 +18,7 @@ export default function WorkCalendar({
   dIn, dOut, setDIn, setDOut, dNote, setDNote,
   saveSelectedEntry, deleteSelectedEntry,
   isSavingEntry, isDeletingEntry,
-  showLeaveSelector, showDeleteConfirm,
+  showLeaveSelector, showDeleteConfirm, confirm,
   selEntry, selLabel, isTodaySelected, isSelectedHoliday,
   previewCalc, detHReg, netDetOT, detE, detOTRateEarn, detShift,
   detOT15h, detOT15e, detOT1h, detOT1e, detOT3h, detOT3e,
@@ -48,23 +48,14 @@ export default function WorkCalendar({
   const isDirty = !!selectedKey && (dIn !== (selEntry.in || '') || dOut !== (selEntry.out || '') || dNote.trim() !== (selEntry.note || ''));
   const closeModal = async () => {
     if (isDirty) {
-      const res = await Swal.fire({
+      const ok = await confirm({
+        tone: 'warning',
         title: t.discard_title,
         text: t.discard_text,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3B4FE4',
-        cancelButtonColor: '#9CA3AF',
-        confirmButtonText: t.discard_yes,
-        cancelButtonText: t.keep_editing,
-        customClass: {
-          container: 'font-sans',
-          popup: 'rounded-2xl',
-          confirmButton: 'rounded-[10px] font-bold px-6 py-2.5',
-          cancelButton: 'rounded-[10px] font-bold px-6 py-2.5',
-        },
+        confirmLabel: t.discard_yes,
+        cancelLabel: t.keep_editing,
       });
-      if (!res.isConfirmed) return;
+      if (!ok) return;
     }
     setSelectedKey(null);
   };
@@ -81,6 +72,7 @@ export default function WorkCalendar({
     closeBtnRef.current?.focus();
     const onKey = (e) => {
       if (isDesktopViewport()) return; // desktop ไม่มี modal
+      if (document.querySelector('[data-confirm-dialog]')) return; // กล่องยืนยันจัดการคีย์บอร์ดเอง
       if (e.key === 'Escape') { closeModalRef.current?.(); return; }
       if (e.key !== 'Tab') return;
       // focus trap: วน Tab อยู่ภายใน dialog ไม่หลุดไปปฏิทินด้านหลัง
@@ -116,25 +108,17 @@ export default function WorkCalendar({
 
         {/* Mobile filters + Today */}
         <div className="flex sm:hidden items-center gap-2 flex-wrap">
-          <div className="relative">
-            <select value={viewM} onChange={(e) => setViewM(Number(e.target.value))} aria-label={t.month_label}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 hover:border-primary">
+          <SelectField value={viewM} onChange={(e) => setViewM(Number(e.target.value))} label={t.month_label}>
               {t.months.map((mn, i) => <option key={i} value={i}>{mn}</option>)}
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
-          </div>
-          <div className="relative">
-            <select value={viewY} aria-label={t.year_label} onChange={(e) => {
+            </SelectField>
+          <SelectField value={viewY} label={t.year_label} onChange={(e) => {
                 setViewY(Number(e.target.value));
                 showToast(t.loading_data);
-            }}
-              className="appearance-none bg-white border-[1.5px] border-line-strong rounded-[10px] text-[13px] font-medium pl-3 pr-6 py-[7px] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary/25 hover:border-primary">
+            }}>
               {yearOptions(today, viewY).map((y) => (
                 <option key={y} value={y}>{lang === 'th' ? y + 543 : y}</option>
               ))}
-            </select>
-            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted text-[10px]">▾</span>
-          </div>
+            </SelectField>
         </div>
       </div>
 
